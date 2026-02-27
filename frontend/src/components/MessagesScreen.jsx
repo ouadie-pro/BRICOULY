@@ -12,7 +12,8 @@ export default function MessagesScreen({ isDesktop }) {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [mediaPreview, setMediaPreview] = useState(null);
-  const mediaInputRef = useRef(null);
+  const imageInputRef = useRef(null);
+  const videoInputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const recordingTimerRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -61,31 +62,39 @@ export default function MessagesScreen({ isDesktop }) {
     if (!newMessage.trim() && !mediaPreview) return;
 
     if (mediaPreview) {
-      const uploadResult = await api.uploadMedia(mediaPreview.file);
-      if (uploadResult.success) {
-        const type = mediaPreview.type.startsWith('video') ? 'video' : 
-                     mediaPreview.type.startsWith('audio') ? 'voice' : 'image';
-        const sent = await api.sendMediaMessage(
-          providerId, 
-          uploadResult.filePath, 
-          type, 
-          newMessage
-        );
-        if (sent) {
-          setMessages([...messages, { ...sent.message, senderId: currentUser.id, receiverId: parseInt(providerId) }]);
+      try {
+        const uploadResult = await api.uploadMedia(mediaPreview.file);
+        console.log('Upload result:', uploadResult);
+        if (uploadResult.success) {
+          const type = mediaPreview.type.startsWith('video') ? 'video' : 
+                       mediaPreview.type.startsWith('audio') ? 'voice' : 'image';
+          const sent = await api.sendMediaMessage(
+            providerId, 
+            uploadResult.filePath, 
+            type, 
+            newMessage
+          );
+          console.log('Sent message:', sent);
+          if (sent) {
+            setMessages([...messages, { ...sent, senderId: currentUser.id, receiverId: parseInt(providerId), type, mediaUrl: uploadResult.filePath }]);
+          }
+        } else {
+          console.error('Upload failed:', uploadResult.error);
         }
+      } catch (err) {
+        console.error('Error sending media:', err);
       }
       setMediaPreview(null);
     } else {
       const sent = await api.sendMessage(providerId, newMessage);
       if (sent) {
-        setMessages([...messages, { ...sent.message, senderId: currentUser.id, receiverId: parseInt(providerId) }]);
+        setMessages([...messages, { ...sent, senderId: currentUser.id, receiverId: parseInt(providerId) }]);
       }
     }
     setNewMessage('');
   };
 
-  const handleMediaSelect = (e) => {
+  const handleMediaSelect = (e, type) => {
     const file = e.target.files[0];
     if (file) {
       const previewUrl = URL.createObjectURL(file);
@@ -96,6 +105,7 @@ export default function MessagesScreen({ isDesktop }) {
       });
       setShowMediaPicker(false);
     }
+    e.target.value = '';
   };
 
   const startRecording = async () => {
@@ -326,13 +336,13 @@ export default function MessagesScreen({ isDesktop }) {
             <div className="absolute bottom-20 left-4 bg-white dark:bg-slate-800 rounded-lg shadow-lg p-2 flex gap-2">
               <input
                 type="file"
-                ref={mediaInputRef}
-                onChange={handleMediaSelect}
-                accept="image/*,video/*"
+                ref={imageInputRef}
+                onChange={(e) => handleMediaSelect(e, 'image')}
+                accept="image/*"
                 className="hidden"
               />
               <button
-                onClick={() => mediaInputRef.current?.click()}
+                onClick={() => imageInputRef.current?.click()}
                 className="flex flex-col items-center p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
               >
                 <span className="material-symbols-outlined text-primary">image</span>
@@ -340,13 +350,13 @@ export default function MessagesScreen({ isDesktop }) {
               </button>
               <input
                 type="file"
-                ref={mediaInputRef}
-                onChange={handleMediaSelect}
+                ref={videoInputRef}
+                onChange={(e) => handleMediaSelect(e, 'video')}
                 accept="video/*"
                 className="hidden"
               />
               <button
-                onClick={() => mediaInputRef.current?.click()}
+                onClick={() => videoInputRef.current?.click()}
                 className="flex flex-col items-center p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
               >
                 <span className="material-symbols-outlined text-purple-500">videocam</span>
@@ -406,10 +416,18 @@ export default function MessagesScreen({ isDesktop }) {
             <header className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <div
-                    className="w-12 h-12 rounded-full bg-cover bg-center border border-slate-200"
-                    style={{ backgroundImage: provider?.avatar ? `url("${provider.avatar}")` : undefined }}
-                  />
+                  {provider?.avatar ? (
+                    <div
+                      className="w-12 h-12 rounded-full bg-cover bg-center border border-slate-200"
+                      style={{ backgroundImage: `url("${provider.avatar}")` }}
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-slate-300 border border-slate-200 flex items-center justify-center">
+                      <span className="text-sm font-bold text-slate-500">
+                        {provider?.name ? provider.name.charAt(0).toUpperCase() : '?'}
+                      </span>
+                    </div>
+                  )}
                   <div className="absolute bottom-0 right-0 size-3 bg-green-500 rounded-full border-2 border-white"></div>
                 </div>
                 <div className="flex flex-col">
@@ -434,11 +452,20 @@ export default function MessagesScreen({ isDesktop }) {
                   className={`flex items-end gap-3 ${(msg.senderId === currentUser.id || msg.sender === currentUser.id) ? 'flex-row-reverse' : ''}`}
                 >
                   {(msg.senderId !== currentUser.id && msg.sender !== currentUser.id) && (
-                    <div
-                      className="w-8 h-8 rounded-full bg-cover bg-center shrink-0"
-                      style={{ backgroundImage: provider?.avatar ? `url("${provider.avatar}")` : undefined }}
-                    />
+                    provider?.avatar ? (
+                      <div
+                        className="w-8 h-8 rounded-full bg-cover bg-center shrink-0"
+                        style={{ backgroundImage: `url("${provider.avatar}")` }}
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-slate-300 shrink-0 flex items-center justify-center">
+                        <span className="text-xs font-bold text-slate-500">
+                          {provider?.name ? provider.name.charAt(0).toUpperCase() : '?'}
+                        </span>
+                      </div>
+                    )
                   )}
+        
                   <div className={`flex flex-col gap-1 max-w-[60%] ${(msg.senderId === currentUser.id || msg.sender === currentUser.id) ? 'items-end' : 'items-start'}`}>
                     <div className={`px-4 py-3 rounded-2xl text-[15px] ${
                       (msg.senderId === currentUser.id || msg.sender === currentUser.id)

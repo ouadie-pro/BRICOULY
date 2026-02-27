@@ -12,6 +12,29 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Multer setup for file uploads
+const multer = require('multer');
+const fs = require('fs');
+
+if (!fs.existsSync(path.join(__dirname, 'uploads'))) {
+  fs.mkdirSync(path.join(__dirname, 'uploads'));
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, 'uploads'));
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 },
+});
+
 // Professions/Categories
 const professions = [
   { id: 1, name: 'Plumber', icon: 'plumbing', color: '#3b82f6' },
@@ -35,7 +58,7 @@ const users = [
     name: 'Alex Johnson',
     email: 'alex@example.com',
     password: 'password123',
-    avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBUJIOG9G-58r7EKqhdutYCCf6PGxFa9J3i_xjisTVTzBs1VdEp463KDXWOgCnuPF47kVClvUTuWFkqbpsE_Nf4cdPqmcfsyoHArd_-Ge39dTlJn5kFuphsIjdewe7vh48txl9W5n923xjPEK3Bbokn1UY1kAPqKgGjpQrO4imJ3Oi0sjIBF_RRyZh4kiq6ouOczH9Hpxo4VZqPZ7P1qEOjhUVImlJZU5oYeXp1LyJ_uzs-p64sMrvMT75QRRcVQavaw-EEWpr8BeU',
+    avatar: null,
     role: 'client',
     phone: '+1 234 567 8900',
     address: '123 Main St, New York, NY',
@@ -46,7 +69,7 @@ const users = [
     name: 'John Doe',
     email: 'john@example.com',
     password: 'password123',
-    avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBbEun0wuS1a1YIMlnQrJqPXhtDY5uCMHrrw3MjQWIIACEi0UX9t7iRsPdf5Odg8v7QBZveVJbdvrbJ_c7ZfMd7TIe67prcE7z1Az3flEXT0WGbFhv43-euJEF9yp3vUdFrLRrHsQGbLmhABa-1PlqahwDCKoRSihEhtwZb8iYY4x7uDmLe3K3LDhFCrfUTc037DzxY58seS9Mmq5lBConLMW3ZUcRdhkIvjw5oCQ3sIujLtACmitspcgj-aydmpTdLoyTOAnaxoeU',
+    avatar: null,
     role: 'provider',
     professionId: 1,
     profession: 'Plumber',
@@ -65,7 +88,7 @@ const users = [
     name: 'Sarah Smith',
     email: 'sarah@example.com',
     password: 'password123',
-    avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDi8rWEn7JXFV1f3EdsW2Pr0thlOAcF4XIDFVpC73pBTA6Ca9WCyTrk-cQgzQONQA9o2RtsPskzNi8_dxWGun48iizf9OPVS-igo1Iffvwd7W-PW1A5Uug7-ksoIs-5J30lQNjePqLmkpwd0bdIR0hbgQP_SIvOKM5b1UcD5BSTq_4li3OyQucgwFd2Vd6QxikSSlrVgiWE9KXgzay29BhV12eqJFCPjYdKvDAh4NqC6-TZnZYQurIXMF7EcvBya-1h7xqcKeQVdwg',
+    avatar: null,
     role: 'provider',
     professionId: 2,
     profession: 'Electrician',
@@ -84,7 +107,7 @@ const users = [
     name: 'Mike Ross',
     email: 'mike@example.com',
     password: 'password123',
-    avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCwkp8PI6A9jJBhEUpeV6k27tsdfD_U3wq_mX4iy-oLZMV70YuAV894jSkTvJqGA7cl7hMjPVnHS1cQUtcf4LHnw5RQ2rHzJbw7Ck7j1IY4kiphLiiFaPOjndNhTk7_hUsSoBVW6F4Y3Trb1kbrXTHl7n62yBXeHdiub56O5qp-PelWT2JosDBrvkbWcNTyiqrl6bI8Ct4Sr1NRIH5fhODEnBrJ4E2xx7O0tMCxZEMKV3lrngXsmB-ISc6bDsCMTc02h63qi0HoMRA',
+    avatar: null,
     role: 'provider',
     professionId: 3,
     profession: 'Painter',
@@ -256,6 +279,7 @@ const reviews = [
 
 // Follows
 const follows = [];
+const followRequests = [];
 
 // Messages
 const messages = [
@@ -331,7 +355,7 @@ app.post('/api/auth/signup', (req, res) => {
     email,
     password,
     role: role || 'client',
-    avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBUJIOG9G-58r7EKqhdutYCCf6PGxFa9J3i_xjisTVTzBs1VdEp463KDXWOgCnuPF47kVClvUTuWFkqbpsE_Nf4cdPqmcfsyoHArd_-Ge39dTlJn5kFuphsIjdewe7vh48txl9W5n923xjPEK3Bbokn1UY1kAPqKgGjpQrO4imJ3Oi0sjIBF_RRyZh4kiq6ouOczH9Hpxo4VZqPZ7P1qEOjhUVImlJZU5oYeXp1LyJ_uzs-p64sMrvMT75QRRcVQavaw-EEWpr8BeU',
+    avatar: null,
     phone: phone || '',
     address: '',
     professionId: professionId ? parseInt(professionId) : null,
@@ -376,17 +400,46 @@ app.get('/api/auth/me', (req, res) => {
 
 app.put('/api/users/profile', (req, res) => {
   const userId = parseInt(req.headers['x-user-id']);
+  console.log('Profile update - userId:', userId, 'updates:', req.body);
+  
   const updates = req.body;
   
   const userIndex = users.findIndex(u => u.id === userId);
   if (userIndex === -1) {
+    console.log('User not found');
     res.status(404).json({ error: 'User not found' });
     return;
   }
   
   users[userIndex] = { ...users[userIndex], ...updates };
+  console.log('Updated user:', users[userIndex]);
   const { password: _, ...userWithoutPassword } = users[userIndex];
   res.json({ success: true, user: userWithoutPassword });
+});
+
+app.post('/api/users/avatar', upload.single('file'), (req, res) => {
+  const userId = parseInt(req.headers['x-user-id']);
+  console.log('Avatar upload - userId:', userId, 'type:', typeof userId);
+  
+  if (!req.file) {
+    return res.status(400).json({ success: false, error: 'No file uploaded' });
+  }
+  
+  console.log('Uploaded file:', req.file);
+  console.log('Users array:', users.map(u => ({ id: u.id, name: u.name })));
+  
+  const userIndex = users.findIndex(u => u.id === userId);
+  console.log('User index:', userIndex);
+  
+  if (userIndex === -1) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+  
+  const avatarUrl = `/uploads/${req.file.filename}`;
+  users[userIndex].avatar = avatarUrl;
+  console.log('Updated user avatar:', users[userIndex].avatar);
+  
+  res.json({ success: true, filePath: avatarUrl });
 });
 
 // ============ PROFESSIONS ROUTES ============
@@ -656,19 +709,96 @@ app.post('/api/follow/:providerId', (req, res) => {
   const providerId = parseInt(req.params.providerId);
   
   const existingFollow = follows.find(f => f.userId === userId && f.providerId === providerId);
+  const existingRequest = followRequests.find(r => r.fromUserId === userId && r.toUserId === providerId && r.status === 'pending');
   
   if (existingFollow) {
     // Unfollow
     const index = follows.indexOf(existingFollow);
     follows.splice(index, 1);
     res.json({ success: true, following: false });
+  } else if (existingRequest) {
+    // Cancel request
+    const reqIndex = followRequests.indexOf(existingRequest);
+    followRequests.splice(reqIndex, 1);
+    res.json({ success: true, following: false, message: 'Request cancelled' });
   } else {
-    // Follow
-    follows.push({ userId, providerId, createdAt: new Date().toISOString() });
-    res.json({ success: true, following: true });
+    // Send follow request (don't follow immediately)
+    const fromUser = users.find(u => u.id === userId);
+    
+    followRequests.push({
+      id: followRequests.length + 1,
+      fromUserId: userId,
+      fromUserName: fromUser?.name || 'Someone',
+      toUserId: providerId,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    });
+    
+    // Send notification to the provider/client
+    notifications.push({
+      id: notifications.length + 1,
+      userId: providerId,
+      type: 'follow_request',
+      title: 'New Follow Request',
+      text: `${fromUser?.name || 'Someone'} wants to follow you`,
+      read: false,
+      createdAt: new Date().toISOString(),
+    });
+    
+    res.json({ success: true, following: false, message: 'Follow request sent' });
   }
 });
 
+// Accept or decline follow request
+app.post('/api/follow/respond', (req, res) => {
+  const userId = parseInt(req.headers['x-user-id']);
+  const { requestId, action } = req.body; // action: 'accept' or 'decline'
+  
+  const request = followRequests.find(r => r.id === parseInt(requestId) && r.toUserId === userId);
+  
+  if (!request) {
+    return res.status(404).json({ success: false, error: 'Request not found' });
+  }
+  
+  if (action === 'accept') {
+    // Add to follows
+    follows.push({
+      userId: request.fromUserId,
+      providerId: request.toUserId,
+      createdAt: new Date().toISOString(),
+    });
+    
+    // Update request status
+    request.status = 'accepted';
+    
+    // Notify the request sender
+    const fromUser = users.find(u => u.id === request.fromUserId);
+    notifications.push({
+      id: notifications.length + 1,
+      userId: request.fromUserId,
+      type: 'follow_accepted',
+      title: 'Follow Request Accepted',
+      text: 'accepted your follow request',
+      read: false,
+      createdAt: new Date().toISOString(),
+    });
+    
+    res.json({ success: true, following: true });
+  } else {
+    // Decline
+    request.status = 'declined';
+    res.json({ success: true, following: false });
+  }
+});
+
+// Get pending follow requests for current user
+app.get('/api/follow/requests', (req, res) => {
+  const userId = parseInt(req.headers['x-user-id']);
+  const pendingRequests = followRequests.filter(r => r.toUserId === userId && r.status === 'pending');
+  res.json(pendingRequests);
+});
+
+// Get accepted followers
 app.get('/api/following', (req, res) => {
   const userId = parseInt(req.headers['x-user-id']);
   const following = follows.filter(f => f.userId === userId).map(f => f.providerId);
@@ -827,14 +957,16 @@ app.get('/api/messages/:userId', (req, res) => {
 
 app.post('/api/messages', (req, res) => {
   const senderId = parseInt(req.headers['x-user-id']);
-  const { receiverId, text } = req.body;
+  const { receiverId, text, mediaUrl, type } = req.body;
   const receiverIdInt = parseInt(receiverId);
   
   const newMessage = {
     id: messages.length + 1,
     senderId,
     receiverId: receiverIdInt,
-    text,
+    text: text || '',
+    mediaUrl: mediaUrl || null,
+    type: type || 'text',
     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     read: false,
     createdAt: new Date().toISOString(),
@@ -843,17 +975,32 @@ app.post('/api/messages', (req, res) => {
   messages.push(newMessage);
   
   // Send notification
+  const notificationText = mediaUrl 
+    ? `${type}: ${mediaUrl}` 
+    : (text || 'New message');
   notifications.push({
     id: notifications.length + 1,
     userId: receiverIdInt,
     type: 'message',
     title: 'New Message',
-    text: text.substring(0, 50),
+    text: notificationText.substring(0, 50),
     read: false,
     createdAt: new Date().toISOString(),
   });
   
   res.json(newMessage);
+});
+
+// Upload media endpoint
+app.post('/api/messages/media', upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, error: 'No file uploaded' });
+  }
+  res.json({
+    success: true,
+    filePath: `/uploads/${req.file.filename}`,
+    filename: req.file.filename,
+  });
 });
 
 // ============ NOTIFICATIONS ROUTES ============

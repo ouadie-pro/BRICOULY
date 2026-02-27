@@ -44,6 +44,21 @@ export const api = {
     return res.json();
   },
 
+  uploadAvatar: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const userId = getUserId();
+    console.log('Uploading avatar, userId:', userId);
+    const res = await fetch(`${API_BASE}/users/avatar`, {
+      method: 'POST',
+      headers: { 'x-user-id': userId },
+      body: formData,
+    });
+    const result = await res.json();
+    console.log('Upload response:', result);
+    return result;
+  },
+
   // Professions
   getProfessions: async () => {
     const res = await fetch(`${API_BASE}/professions`);
@@ -223,6 +238,25 @@ export const api = {
     return res.json();
   },
 
+  respondToFollowRequest: async (requestId, action) => {
+    const res = await fetch(`${API_BASE}/follow/respond`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-user-id': getUserId(),
+      },
+      body: JSON.stringify({ requestId, action }),
+    });
+    return res.json();
+  },
+
+  getFollowRequests: async () => {
+    const res = await fetch(`${API_BASE}/follow/requests`, {
+      headers: { 'x-user-id': getUserId() },
+    });
+    return res.json();
+  },
+
   getFollowing: async () => {
     const res = await fetch(`${API_BASE}/following`, {
       headers: { 'x-user-id': getUserId() },
@@ -265,10 +299,13 @@ export const api = {
       headers: { 'x-user-id': getUserId() },
       body: formData,
     });
-    return res.json();
+    const result = await res.json();
+    console.log('Upload response:', result);
+    return result;
   },
 
   sendMediaMessage: async (receiverId, mediaUrl, type, text = '') => {
+    console.log('Sending media message:', { receiverId, mediaUrl, type, text });
     const res = await fetch(`${API_BASE}/messages`, {
       method: 'POST',
       headers: { 
@@ -277,7 +314,9 @@ export const api = {
       },
       body: JSON.stringify({ receiverId, text, mediaUrl, type }),
     });
-    return res.json();
+    const result = await res.json();
+    console.log('Send message response:', result);
+    return result;
   },
 
   // Notifications

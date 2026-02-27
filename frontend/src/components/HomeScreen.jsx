@@ -69,7 +69,15 @@ export default function HomeScreen({ isDesktop }) {
               <div
                 className="bg-center bg-no-repeat bg-cover rounded-full size-12 border-2 border-white dark:border-slate-700 shadow-sm"
                 style={{ backgroundImage: user?.avatar ? `url("${user.avatar}")` : undefined }}
-              />
+              >
+                {!user?.avatar && (
+                  <div className="w-full h-full rounded-full bg-slate-300 flex items-center justify-center">
+                    <span className="text-sm font-bold text-slate-500">
+                      {user?.name ? user.name.charAt(0).toUpperCase() : '?'}
+                    </span>
+                  </div>
+                )}
+              </div>
               <div className="flex flex-col">
                 <span className="text-slate-500 dark:text-slate-400 text-xs font-medium">Good Morning 👋</span>
                 <h2 className="text-slate-900 dark:text-white text-lg font-bold leading-tight">{user?.name || 'Guest'}</h2>
@@ -192,8 +200,16 @@ export default function HomeScreen({ isDesktop }) {
                 >
                   <div
                     className="shrink-0 size-20 rounded-xl bg-center bg-cover bg-no-repeat"
-                    style={{ backgroundImage: `url("${provider.avatar}")` }}
-                  />
+                    style={{ backgroundImage: provider.avatar ? `url("${provider.avatar}")` : undefined }}
+                  >
+                    {!provider.avatar && (
+                      <div className="w-full h-full rounded-xl bg-slate-300 flex items-center justify-center">
+                        <span className="text-xl font-bold text-slate-500">
+                          {provider.name ? provider.name.charAt(0).toUpperCase() : '?'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                   <div className="flex flex-1 flex-col justify-between">
                     <div>
                       <div className="flex justify-between items-start">
@@ -341,8 +357,16 @@ export default function HomeScreen({ isDesktop }) {
             >
               <div
                 className="shrink-0 size-20 rounded-xl bg-center bg-cover bg-no-repeat"
-                style={{ backgroundImage: `url("${provider.avatar}")` }}
-              />
+                style={{ backgroundImage: provider.avatar ? `url("${provider.avatar}")` : undefined }}
+              >
+                {!provider.avatar && (
+                  <div className="w-full h-full rounded-xl bg-slate-300 flex items-center justify-center">
+                    <span className="text-xl font-bold text-slate-500">
+                      {provider.name ? provider.name.charAt(0).toUpperCase() : '?'}
+                    </span>
+                  </div>
+                )}
+              </div>
               <div className="flex flex-1 flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start">

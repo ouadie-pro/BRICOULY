@@ -10,6 +10,7 @@ import MessagesScreen from './components/MessagesScreen';
 import ReviewScreen from './components/ReviewScreen';
 import ProviderDashboard from './components/ProviderDashboard';
 import MyRequestsScreen from './components/MyRequestsScreen';
+import ProfileScreen from './components/ProfileScreen';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -26,6 +27,11 @@ function App() {
     localStorage.removeItem('user');
     setUser(null);
     navigate('/');
+  };
+
+  const handleUserUpdate = (updatedUser) => {
+    setUser(updatedUser);
+    localStorage.setItem('user', JSON.stringify(updatedUser));
   };
 
   const ProtectedRoute = ({ children }) => {
@@ -48,6 +54,7 @@ function App() {
       <Route path="/provider/:id" element={<ProtectedRoute><ProviderProfileScreen isDesktop /></ProtectedRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><ProviderDashboard isDesktop /></ProtectedRoute>} />
       <Route path="/requests" element={<ProtectedRoute><MyRequestsScreen isDesktop /></ProtectedRoute>} />
+      <Route path="/profile" element={<ProtectedRoute><ProfileScreen isDesktop onUserUpdate={handleUserUpdate} /></ProtectedRoute>} />
       <Route path="/messages/:providerId" element={<ProtectedRoute><MessagesScreen isDesktop /></ProtectedRoute>} />
       <Route path="/review/:providerId" element={<ProtectedRoute><ReviewScreen isDesktop /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />

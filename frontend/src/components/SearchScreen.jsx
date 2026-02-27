@@ -104,10 +104,18 @@ export default function SearchScreen({ isDesktop }) {
             <div key={provider.id} className="bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-slate-100 dark:border-slate-700/50 flex flex-col gap-3">
               <Link to={`/provider/${provider.id}`} className="flex items-start gap-4">
                 <div className="relative shrink-0">
-                  <div
-                    className="bg-center bg-no-repeat bg-cover rounded-lg size-[72px]"
-                    style={{ backgroundImage: `url("${provider.avatar}")` }}
-                  />
+                  {provider.avatar ? (
+                    <div
+                      className="bg-center bg-no-repeat bg-cover rounded-lg size-[72px]"
+                      style={{ backgroundImage: `url("${provider.avatar}")` }}
+                    />
+                  ) : (
+                    <div className="bg-slate-300 rounded-lg size-[72px] flex items-center justify-center">
+                      <span className="text-2xl font-bold text-slate-500">
+                        {provider.name ? provider.name.charAt(0).toUpperCase() : '?'}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-1 flex-col">
                   <div className="flex justify-between items-start">
@@ -225,10 +233,18 @@ export default function SearchScreen({ isDesktop }) {
           <div key={provider.id} className="bg-white rounded-xl p-5 shadow-sm border border-slate-200 hover:shadow-md hover:border-primary/30 transition-all flex flex-col gap-3">
             <Link to={`/provider/${provider.id}`} className="flex items-start gap-4">
               <div className="relative shrink-0">
-                <div
-                  className="bg-center bg-no-repeat bg-cover rounded-xl size-20"
-                  style={{ backgroundImage: `url("${provider.avatar}")` }}
-                />
+                {provider.avatar ? (
+                  <div
+                    className="bg-center bg-no-repeat bg-cover rounded-xl size-20"
+                    style={{ backgroundImage: `url("${provider.avatar}")` }}
+                  />
+                ) : (
+                  <div className="bg-slate-300 rounded-xl size-20 flex items-center justify-center">
+                    <span className="text-2xl font-bold text-slate-500">
+                      {provider.name ? provider.name.charAt(0).toUpperCase() : '?'}
+                    </span>
+                  </div>
+                )}
                 {provider.verified && (
                   <div className="absolute -bottom-1 -right-1 bg-primary text-white rounded-full p-0.5">
                     <span className="material-symbols-outlined text-[12px]">verified</span>

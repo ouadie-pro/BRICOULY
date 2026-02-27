@@ -92,10 +92,18 @@ export default function ReviewScreen({ isDesktop }) {
           <div className="flex w-full flex-col gap-4 items-center mt-4">
             <div className="flex gap-3 flex-col items-center">
               <div className="relative">
-                <div
-                  className="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-24 w-24 border-4 border-white dark:border-slate-800 shadow-lg"
-                  style={{ backgroundImage: `url("${provider.avatar}")` }}
-                />
+                {provider.avatar ? (
+                  <div
+                    className="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-24 w-24 border-4 border-white dark:border-slate-800 shadow-lg"
+                    style={{ backgroundImage: `url("${provider.avatar}")` }}
+                  />
+                ) : (
+                  <div className="bg-slate-300 aspect-square rounded-full h-24 w-24 border-4 border-white dark:border-slate-800 shadow-lg flex items-center justify-center">
+                    <span className="text-3xl font-bold text-slate-500">
+                      {provider.name ? provider.name.charAt(0).toUpperCase() : '?'}
+                    </span>
+                  </div>
+                )}
                 <div className="absolute bottom-0 right-0 bg-green-500 border-2 border-background-dark w-6 h-6 rounded-full flex items-center justify-center">
                   <span className="material-symbols-outlined text-white" style={{ fontSize: '14px' }}>check</span>
                 </div>
@@ -176,10 +184,18 @@ export default function ReviewScreen({ isDesktop }) {
         <form onSubmit={handleSubmit}>
           <div className="flex items-center gap-4 mb-8 p-4 bg-slate-50 rounded-xl">
             <div className="relative">
-              <div
-                className="bg-center bg-no-repeat bg-cover rounded-xl h-20 w-20 border-2 border-white shadow"
-                style={{ backgroundImage: `url("${provider.avatar}")` }}
-              />
+              {provider.avatar ? (
+                <div
+                  className="bg-center bg-no-repeat bg-cover rounded-xl h-20 w-20 border-2 border-white shadow"
+                  style={{ backgroundImage: `url("${provider.avatar}")` }}
+                />
+              ) : (
+                <div className="bg-slate-300 rounded-xl h-20 w-20 border-2 border-white shadow flex items-center justify-center">
+                  <span className="text-2xl font-bold text-slate-500">
+                    {provider.name ? provider.name.charAt(0).toUpperCase() : '?'}
+                  </span>
+                </div>
+              )}
               <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-1 border-2 border-white">
                 <span className="material-symbols-outlined text-white text-xs">check</span>
               </div>

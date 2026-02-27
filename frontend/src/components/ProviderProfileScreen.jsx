@@ -13,6 +13,7 @@ export default function ProviderProfileScreen({ isDesktop }) {
   const [requestSent, setRequestSent] = useState(false);
   const [following, setFollowing] = useState(false);
   const [followingList, setFollowingList] = useState([]);
+  const [followRequestSent, setFollowRequestSent] = useState(false);
   const navigate = useNavigate();
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
@@ -53,7 +54,11 @@ export default function ProviderProfileScreen({ isDesktop }) {
   const handleFollow = async () => {
     const res = await api.followProvider(id);
     if (res.success) {
-      setFollowing(res.following);
+      if (res.message === 'Follow request sent') {
+        setFollowRequestSent(true);
+      } else {
+        setFollowing(res.following);
+      }
     }
   };
 
@@ -89,10 +94,18 @@ export default function ProviderProfileScreen({ isDesktop }) {
           <div className="flex p-4 pb-2 bg-card-light dark:bg-card-dark pt-6">
             <div className="flex w-full flex-col gap-4 items-center">
               <div className="relative">
-                <div
-                  className="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-32 w-32 border-4 border-background-light dark:border-background-dark shadow-md"
-                  style={{ backgroundImage: `url("${provider.avatar}")` }}
-                />
+                {provider.avatar ? (
+                  <div
+                    className="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-32 w-32 border-4 border-background-light dark:border-background-dark shadow-md"
+                    style={{ backgroundImage: `url("${provider.avatar}")` }}
+                  />
+                ) : (
+                  <div className="bg-slate-300 aspect-square rounded-full h-32 w-32 border-4 border-background-light dark:border-background-dark shadow-md flex items-center justify-center">
+                    <span className="text-3xl font-bold text-slate-500">
+                      {provider.name ? provider.name.charAt(0).toUpperCase() : '?'}
+                    </span>
+                  </div>
+                )}
                 {provider.verified && (
                   <div className="absolute bottom-1 right-1 bg-green-500 rounded-full p-1.5 border-4 border-card-light dark:border-card-dark">
                     <span className="material-symbols-outlined text-white text-sm">verified</span>
@@ -117,13 +130,14 @@ export default function ProviderProfileScreen({ isDesktop }) {
             <div className="px-4 pb-4">
               <button
                 onClick={handleFollow}
+                disabled={followRequestSent}
                 className={`w-full py-2.5 rounded-xl font-medium transition-colors ${
-                  following 
+                  following || followRequestSent
                     ? 'bg-slate-200 text-slate-700' 
                     : 'bg-primary text-white'
                 }`}
               >
-                {following ? 'Following' : 'Follow'}
+                {following ? 'Following' : followRequestSent ? 'Request Sent' : 'Follow'}
               </button>
             </div>
           )}
@@ -251,10 +265,18 @@ export default function ProviderProfileScreen({ isDesktop }) {
           <div className="flex p-6 pb-4 bg-slate-50">
             <div className="flex w-full gap-6 items-center">
               <div className="relative">
-                <div
-                  className="bg-center bg-no-repeat aspect-square bg-cover rounded-2xl h-32 w-32 border-4 border-white shadow-md"
-                  style={{ backgroundImage: `url("${provider.avatar}")` }}
-                />
+                {provider.avatar ? (
+                  <div
+                    className="bg-center bg-no-repeat aspect-square bg-cover rounded-2xl h-32 w-32 border-4 border-white shadow-md"
+                    style={{ backgroundImage: `url("${provider.avatar}")` }}
+                  />
+                ) : (
+                  <div className="bg-slate-300 aspect-square rounded-2xl h-32 w-32 border-4 border-white shadow-md flex items-center justify-center">
+                    <span className="text-3xl font-bold text-slate-500">
+                      {provider.name ? provider.name.charAt(0).toUpperCase() : '?'}
+                    </span>
+                  </div>
+                )}
                 {provider.verified && (
                   <div className="absolute bottom-2 right-2 bg-green-500 rounded-full p-1.5 border-4 border-white">
                     <span className="material-symbols-outlined text-white text-sm">verified</span>
@@ -279,13 +301,14 @@ export default function ProviderProfileScreen({ isDesktop }) {
             <div className="px-6 pb-4 flex gap-3">
               <button
                 onClick={handleFollow}
+                disabled={followRequestSent}
                 className={`px-6 py-2.5 rounded-xl font-medium transition-colors ${
-                  following 
+                  following || followRequestSent
                     ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' 
                     : 'bg-primary text-white hover:bg-blue-600'
                 }`}
               >
-                {following ? 'Following' : 'Follow'}
+                {following ? 'Following' : followRequestSent ? 'Request Sent' : 'Follow'}
               </button>
               <Link to={`/messages/${provider.id}`} className="flex items-center gap-2 px-6 py-2.5 border border-primary text-primary rounded-xl hover:bg-blue-50 transition-colors">
                 <span className="material-symbols-outlined">chat_bubble</span>
@@ -454,8 +477,9 @@ export default function ProviderProfileScreen({ isDesktop }) {
             </button>
             <button 
               onClick={handleFollow}
+              disabled={followRequestSent}
               className={`flex items-center justify-center w-12 h-12 rounded-full transition-colors ${
-                following ? 'bg-primary text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                following || followRequestSent ? 'bg-primary text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
               }`}
             >
               <span className="material-symbols-outlined">{following ? 'person_remove' : 'person_add'}</span>

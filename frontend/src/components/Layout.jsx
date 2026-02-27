@@ -7,15 +7,18 @@ export default function Layout({ children, user, onLogout }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [followRequests, setFollowRequests] = useState([]);
 
   useEffect(() => {
     const loadNotifications = async () => {
-      const [notifData, countData] = await Promise.all([
+      const [notifData, countData, requestsData] = await Promise.all([
         api.getNotifications(),
         api.getUnreadCount(),
+        api.getFollowRequests(),
       ]);
       setNotifications(notifData);
       setUnreadCount(countData.count);
+      setFollowRequests(requestsData);
     };
     loadNotifications();
     
@@ -30,11 +33,23 @@ export default function Layout({ children, user, onLogout }) {
     setNotifications(notifications.map(n => ({ ...n, read: true })));
   };
 
+  const handleFollowResponse = async (requestId, action) => {
+    const res = await api.respondToFollowRequest(requestId, action);
+    if (res.success) {
+      setFollowRequests(followRequests.filter(r => r.id !== requestId));
+      // Refresh notifications
+      const notifData = await api.getNotifications();
+      setNotifications(notifData);
+    }
+  };
+
   const getNotificationIcon = (type) => {
     switch (type) {
       case 'message': return 'chat_bubble';
       case 'request': return 'assignment';
       case 'request_update': return 'check_circle';
+      case 'follow_request': return 'person_add';
+      case 'follow_accepted': return 'people';
       default: return 'notifications';
     }
   };
@@ -91,10 +106,20 @@ export default function Layout({ children, user, onLogout }) {
 
         <div className="sidebar-footer">
           <div className="flex items-center gap-3 mb-3">
-            <div
-              className="w-10 h-10 rounded-full bg-cover bg-center border-2 border-slate-200"
-              style={{ backgroundImage: user?.avatar ? `url("${user.avatar}")` : undefined }}
-            />
+            {user?.avatar && user.avatar.length > 0 ? (
+              <div
+                className="w-10 h-10 rounded-full bg-cover bg-center border-2 border-slate-200"
+                style={{ 
+                  backgroundImage: `url("${user.avatar.startsWith('http') ? user.avatar : window.location.origin + user.avatar}")` 
+                }}
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-slate-300 border-2 border-slate-200 flex items-center justify-center">
+                <span className="text-sm font-bold text-slate-500">
+                  {user?.name ? user.name.charAt(0).toUpperCase() : '?'}
+                </span>
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-slate-900 truncate">{user?.name || 'Guest'}</p>
               <p className="text-xs text-slate-500 truncate">
@@ -154,6 +179,33 @@ export default function Layout({ children, user, onLogout }) {
                       </button>
                     )}
                   </div>
+                  
+                  {/* Follow Requests Section */}
+                  {followRequests.length > 0 && (
+                    <div className="p-3 border-b border-slate-200 bg-blue-50">
+                      <p className="text-xs font-semibold text-slate-600 mb-2">Follow Requests</p>
+                      {followRequests.map((req) => (
+                        <div key={req.id} className="flex items-center justify-between mb-2">
+                          <span className="text-sm text-slate-700">{req.fromUserName}</span>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleFollowResponse(req.id, 'accept')}
+                              className="text-xs px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => handleFollowResponse(req.id, 'decline')}
+                              className="text-xs px-2 py-1 bg-slate-300 text-slate-700 rounded hover:bg-slate-400"
+                            >
+                              Decline
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
                   <div className="max-h-80 overflow-y-auto">
                     {notifications.length === 0 ? (
                       <p className="p-4 text-center text-slate-500 text-sm">No notifications</p>
