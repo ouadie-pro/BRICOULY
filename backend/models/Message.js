@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');
 
 const messageSchema = new mongoose.Schema({
+  conversationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Conversation',
+  },
   sender: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -11,30 +15,32 @@ const messageSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
-  provider: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Provider',
-  },
-  text: {
+  content: {
     type: String,
-    required: [true, 'Message text is required'],
+    default: '',
   },
   type: {
     type: String,
-    enum: ['text', 'image', 'video', 'voice', 'location'],
+    enum: ['text', 'image', 'video', 'voice'],
     default: 'text',
   },
   mediaUrl: {
     type: String,
+    default: null,
+  },
+  audioUrl: {
+    type: String,
+    default: null,
   },
   read: {
     type: Boolean,
     default: false,
   },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
 });
+
+messageSchema.index({ conversationId: 1 });
+messageSchema.index({ sender: 1, receiver: 1 });
+
+messageSchema.set('timestamps', true);
 
 module.exports = mongoose.model('Message', messageSchema);

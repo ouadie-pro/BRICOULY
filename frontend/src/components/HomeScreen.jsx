@@ -244,15 +244,19 @@ export default function HomeScreen({ isDesktop }) {
               <span className="material-symbols-outlined filled" style={{ fontVariationSettings: "'FILL' 1" }}>home</span>
               <span className="text-[10px] font-bold">Home</span>
             </button>
-            <button className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 w-16">
+            <button className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 w-16" onClick={() => navigate('/search')}>
               <span className="material-symbols-outlined">search</span>
               <span className="text-[10px] font-medium">Search</span>
             </button>
-            <button className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 w-16">
+            <button className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 w-16" onClick={() => navigate('/videos')}>
+              <span className="material-symbols-outlined">play_circle</span>
+              <span className="text-[10px] font-medium">Videos</span>
+            </button>
+            <button className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 w-16" onClick={() => navigate('/messages/1')}>
               <span className="material-symbols-outlined">chat_bubble</span>
               <span className="text-[10px] font-medium">Messages</span>
             </button>
-            <button className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 w-16">
+            <button className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 w-16" onClick={() => navigate('/profile')}>
               <span className="material-symbols-outlined">person</span>
               <span className="text-[10px] font-medium">Profile</span>
             </button>

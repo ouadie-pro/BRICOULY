@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../services/api';
 
-export default function ProfileScreen({ isDesktop, onUserUpdate }) {
+export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther }) {
+  const { id: userId } = useParams();
   const [user, setUser] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState('');
@@ -11,27 +12,56 @@ export default function ProfileScreen({ isDesktop, onUserUpdate }) {
   const [bio, setBio] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedAvatar, setUploadedAvatar] = useState(null);
+  const [articles, setArticles] = useState([]);
+  const [followers, setFollowers] = useState([]);
+  const [following, setFollowing] = useState([]);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [showArticleForm, setShowArticleForm] = useState(false);
+  const [articleTitle, setArticleTitle] = useState('');
+  const [articleContent, setArticleContent] = useState('');
+  const [articleImage, setArticleImage] = useState(null);
+  const [articleImagePreview, setArticleImagePreview] = useState(null);
+  const [isSubmittingArticle, setIsSubmittingArticle] = useState(false);
+  const [activeTab, setActiveTab] = useState('info');
   const avatarInputRef = useRef(null);
+  const articleImageInputRef = useRef(null);
   const navigate = useNavigate();
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const targetUserId = isViewingOther ? parseInt(userId) : currentUser.id;
 
   useEffect(() => {
     const loadUserData = async () => {
-      if (currentUser.id) {
+      if (targetUserId) {
         try {
-          if (currentUser.role === 'provider') {
-            const providerData = await api.getProvider(currentUser.id);
-            setUser(providerData);
-            setName(providerData.name || '');
-            setPhone(providerData.phone || '');
-            setLocation(providerData.location || '');
-            setBio(providerData.bio || '');
+          let userData;
+          if (isViewingOther) {
+            userData = await api.getUser(targetUserId);
+          } else if (currentUser.role === 'provider') {
+            userData = await api.getProvider(currentUser.id);
           } else {
-            const userData = await api.getCurrentUser();
+            userData = await api.getCurrentUser();
+          }
+          
+          if (userData) {
             setUser(userData);
             setName(userData.name || '');
             setPhone(userData.phone || '');
-            setLocation(userData.address || '');
+            setLocation(userData.location || userData.address || '');
+            setBio(userData.bio || '');
+          }
+
+          const [userArticles, userFollowers, userFollowing] = await Promise.all([
+            api.getUserArticles(targetUserId),
+            api.getFollowers(targetUserId),
+            api.getFollowing(targetUserId),
+          ]);
+          setArticles(userArticles);
+          setFollowers(userFollowers);
+          setFollowing(userFollowing);
+
+          if (isViewingOther && currentUser.id) {
+            const currentFollowing = await api.getFollowing(currentUser.id);
+            setIsFollowing(currentFollowing.includes(targetUserId));
           }
         } catch (err) {
           console.error('Error loading user:', err);
@@ -39,7 +69,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate }) {
       }
     };
     loadUserData();
-  }, [currentUser.id, currentUser.role]);
+  }, [targetUserId, currentUser.id, currentUser.role, isViewingOther]);
 
   const handleAvatarChange = async (e) => {
     const file = e.target.files[0];
@@ -106,6 +136,52 @@ export default function ProfileScreen({ isDesktop, onUserUpdate }) {
     }
   };
 
+  const handleArticleImageSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setArticleImage(file);
+      const url = URL.createObjectURL(file);
+      setArticleImagePreview(url);
+    }
+  };
+
+  const handleSubmitArticle = async () => {
+    if (!articleTitle.trim() || !articleContent.trim()) return;
+
+    setIsSubmittingArticle(true);
+    try {
+      const result = await api.createArticle({
+        title: articleTitle,
+        content: articleContent,
+        image: articleImage,
+      });
+      if (result.success) {
+        setArticles([result.article, ...articles]);
+        setShowArticleForm(false);
+        setArticleTitle('');
+        setArticleContent('');
+        setArticleImage(null);
+        setArticleImagePreview(null);
+      }
+    } catch (err) {
+      console.error('Error creating article:', err);
+    } finally {
+      setIsSubmittingArticle(false);
+    }
+  };
+
+  const handleLikeArticle = async (articleId) => {
+    const res = await api.likeArticle(articleId);
+    if (res.success) {
+      setArticles(articles.map(a => a.id === articleId ? { ...a, likes: res.likes } : a));
+    }
+  };
+
+  const formatDate = (dateStr) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString();
+  };
+
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background-light dark:bg-background-dark">
@@ -134,13 +210,30 @@ export default function ProfileScreen({ isDesktop, onUserUpdate }) {
           >
             <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>arrow_back_ios_new</span>
           </button>
-          <h2 className="text-text-light dark:text-text-dark text-lg font-bold leading-tight tracking-[-0.015em] text-center flex-1">My Profile</h2>
-          <button 
-            onClick={() => setIsEditing(!isEditing)}
-            className="flex size-12 shrink-0 items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full justify-center transition-colors"
-          >
-            <span className="material-symbols-outlined text-primary" style={{ fontSize: '24px' }}>{isEditing ? 'close' : 'edit'}</span>
-          </button>
+          <h2 className="text-text-light dark:text-text-dark text-lg font-bold leading-tight tracking-[-0.015em] text-center flex-1">
+            {isViewingOther ? user?.name : 'My Profile'}
+          </h2>
+          {isViewingOther ? (
+            <button 
+              onClick={handleFollow}
+              className={`flex items-center justify-center size-10 rounded-full font-medium transition-colors ${
+                isFollowing
+                  ? 'bg-slate-200 text-slate-700'
+                  : 'bg-primary text-white'
+              }`}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
+                {isFollowing ? 'person_remove' : 'person_add'}
+              </span>
+            </button>
+          ) : (
+            <button 
+              onClick={() => setIsEditing(!isEditing)}
+              className="flex size-12 shrink-0 items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full justify-center transition-colors"
+            >
+              <span className="material-symbols-outlined text-primary" style={{ fontSize: '24px' }}>{isEditing ? 'close' : 'edit'}</span>
+            </button>
+          )}
         </div>
 
         <div className="flex flex-col">
@@ -313,21 +406,49 @@ export default function ProfileScreen({ isDesktop, onUserUpdate }) {
     );
   }
 
+  const handleFollow = async () => {
+    if (isFollowing) {
+      await api.followProvider(targetUserId);
+      setIsFollowing(false);
+      const newFollowing = await api.getFollowing(currentUser.id);
+      setFollowing(newFollowing);
+    } else {
+      await api.followProvider(targetUserId);
+      setIsFollowing(true);
+    }
+  };
+
   return (
     <div className="p-8 max-w-4xl mx-auto w-full">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">My Profile</h1>
-        <button
-          onClick={() => setIsEditing(!isEditing)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-            isEditing 
-              ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' 
-              : 'bg-primary text-white hover:bg-blue-600'
-          }`}
-        >
-          <span className="material-symbols-outlined">{isEditing ? 'close' : 'edit'}</span>
-          {isEditing ? 'Cancel' : 'Edit Profile'}
-        </button>
+        <h1 className="text-2xl font-bold text-slate-900">
+          {isViewingOther ? user?.name : 'My Profile'}
+        </h1>
+        {isViewingOther ? (
+          <button
+            onClick={handleFollow}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+              isFollowing
+                ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                : 'bg-primary text-white hover:bg-blue-600'
+            }`}
+          >
+            <span className="material-symbols-outlined">{isFollowing ? 'person_remove' : 'person_add'}</span>
+            {isFollowing ? 'Unfollow' : 'Follow'}
+          </button>
+        ) : (
+          <button
+            onClick={() => setIsEditing(!isEditing)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+              isEditing 
+                ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' 
+                : 'bg-primary text-white hover:bg-blue-600'
+            }`}
+          >
+            <span className="material-symbols-outlined">{isEditing ? 'close' : 'edit'}</span>
+            {isEditing ? 'Cancel' : 'Edit Profile'}
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -388,20 +509,35 @@ export default function ProfileScreen({ isDesktop, onUserUpdate }) {
               <p className="text-slate-500 text-center mb-4">{user.role === 'provider' ? user.profession : 'Client'}</p>
 
               <div className="flex justify-around w-full py-4 border-t border-b border-slate-100 mb-4">
-                <div className="flex flex-col items-center">
-                  <p className="text-lg font-bold text-slate-900">{user.jobsDone || 0}</p>
-                  <p className="text-xs text-slate-500">Jobs Done</p>
-                </div>
+                <button 
+                  onClick={() => setActiveTab('followers')}
+                  className="flex flex-col items-center hover:text-primary transition-colors"
+                >
+                  <p className="text-lg font-bold text-slate-900">{followers.length}</p>
+                  <p className="text-xs text-slate-500">Followers</p>
+                </button>
                 <div className="w-px bg-slate-200"></div>
-                <div className="flex flex-col items-center">
-                  <p className="text-lg font-bold text-slate-900">{user.rating || 0}</p>
-                  <p className="text-xs text-slate-500">Rating</p>
-                </div>
+                <button 
+                  onClick={() => setActiveTab('following')}
+                  className="flex flex-col items-center hover:text-primary transition-colors"
+                >
+                  <p className="text-lg font-bold text-slate-900">{following.length}</p>
+                  <p className="text-xs text-slate-500">Following</p>
+                </button>
                 <div className="w-px bg-slate-200"></div>
-                <div className="flex flex-col items-center">
-                  <p className="text-lg font-bold text-slate-900">{user.reviewCount || 0}</p>
-                  <p className="text-xs text-slate-500">Reviews</p>
-                </div>
+                {user.role === 'provider' && (
+                  <>
+                    <div className="flex flex-col items-center">
+                      <p className="text-lg font-bold text-slate-900">{user.jobsDone || 0}</p>
+                      <p className="text-xs text-slate-500">Jobs Done</p>
+                    </div>
+                    <div className="w-px bg-slate-200"></div>
+                    <div className="flex flex-col items-center">
+                      <p className="text-lg font-bold text-slate-900">{user.rating || 0}</p>
+                      <p className="text-xs text-slate-500">Rating</p>
+                    </div>
+                  </>
+                )}
               </div>
 
               {isEditing && (
@@ -507,8 +643,256 @@ export default function ProfileScreen({ isDesktop, onUserUpdate }) {
               </div>
             </div>
           </div>
+
+          <div className="mt-6">
+            <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
+              <button
+                onClick={() => setActiveTab('info')}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === 'info' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Info
+              </button>
+              <button
+                onClick={() => setActiveTab('followers')}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === 'followers' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Followers ({followers.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('following')}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === 'following' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Following ({following.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('articles')}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === 'articles' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Articles ({articles.length})
+              </button>
+            </div>
+
+            {activeTab === 'articles' && (
+              <div className="mt-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-slate-900">My Articles</h3>
+                  <button
+                    onClick={() => setShowArticleForm(true)}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-primary text-white text-sm rounded-lg hover:bg-blue-600 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">add</span>
+                    Write Article
+                  </button>
+                </div>
+
+                {articles.length === 0 ? (
+                  <div className="text-center py-8 bg-slate-50 rounded-xl">
+                    <span className="material-symbols-outlined text-5xl text-slate-300">article</span>
+                    <p className="text-slate-500 mt-2">No articles yet</p>
+                    <button
+                      onClick={() => setShowArticleForm(true)}
+                      className="mt-3 px-4 py-2 bg-primary text-white text-sm rounded-lg"
+                    >
+                      Write Your First Article
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {articles.map((article) => (
+                      <div key={article.id} className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
+                        {article.imageUrl && (
+                          <div
+                            className="w-full h-48 rounded-lg bg-cover bg-center mb-4"
+                            style={{ backgroundImage: `url("${window.location.origin}${article.imageUrl}")` }}
+                          />
+                        )}
+                        <h4 className="font-bold text-slate-900 text-lg mb-2">{article.title}</h4>
+                        <p className="text-slate-600 text-sm mb-3 line-clamp-3">{article.content}</p>
+                        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                          <span className="text-xs text-slate-400">{formatDate(article.createdAt)}</span>
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => handleLikeArticle(article.id)}
+                              className="flex items-center gap-1 text-slate-500 hover:text-red-500 text-sm transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">favorite</span>
+                              {article.likes}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'followers' && (
+              <div className="mt-4">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Followers</h3>
+                {followers.length === 0 ? (
+                  <div className="text-center py-8 bg-slate-50 rounded-xl">
+                    <span className="material-symbols-outlined text-5xl text-slate-300">people</span>
+                    <p className="text-slate-500 mt-2">No followers yet</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {followers.map((follower) => (
+                      <div key={follower.id} className="flex items-center gap-3 p-4 bg-white rounded-xl shadow-sm border border-slate-200">
+                        <div
+                          className="w-12 h-12 rounded-full bg-cover bg-center bg-slate-200 cursor-pointer"
+                          style={{ backgroundImage: follower.avatar ? `url("${window.location.origin}${follower.avatar}")` : undefined }}
+                          onClick={() => navigate(follower.role === 'provider' ? `/provider/${follower.id}` : `/user/${follower.id}`)}
+                        >
+                          {!follower.avatar && (
+                            <div className="w-full h-full rounded-full flex items-center justify-center">
+                              <span className="text-sm font-bold text-slate-500">
+                                {follower.name?.charAt(0).toUpperCase() || '?'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(follower.role === 'provider' ? `/provider/${follower.id}` : `/user/${follower.id}`)}>
+                          <p className="font-semibold text-slate-900 truncate">{follower.name}</p>
+                          <p className="text-xs text-slate-500 truncate">
+                            {follower.role === 'provider' ? follower.profession : 'Client'}
+                          </p>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          follower.role === 'provider' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {follower.role === 'provider' ? 'Provider' : 'Client'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'following' && (
+              <div className="mt-4">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Following</h3>
+                {following.length === 0 ? (
+                  <div className="text-center py-8 bg-slate-50 rounded-xl">
+                    <span className="material-symbols-outlined text-5xl text-slate-300">people</span>
+                    <p className="text-slate-500 mt-2">Not following anyone yet</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {following.map((u) => (
+                      <div key={u.id} className="flex items-center gap-3 p-4 bg-white rounded-xl shadow-sm border border-slate-200">
+                        <div
+                          className="w-12 h-12 rounded-full bg-cover bg-center bg-slate-200 cursor-pointer"
+                          style={{ backgroundImage: u.avatar ? `url("${window.location.origin}${u.avatar}")` : undefined }}
+                          onClick={() => navigate(u.role === 'provider' ? `/provider/${u.id}` : `/user/${u.id}`)}
+                        >
+                          {!u.avatar && (
+                            <div className="w-full h-full rounded-full flex items-center justify-center">
+                              <span className="text-sm font-bold text-slate-500">
+                                {u.name?.charAt(0).toUpperCase() || '?'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(u.role === 'provider' ? `/provider/${u.id}` : `/user/${u.id}`)}>
+                          <p className="font-semibold text-slate-900 truncate">{u.name}</p>
+                          <p className="text-xs text-slate-500 truncate">
+                            {u.role === 'provider' ? u.profession : 'Client'}
+                          </p>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          u.role === 'provider' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {u.role === 'provider' ? 'Provider' : 'Client'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
+
+  // Article Form Modal
+  if (showArticleForm) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-surface-dark rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+          <h3 className="text-xl font-bold mb-4">Write Article</h3>
+          
+          <div
+            onClick={() => articleImageInputRef.current?.click()}
+            className="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center cursor-pointer hover:border-primary transition-colors mb-4"
+          >
+            {articleImagePreview ? (
+              <img src={articleImagePreview} alt="Preview" className="w-full max-h-48 object-contain rounded" />
+            ) : (
+              <>
+                <span className="material-symbols-outlined text-4xl text-slate-400">add_photo_alternate</span>
+                <p className="text-slate-500 mt-2">Add cover image (optional)</p>
+              </>
+            )}
+          </div>
+          <input
+            type="file"
+            ref={articleImageInputRef}
+            onChange={handleArticleImageSelect}
+            accept="image/*"
+            className="hidden"
+          />
+
+          <input
+            type="text"
+            value={articleTitle}
+            onChange={(e) => setArticleTitle(e.target.value)}
+            placeholder="Article title *"
+            className="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent mb-3"
+          />
+          
+          <textarea
+            value={articleContent}
+            onChange={(e) => setArticleContent(e.target.value)}
+            placeholder="Write your article content... *"
+            className="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent resize-none"
+            rows={8}
+          />
+
+          <div className="flex gap-3 mt-6">
+            <button
+              onClick={() => {
+                setShowArticleForm(false);
+                setArticleTitle('');
+                setArticleContent('');
+                setArticleImage(null);
+                setArticleImagePreview(null);
+              }}
+              className="flex-1 py-3 rounded-lg border border-slate-200 font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmitArticle}
+              disabled={!articleTitle.trim() || !articleContent.trim() || isSubmittingArticle}
+              className="flex-1 py-3 rounded-lg bg-primary text-white font-medium disabled:opacity-50"
+            >
+              {isSubmittingArticle ? 'Publishing...' : 'Publish Article'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 }

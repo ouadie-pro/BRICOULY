@@ -8,6 +8,10 @@ export default function Layout({ children, user, onLogout }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
   const [followRequests, setFollowRequests] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     const loadNotifications = async () => {
@@ -43,6 +47,50 @@ export default function Layout({ children, user, onLogout }) {
     }
   };
 
+  const handleSearch = async (query) => {
+    setSearchQuery(query);
+    if (query.trim().length < 2) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const [users, providers] = await Promise.all([
+        api.searchUsers(query),
+        api.getProviders({ search: query }),
+      ]);
+      const combinedResults = [
+        ...users.map(u => ({ ...u, type: u.role === 'provider' ? 'provider' : 'client' })),
+        ...providers.filter(p => !users.find(u => u.id === p.id)).map(p => ({ ...p, type: 'provider' })),
+      ];
+      setSearchResults(combinedResults.slice(0, 6));
+      setShowSearchResults(true);
+    } catch (err) {
+      console.error('Search error:', err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleSearchSubmit = (e) => {
+    e?.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
+      setShowSearchResults(false);
+    }
+  };
+
+  const handleResultClick = (result) => {
+    if (result.type === 'provider') {
+      navigate(`/provider/${result.id}`);
+    } else {
+      navigate(`/user/${result.id}`);
+    }
+    setShowSearchResults(false);
+    setSearchQuery('');
+  };
+
   const getNotificationIcon = (type) => {
     switch (type) {
       case 'message': return 'chat_bubble';
@@ -57,6 +105,7 @@ export default function Layout({ children, user, onLogout }) {
   const clientNavItems = [
     { path: '/home', icon: 'home', label: 'Home' },
     { path: '/search', icon: 'search', label: 'Search' },
+    { path: '/videos', icon: 'play_circle', label: 'Videos' },
     { path: '/requests', icon: 'assignment', label: 'My Requests' },
     { path: '/messages/1', icon: 'chat_bubble', label: 'Messages' },
     { path: '/profile', icon: 'person', label: 'Profile' },
@@ -65,6 +114,7 @@ export default function Layout({ children, user, onLogout }) {
   const providerNavItems = [
     { path: '/home', icon: 'home', label: 'Home' },
     { path: '/search', icon: 'search', label: 'Find Work' },
+    { path: '/videos', icon: 'play_circle', label: 'Videos' },
     { path: '/dashboard', icon: 'dashboard', label: 'Dashboard' },
     { path: '/messages/1', icon: 'chat_bubble', label: 'Messages' },
     { path: '/profile', icon: 'person', label: 'Profile' },
@@ -144,16 +194,52 @@ export default function Layout({ children, user, onLogout }) {
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                 <span className="material-symbols-outlined">search</span>
               </span>
-              <input
-                type="text"
-                placeholder="Search services, professionals..."
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-100 border-none focus:ring-2 focus:ring-primary/30 text-sm"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    navigate(`/search?q=${encodeURIComponent(e.target.value)}`);
-                  }
-                }}
-              />
+              <form onSubmit={handleSearchSubmit}>
+                <input
+                  type="text"
+                  placeholder="Search services, professionals, users..."
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-100 border-none focus:ring-2 focus:ring-primary/30 text-sm"
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
+                  onBlur={() => setTimeout(() => setShowSearchResults(false), 200)}
+                />
+              </form>
+              {showSearchResults && searchResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-slate-200 z-50 max-h-80 overflow-y-auto">
+                  {searchResults.map((result) => (
+                    <button
+                      key={result.id}
+                      onClick={() => handleResultClick(result)}
+                      className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors text-left"
+                    >
+                      <div
+                        className="w-10 h-10 rounded-full bg-cover bg-center bg-slate-200"
+                        style={{ backgroundImage: result.avatar ? `url("${result.avatar.startsWith('http') ? result.avatar : window.location.origin + result.avatar}")` : undefined }}
+                      >
+                        {!result.avatar && (
+                          <div className="w-full h-full rounded-full flex items-center justify-center">
+                            <span className="text-sm font-bold text-slate-500">
+                              {result.name?.charAt(0).toUpperCase() || '?'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-slate-900 truncate">{result.name}</p>
+                        <p className="text-xs text-slate-500 truncate">
+                          {result.type === 'provider' ? (result.profession || 'Service Provider') : 'Client'}
+                        </p>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                        result.type === 'provider' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {result.type === 'provider' ? 'Provider' : 'Client'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -185,9 +271,26 @@ export default function Layout({ children, user, onLogout }) {
                     <div className="p-3 border-b border-slate-200 bg-blue-50">
                       <p className="text-xs font-semibold text-slate-600 mb-2">Follow Requests</p>
                       {followRequests.map((req) => (
-                        <div key={req.id} className="flex items-center justify-between mb-2">
-                          <span className="text-sm text-slate-700">{req.fromUserName}</span>
-                          <div className="flex gap-2">
+                        <div key={req.id} className="flex items-center gap-3 mb-3">
+                          <div
+                            className="w-10 h-10 rounded-full bg-cover bg-center bg-slate-200 shrink-0"
+                            style={{ backgroundImage: req.fromUserAvatar ? `url("${window.location.origin}${req.fromUserAvatar}")` : undefined }}
+                          >
+                            {!req.fromUserAvatar && (
+                              <div className="w-full h-full rounded-full flex items-center justify-center">
+                                <span className="text-sm font-bold text-slate-500">
+                                  {req.fromUserName?.charAt(0).toUpperCase() || '?'}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-slate-900 truncate">{req.fromUserName}</p>
+                            <p className="text-xs text-slate-500">
+                              {req.fromUserRole === 'provider' ? req.fromUserProfession : 'Client'}
+                            </p>
+                          </div>
+                          <div className="flex gap-2 shrink-0">
                             <button
                               onClick={() => handleFollowResponse(req.id, 'accept')}
                               className="text-xs px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600"
@@ -216,11 +319,24 @@ export default function Layout({ children, user, onLogout }) {
                           className={`p-3 border-b border-slate-100 hover:bg-slate-50 ${!notif.read ? 'bg-blue-50' : ''}`}
                         >
                           <div className="flex items-start gap-3">
-                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                              <span className="material-symbols-outlined text-primary text-[16px]">
-                                {getNotificationIcon(notif.type)}
-                              </span>
-                            </div>
+                            {notif.type === 'follow_request' && notif.fromUserAvatar ? (
+                              <div
+                                className="w-8 h-8 rounded-full bg-cover bg-center bg-slate-200 shrink-0"
+                                style={{ backgroundImage: `url("${window.location.origin}${notif.fromUserAvatar}")` }}
+                              />
+                            ) : notif.type === 'follow_request' ? (
+                              <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center shrink-0">
+                                <span className="text-xs font-bold text-slate-500">
+                                  {notif.fromUserName?.charAt(0).toUpperCase() || '?'}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                <span className="material-symbols-outlined text-primary text-[16px]">
+                                  {getNotificationIcon(notif.type)}
+                                </span>
+                              </div>
+                            )}
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-slate-900">{notif.title}</p>
                               <p className="text-xs text-slate-500 truncate">{notif.text}</p>

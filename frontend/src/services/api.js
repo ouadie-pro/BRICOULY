@@ -211,6 +211,79 @@ export const api = {
     return res.json();
   },
 
+  // Videos
+  getVideos: async () => {
+    const res = await fetch(`${API_BASE}/videos`);
+    return res.json();
+  },
+
+  uploadVideo: async (videoFile, title, description) => {
+    const formData = new FormData();
+    formData.append('video', videoFile);
+    if (title) formData.append('title', title);
+    if (description) formData.append('description', description);
+    const res = await fetch(`${API_BASE}/videos`, {
+      method: 'POST',
+      headers: { 'x-user-id': getUserId() },
+      body: formData,
+    });
+    return res.json();
+  },
+
+  likeVideo: async (videoId) => {
+    const res = await fetch(`${API_BASE}/videos/${videoId}/like`, {
+      method: 'POST',
+    });
+    return res.json();
+  },
+
+  deleteVideo: async (videoId) => {
+    const res = await fetch(`${API_BASE}/videos/${videoId}`, {
+      method: 'DELETE',
+      headers: { 'x-user-id': getUserId() },
+    });
+    return res.json();
+  },
+
+  // Articles
+  getArticles: async () => {
+    const res = await fetch(`${API_BASE}/articles`);
+    return res.json();
+  },
+
+  getUserArticles: async (userId) => {
+    const res = await fetch(`${API_BASE}/users/${userId}/articles`);
+    return res.json();
+  },
+
+  createArticle: async (articleData) => {
+    const formData = new FormData();
+    if (articleData.title) formData.append('title', articleData.title);
+    if (articleData.content) formData.append('content', articleData.content);
+    if (articleData.image) formData.append('image', articleData.image);
+    const res = await fetch(`${API_BASE}/articles`, {
+      method: 'POST',
+      headers: { 'x-user-id': getUserId() },
+      body: formData,
+    });
+    return res.json();
+  },
+
+  likeArticle: async (articleId) => {
+    const res = await fetch(`${API_BASE}/articles/${articleId}/like`, {
+      method: 'POST',
+    });
+    return res.json();
+  },
+
+  deleteArticle: async (articleId) => {
+    const res = await fetch(`${API_BASE}/articles/${articleId}`, {
+      method: 'DELETE',
+      headers: { 'x-user-id': getUserId() },
+    });
+    return res.json();
+  },
+
   // Reviews
   getProviderReviews: async (providerId) => {
     const res = await fetch(`${API_BASE}/providers/${providerId}/reviews`);
@@ -279,14 +352,14 @@ export const api = {
     return res.json();
   },
 
-  sendMessage: async (receiverId, text) => {
+  sendMessage: async (receiverId, content) => {
     const res = await fetch(`${API_BASE}/messages`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
         'x-user-id': getUserId(),
       },
-      body: JSON.stringify({ receiverId, text }),
+      body: JSON.stringify({ receiverId, content }),
     });
     return res.json();
   },
@@ -304,15 +377,15 @@ export const api = {
     return result;
   },
 
-  sendMediaMessage: async (receiverId, mediaUrl, type, text = '') => {
-    console.log('Sending media message:', { receiverId, mediaUrl, type, text });
+  sendMediaMessage: async (receiverId, mediaUrl, type, content = '') => {
+    console.log('Sending media message:', { receiverId, mediaUrl, type, content });
     const res = await fetch(`${API_BASE}/messages`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
         'x-user-id': getUserId(),
       },
-      body: JSON.stringify({ receiverId, text, mediaUrl, type }),
+      body: JSON.stringify({ receiverId, content, mediaUrl, type }),
     });
     const result = await res.json();
     console.log('Send message response:', result);
@@ -345,6 +418,29 @@ export const api = {
   // Categories (backward compatibility)
   getCategories: async () => {
     const res = await fetch(`${API_BASE}/categories`);
+    return res.json();
+  },
+
+  // User Search
+  searchUsers: async (query) => {
+    const res = await fetch(`${API_BASE}/users/search?q=${encodeURIComponent(query)}`);
+    return res.json();
+  },
+
+  // Get single user
+  getUser: async (userId) => {
+    const res = await fetch(`${API_BASE}/users/${userId}`);
+    return res.json();
+  },
+
+  // Followers
+  getFollowers: async (userId) => {
+    const res = await fetch(`${API_BASE}/users/${userId}/followers`);
+    return res.json();
+  },
+
+  getFollowing: async (userId) => {
+    const res = await fetch(`${API_BASE}/users/${userId}/following`);
     return res.json();
   },
 };

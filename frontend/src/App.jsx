@@ -11,6 +11,7 @@ import ReviewScreen from './components/ReviewScreen';
 import ProviderDashboard from './components/ProviderDashboard';
 import MyRequestsScreen from './components/MyRequestsScreen';
 import ProfileScreen from './components/ProfileScreen';
+import VideosScreen from './components/VideosScreen';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -51,6 +52,8 @@ function App() {
       <Route path="/home" element={<ProtectedRoute><HomeScreen isDesktop /></ProtectedRoute>} />
       <Route path="/search" element={<ProtectedRoute><SearchScreen isDesktop /></ProtectedRoute>} />
       <Route path="/search/:q" element={<ProtectedRoute><SearchScreen isDesktop /></ProtectedRoute>} />
+      <Route path="/videos" element={<ProtectedRoute><VideosScreen isDesktop /></ProtectedRoute>} />
+      <Route path="/user/:id" element={<ProtectedRoute><ProfileScreen isDesktop isViewingOther /></ProtectedRoute>} />
       <Route path="/provider/:id" element={<ProtectedRoute><ProviderProfileScreen isDesktop /></ProtectedRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><ProviderDashboard isDesktop /></ProtectedRoute>} />
       <Route path="/requests" element={<ProtectedRoute><MyRequestsScreen isDesktop /></ProtectedRoute>} />

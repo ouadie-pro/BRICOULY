@@ -22,8 +22,13 @@ export default function MessagesScreen({ isDesktop }) {
 
   useEffect(() => {
     const fetchConversations = async () => {
-      const data = await api.getConversations();
-      setConversations(data);
+      try {
+        const data = await api.getConversations();
+        setConversations(data || []);
+      } catch (error) {
+        console.error('Error fetching conversations:', error);
+        setConversations([]);
+      }
     };
     fetchConversations();
   }, []);
@@ -31,16 +36,21 @@ export default function MessagesScreen({ isDesktop }) {
   useEffect(() => {
     if (providerId) {
       const loadChat = async () => {
-        const [msgs, providerData] = await Promise.all([
-          api.getMessages(providerId),
-          api.getProvider(providerId),
-        ]);
-        setMessages(msgs);
-        setProvider(providerData);
+        try {
+          const [msgs, providerData] = await Promise.all([
+            api.getMessages(providerId),
+            api.getProvider(providerId).catch(() => null),
+          ]);
+          setMessages(msgs || []);
+          setProvider(providerData);
+        } catch (error) {
+          console.error('Error loading chat:', error);
+          setMessages([]);
+        }
       };
       loadChat();
     }
-  }, [providerId, conversations]);
+  }, [providerId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -75,8 +85,8 @@ export default function MessagesScreen({ isDesktop }) {
             newMessage
           );
           console.log('Sent message:', sent);
-          if (sent) {
-            setMessages([...messages, { ...sent, senderId: currentUser.id, receiverId: parseInt(providerId), type, mediaUrl: uploadResult.filePath }]);
+          if (sent && !sent.error) {
+            setMessages(prev => [...prev, { ...sent, senderId: currentUser.id, receiverId: providerId, type, mediaUrl: uploadResult.filePath }]);
           }
         } else {
           console.error('Upload failed:', uploadResult.error);
@@ -87,8 +97,8 @@ export default function MessagesScreen({ isDesktop }) {
       setMediaPreview(null);
     } else {
       const sent = await api.sendMessage(providerId, newMessage);
-      if (sent) {
-        setMessages([...messages, { ...sent, senderId: currentUser.id, receiverId: parseInt(providerId) }]);
+      if (sent && !sent.error) {
+        setMessages(prev => [...prev, { ...sent, senderId: currentUser.id, receiverId: providerId }]);
       }
     }
     setNewMessage('');
@@ -165,6 +175,8 @@ export default function MessagesScreen({ isDesktop }) {
   };
 
   const renderMessageContent = (msg) => {
+    const text = msg.content || msg.text || '';
+    
     if (msg.type === 'image' && msg.mediaUrl) {
       return (
         <div className="max-w-[250px]">
@@ -173,7 +185,7 @@ export default function MessagesScreen({ isDesktop }) {
             alt="Shared image" 
             className="rounded-lg max-h-[200px] object-cover"
           />
-          {msg.text && <p className="mt-1">{msg.text}</p>}
+          {text && <p className="mt-1">{text}</p>}
         </div>
       );
     }
@@ -186,7 +198,7 @@ export default function MessagesScreen({ isDesktop }) {
             controls 
             className="rounded-lg max-h-[200px]"
           />
-          {msg.text && <p className="mt-1">{msg.text}</p>}
+          {text && <p className="mt-1">{text}</p>}
         </div>
       );
     }
@@ -196,12 +208,12 @@ export default function MessagesScreen({ isDesktop }) {
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-primary">graphic_eq</span>
           <audio src={msg.mediaUrl} controls className="h-8" />
-          {msg.text && <p className="mt-1">{msg.text}</p>}
+          {text && <p className="mt-1">{text}</p>}
         </div>
       );
     }
     
-    return <p>{msg.text}</p>;
+    return <p>{text}</p>;
   };
 
   const renderMediaPreview = () => {
@@ -269,20 +281,23 @@ export default function MessagesScreen({ isDesktop }) {
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
-          {messages.map((msg) => (
+          {messages.map((msg) => {
+            const isOwn = String(msg.senderId) === String(currentUser.id) || String(msg.sender) === String(currentUser.id);
+            return (
             <div
               key={msg.id || msg._id}
-              className={`flex items-end gap-2 ${(msg.senderId === currentUser.id || msg.sender === currentUser.id) ? 'flex-row-reverse' : ''}`}
+              className={`flex items-end gap-2 ${isOwn ? 'flex-row-reverse' : ''}`}
             >
               <div className={`max-w-[80%] px-4 py-3 rounded-2xl text-[15px] ${
-                (msg.senderId === currentUser.id || msg.sender === currentUser.id)
+                isOwn
                   ? 'bg-primary text-white rounded-tr-sm' 
                   : 'bg-surface-light dark:bg-surface-dark text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-700 rounded-tl-sm'
               }`}>
                 {renderMessageContent(msg)}
               </div>
             </div>
-          ))}
+          );
+          })}
           <div ref={messagesEndRef} />
         </main>
 
@@ -387,7 +402,7 @@ export default function MessagesScreen({ isDesktop }) {
                 key={conv.userId}
                 to={`/messages/${conv.userId}`}
                 className={`flex items-center gap-3 p-4 hover:bg-slate-50 cursor-pointer border-b border-slate-100 ${
-                  parseInt(providerId) === conv.userId ? 'bg-blue-50' : ''
+                  String(providerId) === String(conv.userId) ? 'bg-blue-50' : ''
                 }`}
               >
                 <div
@@ -446,12 +461,14 @@ export default function MessagesScreen({ isDesktop }) {
             </header>
 
             <main className="flex-1 overflow-y-auto p-6 space-y-4">
-              {messages.map((msg) => (
+              {messages.map((msg) => {
+                const isOwn = String(msg.senderId) === String(currentUser.id) || String(msg.sender) === String(currentUser.id);
+                return (
                 <div
                   key={msg.id || msg._id}
-                  className={`flex items-end gap-3 ${(msg.senderId === currentUser.id || msg.sender === currentUser.id) ? 'flex-row-reverse' : ''}`}
+                  className={`flex items-end gap-3 ${isOwn ? 'flex-row-reverse' : ''}`}
                 >
-                  {(msg.senderId !== currentUser.id && msg.sender !== currentUser.id) && (
+                  {!isOwn && (
                     provider?.avatar ? (
                       <div
                         className="w-8 h-8 rounded-full bg-cover bg-center shrink-0"
@@ -466,9 +483,9 @@ export default function MessagesScreen({ isDesktop }) {
                     )
                   )}
         
-                  <div className={`flex flex-col gap-1 max-w-[60%] ${(msg.senderId === currentUser.id || msg.sender === currentUser.id) ? 'items-end' : 'items-start'}`}>
+                  <div className={`flex flex-col gap-1 max-w-[60%] ${isOwn ? 'items-end' : 'items-start'}`}>
                     <div className={`px-4 py-3 rounded-2xl text-[15px] ${
-                      (msg.senderId === currentUser.id || msg.sender === currentUser.id)
+                      isOwn
                         ? 'bg-primary text-white rounded-tr-sm' 
                         : 'bg-slate-100 text-slate-800 rounded-tl-sm'
                     }`}>
@@ -479,7 +496,8 @@ export default function MessagesScreen({ isDesktop }) {
                     </span>
                   </div>
                 </div>
-              ))}
+              );
+              })}
               <div ref={messagesEndRef} />
             </main>
 

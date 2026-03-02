@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const dotenv = require('dotenv');
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 dotenv.config();
 
@@ -12,7 +14,45 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Multer setup for file uploads
+const seedCategories = async () => {
+  try {
+    const count = await Category.countDocuments();
+    if (count === 0) {
+      await Category.insertMany(categoriesData);
+      console.log('Categories seeded');
+    }
+  } catch (error) {
+    console.error('Error seeding categories:', error.message);
+  }
+};
+
+// Start server after connecting to MongoDB and seeding
+mongoose.connect(process.env.MONGODB_URI)
+  .then(async () => {
+    console.log('MongoDB Connected');
+    await seedCategories();
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  })
+  .catch(err => console.error('MongoDB Connection Error:', err));
+
+const User = require('./models/User');
+const Provider = require('./models/Provider');
+const Service = require('./models/Service');
+const Portfolio = require('./models/Portfolio');
+const Post = require('./models/Post');
+const Video = require('./models/Video');
+const Article = require('./models/Article');
+const Message = require('./models/Message');
+const Conversation = require('./models/Conversation');
+const Notification = require('./models/Notification');
+const Review = require('./models/Review');
+const Follow = require('./models/Follow');
+const FollowRequest = require('./models/FollowRequest');
+const ServiceRequest = require('./models/ServiceRequest');
+const Category = require('./models/Category');
+
 const multer = require('multer');
 const fs = require('fs');
 
@@ -35,960 +75,1291 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 },
 });
 
-// Professions/Categories
-const professions = [
-  { id: 1, name: 'Plumber', icon: 'plumbing', color: '#3b82f6' },
-  { id: 2, name: 'Electrician', icon: 'bolt', color: '#eab308' },
-  { id: 3, name: 'Painter', icon: 'format_paint', color: '#ec4899' },
-  { id: 4, name: 'Carpenter', icon: 'carpenter', color: '#f59e0b' },
-  { id: 5, name: 'Home Cleaner', icon: 'cleaning_services', color: '#8b5cf6' },
-  { id: 6, name: 'Mover', icon: 'local_shipping', color: '#22c55e' },
-  { id: 7, name: 'HVAC Technician', icon: 'ac_unit', color: '#06b6d4' },
-  { id: 8, name: 'Landscaper', icon: 'grass', color: '#84cc16' },
-  { id: 9, name: 'Roofer', icon: 'roofing', color: '#dc2626' },
-  { id: 10, name: 'Appliance Repair', icon: 'kitchen', color: '#6366f1' },
+const categoriesData = [
+  { name: 'Plumber', icon: 'plumbing', color: '#3b82f6' },
+  { name: 'Electrician', icon: 'bolt', color: '#eab308' },
+  { name: 'Painter', icon: 'format_paint', color: '#ec4899' },
+  { name: 'Carpenter', icon: 'carpenter', color: '#f59e0b' },
+  { name: 'Home Cleaner', icon: 'cleaning_services', color: '#8b5cf6' },
+  { name: 'Mover', icon: 'local_shipping', color: '#22c55e' },
+  { name: 'HVAC Technician', icon: 'ac_unit', color: '#06b6d4' },
+  { name: 'Landscaper', icon: 'grass', color: '#84cc16' },
+  { name: 'Roofer', icon: 'roofing', color: '#dc2626' },
+  { name: 'Appliance Repair', icon: 'kitchen', color: '#6366f1' },
 ];
-
-let professionIdCounter = professions.length + 1;
-
-// Users Database
-const users = [
-  {
-    id: 1,
-    name: 'Alex Johnson',
-    email: 'alex@example.com',
-    password: 'password123',
-    avatar: null,
-    role: 'client',
-    phone: '+1 234 567 8900',
-    address: '123 Main St, New York, NY',
-    createdAt: '2024-01-15T10:00:00Z',
-  },
-  {
-    id: 2,
-    name: 'John Doe',
-    email: 'john@example.com',
-    password: 'password123',
-    avatar: null,
-    role: 'provider',
-    professionId: 1,
-    profession: 'Plumber',
-    bio: 'Reliable and experienced plumber specializing in residential repairs and installations. I pride myself on quick response times, transparent pricing, and quality workmanship.',
-    experience: '8 Years Exp.',
-    location: 'Brooklyn, NY',
-    serviceArea: '15km radius',
-    verified: true,
-    rating: 4.8,
-    reviewCount: 124,
-    jobsDone: 450,
-    createdAt: '2024-01-10T10:00:00Z',
-  },
-  {
-    id: 3,
-    name: 'Sarah Smith',
-    email: 'sarah@example.com',
-    password: 'password123',
-    avatar: null,
-    role: 'provider',
-    professionId: 2,
-    profession: 'Electrician',
-    bio: 'Certified electrician with 10+ years of experience. Specializing in residential and commercial electrical work.',
-    experience: '10 Years Exp.',
-    location: 'Manhattan, NY',
-    serviceArea: '20km radius',
-    verified: true,
-    rating: 4.9,
-    reviewCount: 89,
-    jobsDone: 320,
-    createdAt: '2024-02-01T10:00:00Z',
-  },
-  {
-    id: 4,
-    name: 'Mike Ross',
-    email: 'mike@example.com',
-    password: 'password123',
-    avatar: null,
-    role: 'provider',
-    professionId: 3,
-    profession: 'Painter',
-    bio: 'Professional painter specializing in interior and exterior painting. Quality work at fair prices.',
-    experience: '5 Years Exp.',
-    location: 'Queens, NY',
-    serviceArea: '10km radius',
-    verified: false,
-    rating: 4.7,
-    reviewCount: 56,
-    jobsDone: 180,
-    createdAt: '2024-02-15T10:00:00Z',
-  },
-];
-
-// Provider Services
-const services = [
-  {
-    id: 1,
-    providerId: 2,
-    name: 'Pipe Repair',
-    description: 'Fix leaky pipes and pipe replacements',
-    price: 50,
-    category: 'plumbing',
-  },
-  {
-    id: 2,
-    providerId: 2,
-    name: 'Water Heater Installation',
-    description: 'Install and repair water heaters',
-    price: 150,
-    category: 'plumbing',
-  },
-  {
-    id: 3,
-    providerId: 2,
-    name: 'Drain Cleaning',
-    description: 'Professional drain cleaning services',
-    price: 75,
-    category: 'plumbing',
-  },
-  {
-    id: 4,
-    providerId: 3,
-    name: 'Electrical Wiring',
-    description: 'Complete electrical wiring solutions',
-    price: 80,
-    category: 'electrical',
-  },
-  {
-    id: 5,
-    providerId: 3,
-    name: 'Switch & Outlet Installation',
-    description: 'Install switches, outlets, and fixtures',
-    price: 40,
-    category: 'electrical',
-  },
-  {
-    id: 6,
-    providerId: 4,
-    name: 'Interior Painting',
-    description: 'Professional interior painting services',
-    price: 35,
-    category: 'painting',
-  },
-];
-
-// Portfolio/Work Photos
-const portfolios = [
-  {
-    id: 1,
-    providerId: 2,
-    imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBAYxHEmX7ceP2j44nnPeJefxrCkFNwNK5BbA1L1fYBttFRjs17MEjJ9t-wBWSqfD4gXx6uZpQXO5EM-Pp1Hv1Kv-rG1ldSme0G_1IoDS9LVu6IQKPiL1HxAp7A4gqmAk5nz-UbQ8IusHcpCX37KgMeXsZoynf4qcvgczOjfjr4nOYnVOb8rYP96HWadFsSH7gQ6Ofyn8j-szZdsHwOZy_Rtp-iRoCxxJWGt939kS3t_jNZVr_HDcJ33GdhotY7dYd5c8Ta01-TeKc',
-    caption: 'Complete bathroom pipe renovation',
-    createdAt: '2026-02-20T10:00:00Z',
-  },
-  {
-    id: 2,
-    providerId: 2,
-    imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAIsO1XU-VvZ2ibKbxfPnai3sM9XXi0S-vfmBo-tRfSHVoUb2LKGdXCDGTvZol0W1HdWcjWXHZiONA20Babxfs64hf3t72ADgM7YgQQ8zh3aG1ZoiOQBxK4gB5GLkvO5PbMwAvqOLt5NKUNp287_DkXsCC69NbCfSOp3XW2EVnqWv4IvvA5L-WWYWnQeGKU4z4WviIZrfZTjS47LlMR8vAZnUt-mkyUS5Cl_b2d9jn8-_hbIj16arJcReceb8qR9pQNLCZEj0etVtY',
-    caption: 'Kitchen sink installation',
-    createdAt: '2026-02-15T10:00:00Z',
-  },
-  {
-    id: 3,
-    providerId: 3,
-    imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDi8rWEn7JXFV1f3EdsW2Pr0thlOAcF4XIDFVpC73pBTA6Ca9WCyTrk-cQgzQONQA9o2RtsPskzNi8_dxWGun48iizf9OPVS-igo1Iffvwd7W-PW1A5Uug7-ksoIs-5J30lQNjePqLmkpwd0bdIR0hbgQP_SIvOKM5b1UcD5BSTq_4li3OyQucgwFd2Vd6QxikSSlrVgiWE9KXgzay29BhV12eqJFCPjYdKvDAh4NqC6-TZnZYQurIXMF7EcvBya-1h7xqcKeQVdwg',
-    caption: 'Modern lighting installation',
-    createdAt: '2026-02-18T10:00:00Z',
-  },
-];
-
-// Posts for home page
-const posts = [
-  {
-    id: 1,
-    authorId: 2,
-    authorName: 'John Doe',
-    authorAvatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBbEun0wuS1a1YIMlnQrJqPXhtDY5uCMHrrw3MjQWIIACEi0UX9t7iRsPdf5Odg8v7QBZveVJbdvrbJ_c7ZfMd7TIe67prcE7z1Az3flEXT0WGbFhv43-euJEF9yp3vUdFrLRrHsQGbLmhABa-1PlqahwDCKoRSihEhtwZb8iYY4x7uDmLe3K3LDhFCrfUTc037DzxY58seS9Mmq5lBConLMW3ZUcRdhkIvjw5oCQ3sIujLtACmitspcgj-aydmpTdLoyTOAnaxoeU',
-    content: '🎉 New Year Special! Get 20% off on all plumbing services this month. Book now and save!',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBAYxHEmX7ceP2j44nnPeJefxrCkFNwNK5BbA1L1fYBttFRjs17MEjJ9t-wBWSqfD4gXx6uZpQXO5EM-Pp1Hv1Kv-rG1ldSme0G_1IoDS9LVu6IQKPiL1HxAp7A4gqmAk5nz-UbQ8IusHcpCX37KgMeXsZoynf4qcvgczOjfjr4nOYnVOb8rYP96HWadFsSH7gQ6Ofyn8j-szZdsHwOZy_Rtp-iRoCxxJWGt939kS3t_jNZVr_HDcJ33GdhotY7dYd5c8Ta01-TeKc',
-    likes: 24,
-    comments: 5,
-    createdAt: '2026-02-25T10:00:00Z',
-    type: 'promo',
-  },
-  {
-    id: 2,
-    authorId: 2,
-    authorName: 'John Doe',
-    authorAvatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBbEun0wuS1a1YIMlnQrJqPXhtDY5uCMHrrw3MjQWIIACEi0UX9t7iRsPdf5Odg8v7QBZveVJbdvrbJ_c7ZfMd7TIe67prcE7z1Az3flEXT0WGbFhv43-euJEF9yp3vUdFrLRrHsQGbLmhABa-1PlqahwDCKoRSihEhtwZb8iYY4x7uDmLe3K3LDhFCrfUTc037DzxY58seS9Mmq5lBConLMW3ZUcRdhkIvjw5oCQ3sIujLtACmitspcgj-aydmpTdLoyTOAnaxoeU',
-    content: '🛠️ Quick tip: Don\'t wait for small leaks to become big problems. Early detection saves money! Contact me for a free inspection.',
-    image: null,
-    likes: 18,
-    comments: 2,
-    createdAt: '2026-02-24T14:30:00Z',
-    type: 'tip',
-  },
-  {
-    id: 3,
-    authorId: 3,
-    authorName: 'Sarah Smith',
-    authorAvatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDi8rWEn7JXFV1f3EdsW2Pr0thlOAcF4XIDFVpC73pBTA6Ca9WCyTrk-cQgzQONQA9o2RtsPskzNi8_dxWGun48iizf9OPVS-igo1Iffvwd7W-PW1A5Uug7-ksoIs-5J30lQNjePqLmkpwd0bdIR0hbgQP_SIvOKM5b1UcD5BSTq_4li3OyQucgwFd2Vd6QxikSSlrVgiWE9KXgzay29BhV12eqJFCPjYdKvDAh4NqC6-TZnZYQurIXMF7EcvBya-1h7xqcKeQVdwg',
-    content: '⚡ Just completed a full rewiring project in Manhattan. Safety is our top priority!',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDi8rWEn7JXFV1f3EdsW2Pr0thlOAcF4XIDFVpC73pBTA6Ca9WCyTrk-cQgzQONQA9o2RtsPskzNi8_dxWGun48iizf9OPVS-igo1Iffvwd7W-PW1A5Uug7-ksoIs-5J30lQNjePqLmkpwd0bdIR0hbgQP_SIvOKM5b1UcD5BSTq_4li3OyQucgwFd2Vd6QxikSSlrVgiWE9KXgzay29BhV12eqJFCPjYdKvDAh4NqC6-TZnZYQurIXMF7EcvBya-1h7xqcKeQVdwg',
-    likes: 32,
-    comments: 8,
-    createdAt: '2026-02-23T10:00:00Z',
-    type: 'work',
-  },
-];
-
-// Service Requests
-const serviceRequests = [
-  {
-    id: 1,
-    clientId: 1,
-    providerId: 2,
-    serviceName: 'Pipe Repair',
-    description: 'Kitchen sink pipe is leaking',
-    status: 'pending',
-    createdAt: '2026-02-26T09:00:00Z',
-  },
-];
-
-// Reviews/Ratings
-const reviews = [
-  {
-    id: 1,
-    providerId: 2,
-    clientId: 1,
-    clientName: 'Alex Johnson',
-    clientAvatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBUJIOG9G-58r7EKqhdutYCCf6PGxFa9J3i_xjisTVTzBs1VdEp463KDXWOgCnuPF47kVClvUTuWFkqbpsE_Nf4cdPqmcfsyoHArd_-Ge39dTlJn5kFuphsIjdewe7vh48txl9W5n923xjPEK3Bbokn1UY1kAPqKgGjpQrO4imJ3Oi0sjIBF_RRyZh4kiq6ouOczH9Hpxo4VZqPZ7P1qEOjhUVImlJZU5oYeXp1LyJ_uzs-p64sMrvMT75QRRcVQavaw-EEWpr8BeU',
-    rating: 5,
-    comment: 'John did an amazing job fixing our kitchen sink. He arrived on time, was very professional, and cleaned up afterwards.',
-    createdAt: '2026-02-24T10:00:00Z',
-  },
-  {
-    id: 2,
-    providerId: 2,
-    clientId: 1,
-    clientName: 'Michael Ross',
-    clientAvatar: '',
-    rating: 4,
-    comment: 'Great service overall, but arrived slightly later than expected due to traffic. Work quality was excellent though.',
-    createdAt: '2026-02-17T10:00:00Z',
-  },
-];
-
-// Follows
-const follows = [];
-const followRequests = [];
-
-// Messages
-const messages = [
-  {
-    id: 1,
-    senderId: 1,
-    receiverId: 2,
-    text: 'Hi, are you available to fix a leak today?',
-    time: '10:30 AM',
-    read: true,
-    createdAt: '2026-02-26T10:30:00Z',
-  },
-  {
-    id: 2,
-    senderId: 2,
-    receiverId: 1,
-    text: 'Yes, I can be there by 2 PM.',
-    time: '10:32 AM',
-    read: true,
-    createdAt: '2026-02-26T10:32:00Z',
-  },
-  {
-    id: 3,
-    senderId: 1,
-    receiverId: 2,
-    text: 'Great, see you then.',
-    time: '10:34 AM',
-    read: true,
-    createdAt: '2026-02-26T10:34:00Z',
-  },
-];
-
-// Notifications
-const notifications = [
-  {
-    id: 1,
-    userId: 1,
-    type: 'message',
-    title: 'New message from John Doe',
-    text: 'Yes, I can be there by 2 PM.',
-    read: false,
-    createdAt: '2026-02-26T10:32:00Z',
-  },
-];
-
-// Helper functions
-const getProvidersFromUsers = () => {
-  return users.filter(u => u.role === 'provider').map(u => ({
-    ...u,
-    hourlyRate: services.filter(s => s.providerId === u.id)[0]?.price || 50,
-    distance: Math.random() * 5 + 0.5,
-    services: services.filter(s => s.providerId === u.id),
-    portfolio: portfolios.filter(p => p.providerId === u.id),
-    reviews: reviews.filter(r => r.providerId === u.id),
-  }));
-};
 
 // ============ AUTH ROUTES ============
 
-app.post('/api/auth/signup', (req, res) => {
-  const { name, email, password, role, phone, professionId, bio } = req.body;
-  
-  if (users.find(u => u.email === email)) {
-    res.status(400).json({ success: false, error: 'Email already exists' });
-    return;
-  }
-  
-  const profession = professions.find(p => p.id === parseInt(professionId));
-  
-  const newUser = {
-    id: users.length + 1,
-    name,
-    email,
-    password,
-    role: role || 'client',
-    avatar: null,
-    phone: phone || '',
-    address: '',
-    professionId: professionId ? parseInt(professionId) : null,
-    profession: role === 'provider' ? (profession?.name || '') : '',
-    bio: bio || '',
-    verified: role === 'provider' ? false : undefined,
-    rating: role === 'provider' ? 0 : undefined,
-    reviewCount: 0,
-    jobsDone: 0,
-    createdAt: new Date().toISOString(),
-  };
-  
-  users.push(newUser);
-  
-  const { password: _, ...userWithoutPassword } = newUser;
-  res.json({ success: true, user: userWithoutPassword });
-});
-
-app.post('/api/auth/login', (req, res) => {
-  const { email, password } = req.body;
-  const user = users.find(u => u.email === email && u.password === password);
-  
-  if (user) {
-    const { password: _, ...userWithoutPassword } = user;
-    res.json({ success: true, user: userWithoutPassword });
-  } else {
-    res.status(401).json({ success: false, error: 'Invalid credentials' });
-  }
-});
-
-app.get('/api/auth/me', (req, res) => {
-  const userId = parseInt(req.headers['x-user-id']);
-  const user = users.find(u => u.id === userId);
-  
-  if (user) {
-    const { password: _, ...userWithoutPassword } = user;
-    res.json(userWithoutPassword);
-  } else {
-    res.status(401).json({ error: 'User not found' });
+app.post('/api/auth/signup', async (req, res) => {
+  try {
+    const { name, email, password, role, phone, professionId, bio } = req.body;
+    
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ success: false, error: 'Email already exists' });
+    }
+    
+    let category = null;
+    if (professionId) {
+      category = await Category.findById(professionId);
+    }
+    
+    const user = await User.create({
+      name,
+      email,
+      password,
+      role: role || 'client',
+      avatar: '',
+      phone: phone || '',
+      location: '',
+    });
+    
+    if (role === 'provider') {
+      await Provider.create({
+        user: user._id,
+        profession: category?.name || '',
+        bio: bio || '',
+        hourlyRate: 50,
+        rating: 0,
+        reviewCount: 0,
+        jobsDone: 0,
+        experience: '1 Year Exp.',
+        verified: false,
+        serviceArea: '10km radius',
+        location: 'New York, NY',
+        category: category?._id,
+      });
+    }
+    
+    const { password: _, ...userWithoutPassword } = user.toObject();
+    const responseUser = { ...userWithoutPassword, id: user._id };
+    
+    res.json({ success: true, user: responseUser });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-app.put('/api/users/profile', (req, res) => {
-  const userId = parseInt(req.headers['x-user-id']);
-  console.log('Profile update - userId:', userId, 'updates:', req.body);
-  
-  const updates = req.body;
-  
-  const userIndex = users.findIndex(u => u.id === userId);
-  if (userIndex === -1) {
-    console.log('User not found');
-    res.status(404).json({ error: 'User not found' });
-    return;
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email }).select('+password');
+    
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json({ success: false, error: 'Invalid credentials' });
+    }
+    
+    const provider = await Provider.findOne({ user: user._id });
+    
+    const { password: _, ...userWithoutPassword } = user.toObject();
+    const responseUser = { 
+      ...userWithoutPassword, 
+      id: user._id,
+      profession: provider?.profession || '',
+      bio: provider?.bio || '',
+      rating: provider?.rating || 0,
+      verified: provider?.verified || false,
+    };
+    
+    res.json({ success: true, user: responseUser });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
-  
-  users[userIndex] = { ...users[userIndex], ...updates };
-  console.log('Updated user:', users[userIndex]);
-  const { password: _, ...userWithoutPassword } = users[userIndex];
-  res.json({ success: true, user: userWithoutPassword });
 });
 
-app.post('/api/users/avatar', upload.single('file'), (req, res) => {
-  const userId = parseInt(req.headers['x-user-id']);
-  console.log('Avatar upload - userId:', userId, 'type:', typeof userId);
-  
-  if (!req.file) {
-    return res.status(400).json({ success: false, error: 'No file uploaded' });
+app.get('/api/auth/me', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+    
+    const provider = await Provider.findOne({ user: user._id });
+    
+    const { password: _, ...userWithoutPassword } = user.toObject();
+    const responseUser = { 
+      ...userWithoutPassword, 
+      id: user._id,
+      profession: provider?.profession || '',
+      bio: provider?.bio || '',
+      rating: provider?.rating || 0,
+      verified: provider?.verified || false,
+    };
+    
+    res.json(responseUser);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-  
-  console.log('Uploaded file:', req.file);
-  console.log('Users array:', users.map(u => ({ id: u.id, name: u.name })));
-  
-  const userIndex = users.findIndex(u => u.id === userId);
-  console.log('User index:', userIndex);
-  
-  if (userIndex === -1) {
-    return res.status(404).json({ error: 'User not found' });
-  }
-  
-  const avatarUrl = `/uploads/${req.file.filename}`;
-  users[userIndex].avatar = avatarUrl;
-  console.log('Updated user avatar:', users[userIndex].avatar);
-  
-  res.json({ success: true, filePath: avatarUrl });
 });
 
-// ============ PROFESSIONS ROUTES ============
-
-app.get('/api/professions', (req, res) => {
-  res.json(professions);
+app.put('/api/users/profile', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const updates = req.body;
+    
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { name: updates.name, phone: updates.phone, location: updates.location, avatar: updates.avatar },
+      { new: true }
+    );
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    if (updates.bio || updates.profession) {
+      await Provider.findOneAndUpdate(
+        { user: user._id },
+        { bio: updates.bio, profession: updates.profession }
+      );
+    }
+    
+    const { password: _, ...userWithoutPassword } = user.toObject();
+    res.json({ success: true, user: { ...userWithoutPassword, id: user._id } });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-app.post('/api/professions', (req, res) => {
-  const { name, icon, color } = req.body;
-  if (!name) {
-    return res.status(400).json({ success: false, error: 'Name is required' });
+app.post('/api/users/avatar', upload.single('file'), async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No file uploaded' });
+    }
+    
+    const avatarUrl = `/uploads/${req.file.filename}`;
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { avatar: avatarUrl },
+      { new: true }
+    );
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json({ success: true, filePath: avatarUrl });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-  const newProfession = {
-    id: professionIdCounter++,
-    name,
-    icon: icon || 'work',
-    color: color || '#64748b',
-  };
-  professions.push(newProfession);
-  res.json({ success: true, profession: newProfession });
+});
+
+// ============ PROFESSIONS/CATEGORIES ROUTES ============
+
+app.get('/api/professions', async (req, res) => {
+  try {
+    const categories = await Category.find();
+    res.json(categories);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/professions', async (req, res) => {
+  try {
+    const { name, icon, color } = req.body;
+    if (!name) {
+      return res.status(400).json({ success: false, error: 'Name is required' });
+    }
+    const category = await Category.create({ name, icon: icon || 'work', color: color || '#64748b' });
+    res.json({ success: true, profession: category });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // ============ PROVIDERS ROUTES ============
 
-app.get('/api/providers', (req, res) => {
-  const { profession, search, sort } = req.query;
-  let providersList = getProvidersFromUsers();
-  
-  if (profession) {
-    providersList = providersList.filter(p => p.profession.toLowerCase() === profession.toLowerCase());
+app.get('/api/providers', async (req, res) => {
+  try {
+    const { profession, search, sort } = req.query;
+    
+    let providers = await Provider.find().populate('user', 'name avatar phone location').populate('category');
+    
+    let providersList = providers.map(p => ({
+      id: p.user._id,
+      name: p.user.name,
+      email: p.user.email,
+      avatar: p.user.avatar,
+      phone: p.user.phone,
+      location: p.user.location,
+      role: 'provider',
+      professionId: p.category?._id,
+      profession: p.profession,
+      bio: p.bio,
+      hourlyRate: p.hourlyRate,
+      distance: Math.random() * 5 + 0.5,
+      experience: p.experience,
+      verified: p.verified,
+      rating: p.rating,
+      reviewCount: p.reviewCount,
+      jobsDone: p.jobsDone,
+      serviceArea: p.serviceArea,
+    }));
+    
+    if (profession) {
+      providersList = providersList.filter(p => p.profession?.toLowerCase() === profession.toLowerCase());
+    }
+    
+    if (search) {
+      providersList = providersList.filter(p => 
+        p.name?.toLowerCase().includes(search.toLowerCase()) ||
+        p.profession?.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+    
+    if (sort === 'rating') {
+      providersList.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    }
+    
+    if (sort === 'price_low') {
+      providersList.sort((a, b) => (a.hourlyRate || 0) - (b.hourlyRate || 0));
+    }
+    
+    if (sort === 'price_high') {
+      providersList.sort((a, b) => (b.hourlyRate || 0) - (a.hourlyRate || 0));
+    }
+    
+    for (let p of providersList) {
+      const services = await Service.find({ provider: p.id });
+      const portfolio = await Portfolio.find({ provider: p.id });
+      const reviews = await Review.find({ provider: p.id });
+      p.services = services;
+      p.portfolio = portfolio;
+      p.reviews = reviews;
+    }
+    
+    res.json(providersList);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-  
-  if (search) {
-    providersList = providersList.filter(p => 
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.profession.toLowerCase().includes(search.toLowerCase())
-    );
-  }
-  
-  if (sort === 'rating') {
-    providersList.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-  }
-  
-  if (sort === 'price_low') {
-    providersList.sort((a, b) => (a.hourlyRate || 0) - (b.hourlyRate || 0));
-  }
-  
-  if (sort === 'price_high') {
-    providersList.sort((a, b) => (b.hourlyRate || 0) - (a.hourlyRate || 0));
-  }
-  
-  res.json(providersList);
 });
 
-app.get('/api/providers/:id', (req, res) => {
-  const providersList = getProvidersFromUsers();
-  const provider = providersList.find(p => p.id === parseInt(req.params.id));
-  
-  if (provider) {
-    res.json(provider);
-  } else {
-    res.status(404).json({ error: 'Provider not found' });
+app.get('/api/providers/:id', async (req, res) => {
+  try {
+    const provider = await Provider.findOne({ user: req.params.id }).populate('user', 'name avatar phone location email').populate('category');
+    
+    if (!provider) {
+      return res.status(404).json({ error: 'Provider not found' });
+    }
+    
+    const services = await Service.find({ provider: provider._id });
+    const portfolio = await Portfolio.find({ provider: provider._id });
+    const reviews = await Review.find({ provider: provider._id }).populate('user', 'name avatar');
+    
+    res.json({
+      id: provider.user._id,
+      name: provider.user.name,
+      email: provider.user.email,
+      avatar: provider.user.avatar,
+      phone: provider.user.phone,
+      location: provider.user.location,
+      role: 'provider',
+      professionId: provider.category?._id,
+      profession: provider.profession,
+      bio: provider.bio,
+      hourlyRate: provider.hourlyRate,
+      distance: provider.distance,
+      experience: provider.experience,
+      verified: provider.verified,
+      rating: provider.rating,
+      reviewCount: provider.reviewCount,
+      jobsDone: provider.jobsDone,
+      serviceArea: provider.serviceArea,
+      services,
+      portfolio,
+      reviews,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
 // ============ SERVICES ROUTES ============
 
-app.get('/api/providers/:id/services', (req, res) => {
-  const providerId = parseInt(req.params.id);
-  const providerServices = services.filter(s => s.providerId === providerId);
-  res.json(providerServices);
+app.get('/api/providers/:id/services', async (req, res) => {
+  try {
+    const provider = await Provider.findOne({ user: req.params.id });
+    if (!provider) {
+      return res.status(404).json({ error: 'Provider not found' });
+    }
+    const services = await Service.find({ provider: provider._id });
+    res.json(services);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-app.post('/api/services', (req, res) => {
-  const userId = parseInt(req.headers['x-user-id']);
-  const user = users.find(u => u.id === userId);
-  
-  if (!user || user.role !== 'provider') {
-    res.status(403).json({ error: 'Only providers can add services' });
-    return;
+app.post('/api/services', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(403).json({ error: 'User not found' });
+    }
+    
+    const provider = await Provider.findOne({ user: userId });
+    if (!provider) {
+      return res.status(403).json({ error: 'Only providers can add services' });
+    }
+    
+    const { name, description, price, category } = req.body;
+    
+    const service = await Service.create({
+      provider: provider._id,
+      name,
+      description,
+      price: parseInt(price),
+      category: category || 'other',
+    });
+    
+    res.json({ success: true, service });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-  
-  const { name, description, price, category } = req.body;
-  
-  const newService = {
-    id: services.length + 1,
-    providerId: userId,
-    name,
-    description,
-    price: parseInt(price),
-    category: category || 'other',
-  };
-  
-  services.push(newService);
-  res.json({ success: true, service: newService });
 });
 
-app.put('/api/services/:id', (req, res) => {
-  const userId = parseInt(req.headers['x-user-id']);
-  const serviceId = parseInt(req.params.id);
-  
-  const serviceIndex = services.findIndex(s => s.id === serviceId && s.providerId === userId);
-  if (serviceIndex === -1) {
-    res.status(404).json({ error: 'Service not found' });
-    return;
+app.put('/api/services/:id', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const provider = await Provider.findOne({ user: userId });
+    
+    if (!provider) {
+      return res.status(403).json({ error: 'Only providers can update services' });
+    }
+    
+    const service = await Service.findOneAndUpdate(
+      { _id: req.params.id, provider: provider._id },
+      req.body,
+      { new: true }
+    );
+    
+    if (!service) {
+      return res.status(404).json({ error: 'Service not found' });
+    }
+    
+    res.json({ success: true, service });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-  
-  services[serviceIndex] = { ...services[serviceIndex], ...req.body };
-  res.json({ success: true, service: services[serviceIndex] });
 });
 
-app.delete('/api/services/:id', (req, res) => {
-  const userId = parseInt(req.headers['x-user-id']);
-  const serviceId = parseInt(req.params.id);
-  
-  const serviceIndex = services.findIndex(s => s.id === serviceId && s.providerId === userId);
-  if (serviceIndex === -1) {
-    res.status(404).json({ error: 'Service not found' });
-    return;
+app.delete('/api/services/:id', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const provider = await Provider.findOne({ user: userId });
+    
+    if (!provider) {
+      return res.status(403).json({ error: 'Only providers can delete services' });
+    }
+    
+    const service = await Service.findOneAndDelete({ _id: req.params.id, provider: provider._id });
+    
+    if (!service) {
+      return res.status(404).json({ error: 'Service not found' });
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-  
-  services.splice(serviceIndex, 1);
-  res.json({ success: true });
 });
 
 // ============ PORTFOLIO ROUTES ============
 
-app.get('/api/providers/:id/portfolio', (req, res) => {
-  const providerId = parseInt(req.params.id);
-  const providerPortfolio = portfolios.filter(p => p.providerId === providerId);
-  res.json(providerPortfolio);
+app.get('/api/providers/:id/portfolio', async (req, res) => {
+  try {
+    const provider = await Provider.findOne({ user: req.params.id });
+    if (!provider) {
+      return res.status(404).json({ error: 'Provider not found' });
+    }
+    const portfolio = await Portfolio.find({ provider: provider._id });
+    res.json(portfolio);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-app.post('/api/portfolio', (req, res) => {
-  const userId = parseInt(req.headers['x-user-id']);
-  const user = users.find(u => u.id === userId);
-  
-  if (!user || user.role !== 'provider') {
-    res.status(403).json({ error: 'Only providers can add portfolio' });
-    return;
+app.post('/api/portfolio', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+    
+    const provider = await Provider.findOne({ user: userId });
+    if (!provider) {
+      return res.status(403).json({ error: 'Only providers can add portfolio' });
+    }
+    
+    const { imageUrl, caption } = req.body;
+    
+    const portfolio = await Portfolio.create({
+      provider: provider._id,
+      imageUrl,
+      caption: caption || '',
+    });
+    
+    res.json({ success: true, portfolio });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-  
-  const { imageUrl, caption } = req.body;
-  
-  const newPortfolio = {
-    id: portfolios.length + 1,
-    providerId: userId,
-    imageUrl,
-    caption: caption || '',
-    createdAt: new Date().toISOString(),
-  };
-  
-  portfolios.push(newPortfolio);
-  res.json({ success: true, portfolio: newPortfolio });
 });
 
-app.delete('/api/portfolio/:id', (req, res) => {
-  const userId = parseInt(req.headers['x-user-id']);
-  const portfolioId = parseInt(req.params.id);
-  
-  const portfolioIndex = portfolios.findIndex(p => p.id === portfolioId && p.providerId === userId);
-  if (portfolioIndex === -1) {
-    res.status(404).json({ error: 'Portfolio not found' });
-    return;
+app.delete('/api/portfolio/:id', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const provider = await Provider.findOne({ user: userId });
+    
+    if (!provider) {
+      return res.status(403).json({ error: 'Only providers can delete portfolio' });
+    }
+    
+    const portfolio = await Portfolio.findOneAndDelete({ _id: req.params.id, provider: provider._id });
+    
+    if (!portfolio) {
+      return res.status(404).json({ error: 'Portfolio not found' });
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-  
-  portfolios.splice(portfolioIndex, 1);
-  res.json({ success: true });
 });
 
 // ============ POSTS ROUTES ============
 
-app.get('/api/posts', (req, res) => {
-  res.json(posts);
-});
-
-app.post('/api/posts', (req, res) => {
-  const userId = parseInt(req.headers['x-user-id']);
-  const user = users.find(u => u.id === userId);
-  
-  if (!user) {
-    res.status(401).json({ error: 'Unauthorized' });
-    return;
+app.get('/api/posts', async (req, res) => {
+  try {
+    const posts = await Post.find().populate('author', 'name avatar role').sort({ createdAt: -1 });
+    const postsWithAuthor = posts.map(p => ({
+      id: p._id,
+      authorId: p.author._id,
+      authorName: p.author.name,
+      authorAvatar: p.author.avatar,
+      content: p.content,
+      image: p.image,
+      likes: p.likes,
+      comments: p.comments,
+      type: p.type,
+      createdAt: p.createdAt,
+    }));
+    res.json(postsWithAuthor);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-  
-  const { content, image } = req.body;
-  
-  const newPost = {
-    id: posts.length + 1,
-    authorId: userId,
-    authorName: user.name,
-    authorAvatar: user.avatar,
-    content,
-    image: image || null,
-    likes: 0,
-    comments: 0,
-    createdAt: new Date().toISOString(),
-    type: 'post',
-  };
-  
-  posts.unshift(newPost);
-  res.json({ success: true, post: newPost });
 });
 
-app.post('/api/posts/:id/like', (req, res) => {
-  const postId = parseInt(req.params.id);
-  const post = posts.find(p => p.id === postId);
-  
-  if (post) {
+app.post('/api/posts', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    const { content, image } = req.body;
+    
+    const post = await Post.create({
+      author: userId,
+      content,
+      image: image || null,
+      type: 'post',
+    });
+    
+    const populatedPost = await Post.findById(post._id).populate('author', 'name avatar');
+    
+    res.json({ 
+      success: true, 
+      post: {
+        id: populatedPost._id,
+        authorId: populatedPost.author._id,
+        authorName: populatedPost.author.name,
+        authorAvatar: populatedPost.author.avatar,
+        content: populatedPost.content,
+        image: populatedPost.image,
+        likes: populatedPost.likes,
+        comments: populatedPost.comments,
+        type: populatedPost.type,
+        createdAt: populatedPost.createdAt,
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/posts/:id/like', async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    
+    if (!post) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+    
     post.likes += 1;
+    await post.save();
+    
     res.json({ success: true, likes: post.likes });
-  } else {
-    res.status(404).json({ error: 'Post not found' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============ VIDEOS ROUTES ============
+
+app.get('/api/videos', async (req, res) => {
+  try {
+    const videos = await Video.find().populate('user', 'name avatar role').sort({ createdAt: -1 });
+    const videosWithUsers = videos.map(v => ({
+      id: v._id,
+      userId: v.user._id,
+      userName: v.user.name,
+      userAvatar: v.user.avatar,
+      userRole: v.user.role,
+      videoUrl: v.videoUrl,
+      title: v.title,
+      description: v.description,
+      likes: v.likes,
+      views: v.views,
+      createdAt: v.createdAt,
+    }));
+    res.json(videosWithUsers);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/videos', upload.single('video'), async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No video file uploaded' });
+    }
+    
+    const { title, description } = req.body;
+    
+    const video = await Video.create({
+      user: userId,
+      videoUrl: `/uploads/${req.file.filename}`,
+      title: title || '',
+      description: description || '',
+    });
+    
+    const populatedVideo = await Video.findById(video._id).populate('user', 'name avatar role');
+    
+    res.json({ 
+      success: true, 
+      video: {
+        id: populatedVideo._id,
+        userId: populatedVideo.user._id,
+        userName: populatedVideo.user.name,
+        userAvatar: populatedVideo.user.avatar,
+        userRole: populatedVideo.user.role,
+        videoUrl: populatedVideo.videoUrl,
+        title: populatedVideo.title,
+        description: populatedVideo.description,
+        likes: populatedVideo.likes,
+        views: populatedVideo.views,
+        createdAt: populatedVideo.createdAt,
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/videos/:id/like', async (req, res) => {
+  try {
+    const video = await Video.findById(req.params.id);
+    
+    if (!video) {
+      return res.status(404).json({ error: 'Video not found' });
+    }
+    
+    video.likes += 1;
+    await video.save();
+    
+    res.json({ success: true, likes: video.likes });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/videos/:id', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const video = await Video.findOneAndDelete({ _id: req.params.id, user: userId });
+    
+    if (!video) {
+      return res.status(404).json({ error: 'Video not found or not authorized' });
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============ ARTICLES ROUTES ============
+
+app.get('/api/articles', async (req, res) => {
+  try {
+    const articles = await Article.find().populate('user', 'name avatar role').sort({ createdAt: -1 });
+    const articlesWithUsers = articles.map(a => ({
+      id: a._id,
+      userId: a.user._id,
+      userName: a.user.name,
+      userAvatar: a.user.avatar,
+      userRole: a.user.role,
+      title: a.title,
+      content: a.content,
+      imageUrl: a.imageUrl,
+      likes: a.likes,
+      createdAt: a.createdAt,
+    }));
+    res.json(articlesWithUsers);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/users/:id/articles', async (req, res) => {
+  try {
+    const articles = await Article.find({ user: req.params.id }).sort({ createdAt: -1 });
+    res.json(articles);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/articles', upload.single('image'), async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    const { title, content } = req.body;
+    
+    const article = await Article.create({
+      user: userId,
+      title: title || '',
+      content: content || '',
+      imageUrl: req.file ? `/uploads/${req.file.filename}` : null,
+    });
+    
+    const populatedArticle = await Article.findById(article._id).populate('user', 'name avatar role');
+    
+    res.json({ 
+      success: true, 
+      article: {
+        id: populatedArticle._id,
+        userId: populatedArticle.user._id,
+        userName: populatedArticle.user.name,
+        userAvatar: populatedArticle.user.avatar,
+        userRole: populatedArticle.user.role,
+        title: populatedArticle.title,
+        content: populatedArticle.content,
+        imageUrl: populatedArticle.imageUrl,
+        likes: populatedArticle.likes,
+        createdAt: populatedArticle.createdAt,
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/articles/:id/like', async (req, res) => {
+  try {
+    const article = await Article.findById(req.params.id);
+    
+    if (!article) {
+      return res.status(404).json({ error: 'Article not found' });
+    }
+    
+    article.likes += 1;
+    await article.save();
+    
+    res.json({ success: true, likes: article.likes });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/articles/:id', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const article = await Article.findOneAndDelete({ _id: req.params.id, user: userId });
+    
+    if (!article) {
+      return res.status(404).json({ error: 'Article not found or not authorized' });
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
 // ============ REVIEWS ROUTES ============
 
-app.get('/api/providers/:id/reviews', (req, res) => {
-  const providerId = parseInt(req.params.id);
-  const providerReviews = reviews.filter(r => r.providerId === providerId);
-  res.json(providerReviews);
+app.get('/api/providers/:id/reviews', async (req, res) => {
+  try {
+    const provider = await Provider.findOne({ user: req.params.id });
+    if (!provider) {
+      return res.status(404).json({ error: 'Provider not found' });
+    }
+    const reviews = await Review.find({ provider: provider._id }).populate('user', 'name avatar');
+    const reviewsData = reviews.map(r => ({
+      id: r._id,
+      providerId: provider._id,
+      clientId: r.user._id,
+      clientName: r.user.name,
+      clientAvatar: r.user.avatar,
+      rating: r.rating,
+      comment: r.comment,
+      createdAt: r.createdAt,
+    }));
+    res.json(reviewsData);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-app.post('/api/reviews', (req, res) => {
-  const userId = parseInt(req.headers['x-user-id']);
-  const user = users.find(u => u.id === userId);
-  
-  if (!user || user.role !== 'client') {
-    res.status(403).json({ error: 'Only clients can leave reviews' });
-    return;
+app.post('/api/reviews', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(403).json({ error: 'User not found' });
+    }
+    
+    const { providerId, rating, comment } = req.body;
+    const provider = await Provider.findOne({ user: providerId });
+    
+    if (!provider) {
+      return res.status(404).json({ error: 'Provider not found' });
+    }
+    
+    const review = await Review.create({
+      user: userId,
+      provider: provider._id,
+      rating: parseInt(rating),
+      comment: comment || '',
+    });
+    
+    res.json({ success: true, review });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-  
-  const { providerId, rating, comment } = req.body;
-  const providerIdInt = parseInt(providerId);
-  
-  const newReview = {
-    id: reviews.length + 1,
-    providerId: providerIdInt,
-    clientId: userId,
-    clientName: user.name,
-    clientAvatar: user.avatar,
-    rating: parseInt(rating),
-    comment,
-    createdAt: new Date().toISOString(),
-  };
-  
-  reviews.push(newReview);
-  
-  // Update provider rating
-  const providerReviews = reviews.filter(r => r.providerId === providerIdInt);
-  const avgRating = providerReviews.reduce((sum, r) => sum + r.rating, 0) / providerReviews.length;
-  const providerIndex = users.findIndex(u => u.id === providerIdInt);
-  if (providerIndex !== -1) {
-    users[providerIndex].rating = Math.round(avgRating * 10) / 10;
-    users[providerIndex].reviewCount = providerReviews.length;
+});
+
+// ============ USERS SEARCH ROUTES ============
+
+app.get('/api/users/search', async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q) {
+      return res.json([]);
+    }
+    
+    const query = q.toLowerCase();
+    const users = await User.find({ name: { $regex: query, $options: 'i' } });
+    const providers = await Provider.find({ profession: { $regex: query, $options: 'i' } }).populate('user', 'name avatar location');
+    
+    const matchingUsers = [
+      ...users.map(u => ({
+        id: u._id,
+        name: u.name,
+        avatar: u.avatar,
+        role: u.role,
+        profession: '',
+        location: u.location || '',
+        rating: 0,
+      })),
+      ...providers.map(p => ({
+        id: p.user._id,
+        name: p.user.name,
+        avatar: p.user.avatar,
+        role: 'provider',
+        profession: p.profession || '',
+        location: p.location || '',
+        rating: p.rating || 0,
+      })),
+    ];
+    
+    res.json(matchingUsers);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-  
-  res.json({ success: true, review: newReview });
 });
 
 // ============ FOLLOWS ROUTES ============
 
-app.post('/api/follow/:providerId', (req, res) => {
-  const userId = parseInt(req.headers['x-user-id']);
-  const providerId = parseInt(req.params.providerId);
-  
-  const existingFollow = follows.find(f => f.userId === userId && f.providerId === providerId);
-  const existingRequest = followRequests.find(r => r.fromUserId === userId && r.toUserId === providerId && r.status === 'pending');
-  
-  if (existingFollow) {
-    // Unfollow
-    const index = follows.indexOf(existingFollow);
-    follows.splice(index, 1);
-    res.json({ success: true, following: false });
-  } else if (existingRequest) {
-    // Cancel request
-    const reqIndex = followRequests.indexOf(existingRequest);
-    followRequests.splice(reqIndex, 1);
-    res.json({ success: true, following: false, message: 'Request cancelled' });
-  } else {
-    // Send follow request (don't follow immediately)
-    const fromUser = users.find(u => u.id === userId);
+app.post('/api/follow/:userId', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const targetUserId = req.params.userId;
     
-    followRequests.push({
-      id: followRequests.length + 1,
-      fromUserId: userId,
-      fromUserName: fromUser?.name || 'Someone',
-      toUserId: providerId,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-    });
+    if (userId === targetUserId) {
+      return res.status(400).json({ success: false, error: 'Cannot follow yourself' });
+    }
     
-    // Send notification to the provider/client
-    notifications.push({
-      id: notifications.length + 1,
-      userId: providerId,
-      type: 'follow_request',
-      title: 'New Follow Request',
-      text: `${fromUser?.name || 'Someone'} wants to follow you`,
-      read: false,
-      createdAt: new Date().toISOString(),
-    });
+    const existingFollow = await Follow.findOne({ user: userId, targetUser: targetUserId });
+    const existingRequest = await FollowRequest.findOne({ fromUser: userId, toUser: targetUserId, status: 'pending' });
     
-    res.json({ success: true, following: false, message: 'Follow request sent' });
+    if (existingFollow) {
+      await Follow.findByIdAndDelete(existingFollow._id);
+      res.json({ success: true, following: false });
+    } else if (existingRequest) {
+      await FollowRequest.findByIdAndDelete(existingRequest._id);
+      res.json({ success: true, following: false, message: 'Request cancelled' });
+    } else {
+      const fromUser = await User.findById(userId);
+      const targetUser = await User.findById(targetUserId);
+      
+      await FollowRequest.create({
+        fromUser: userId,
+        toUser: targetUserId,
+        status: 'pending',
+      });
+      
+      await Notification.create({
+        user: targetUserId,
+        type: 'follow_request',
+        title: 'New Follow Request',
+        text: `${fromUser?.name || 'Someone'} wants to follow you`,
+        fromUser: userId,
+      });
+      
+      res.json({ success: true, following: false, message: 'Follow request sent' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Accept or decline follow request
-app.post('/api/follow/respond', (req, res) => {
-  const userId = parseInt(req.headers['x-user-id']);
-  const { requestId, action } = req.body; // action: 'accept' or 'decline'
-  
-  const request = followRequests.find(r => r.id === parseInt(requestId) && r.toUserId === userId);
-  
-  if (!request) {
-    return res.status(404).json({ success: false, error: 'Request not found' });
-  }
-  
-  if (action === 'accept') {
-    // Add to follows
-    follows.push({
-      userId: request.fromUserId,
-      providerId: request.toUserId,
-      createdAt: new Date().toISOString(),
-    });
+app.post('/api/follow/respond', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const { requestId, action } = req.body;
     
-    // Update request status
-    request.status = 'accepted';
+    const request = await FollowRequest.findOne({ _id: requestId, toUser: userId });
     
-    // Notify the request sender
-    const fromUser = users.find(u => u.id === request.fromUserId);
-    notifications.push({
-      id: notifications.length + 1,
-      userId: request.fromUserId,
-      type: 'follow_accepted',
-      title: 'Follow Request Accepted',
-      text: 'accepted your follow request',
-      read: false,
-      createdAt: new Date().toISOString(),
-    });
+    if (!request) {
+      return res.status(404).json({ success: false, error: 'Request not found' });
+    }
     
-    res.json({ success: true, following: true });
-  } else {
-    // Decline
-    request.status = 'declined';
-    res.json({ success: true, following: false });
+    if (action === 'accept') {
+      await Follow.create({
+        user: request.fromUser,
+        targetUser: request.toUser,
+      });
+      
+      request.status = 'accepted';
+      await request.save();
+      
+      await Notification.create({
+        user: request.fromUser,
+        type: 'follow_accepted',
+        title: 'Follow Request Accepted',
+        text: 'accepted your follow request',
+      });
+      
+      res.json({ success: true, following: true });
+    } else {
+      request.status = 'declined';
+      await request.save();
+      res.json({ success: true, following: false });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Get pending follow requests for current user
-app.get('/api/follow/requests', (req, res) => {
-  const userId = parseInt(req.headers['x-user-id']);
-  const pendingRequests = followRequests.filter(r => r.toUserId === userId && r.status === 'pending');
-  res.json(pendingRequests);
+app.get('/api/follow/requests', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const pendingRequests = await FollowRequest.find({ toUser: userId, status: 'pending' }).populate('fromUser', 'name avatar');
+    const requestsData = pendingRequests.map(r => ({
+      id: r._id,
+      fromUserId: r.fromUser._id,
+      fromUserName: r.fromUser.name,
+      fromUserAvatar: r.fromUser.avatar,
+      toUserId: r.toUser,
+      status: r.status,
+      createdAt: r.createdAt,
+    }));
+    res.json(requestsData);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-// Get accepted followers
-app.get('/api/following', (req, res) => {
-  const userId = parseInt(req.headers['x-user-id']);
-  const following = follows.filter(f => f.userId === userId).map(f => f.providerId);
-  res.json(following);
+app.get('/api/following', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const following = await Follow.find({ user: userId });
+    res.json(following.map(f => f.targetUser));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-app.get('/api/providers/:id/followers', (req, res) => {
-  const providerId = parseInt(req.params.id);
-  const followers = follows.filter(f => f.providerId === providerId).map(f => f.userId);
-  res.json(followers);
+app.get('/api/users/:id/followers', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const follows = await Follow.find({ targetUser: userId }).populate('user', 'name avatar location');
+    const followers = follows.map(f => ({
+      id: f.user._id,
+      name: f.user.name,
+      avatar: f.user.avatar,
+      role: 'user',
+      profession: '',
+      location: f.user.location || '',
+    }));
+    res.json(followers);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/users/:id/following', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const following = await Follow.find({ user: userId }).populate('targetUser', 'name avatar location');
+    const followingData = following.map(f => ({
+      id: f.targetUser._id,
+      name: f.targetUser.name,
+      avatar: f.targetUser.avatar,
+      role: 'user',
+      profession: '',
+      location: f.targetUser.location || '',
+    }));
+    res.json(followingData);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get single user
+app.get('/api/users/:id', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const { password, ...userWithoutPassword } = user.toObject();
+    res.json({ ...userWithoutPassword, id: user._id });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // ============ SERVICE REQUESTS ROUTES ============
 
-app.post('/api/service-requests', (req, res) => {
-  const clientId = parseInt(req.headers['x-user-id']);
-  const { providerId, serviceName, description } = req.body;
-  
-  const newRequest = {
-    id: serviceRequests.length + 1,
-    clientId,
-    providerId: parseInt(providerId),
-    serviceName,
-    description,
-    status: 'pending',
-    createdAt: new Date().toISOString(),
-  };
-  
-  serviceRequests.push(newRequest);
-  
-  // Send notification to provider
-  const provider = users.find(u => u.id === parseInt(providerId));
-  if (provider) {
-    notifications.push({
-      id: notifications.length + 1,
-      userId: provider.id,
+app.post('/api/service-requests', async (req, res) => {
+  try {
+    const clientId = req.headers['x-user-id'];
+    const { providerId, serviceName, description } = req.body;
+    
+    const provider = await Provider.findOne({ user: providerId });
+    if (!provider) {
+      return res.status(404).json({ error: 'Provider not found' });
+    }
+    
+    const serviceRequest = await ServiceRequest.create({
+      client: clientId,
+      provider: provider._id,
+      serviceName,
+      description,
+      status: 'pending',
+    });
+    
+    await Notification.create({
+      user: providerId,
       type: 'request',
       title: 'New Service Request',
       text: `${serviceName} - ${description.substring(0, 50)}`,
-      read: false,
-      createdAt: new Date().toISOString(),
     });
+    
+    res.json({ success: true, request: serviceRequest });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-  
-  res.json({ success: true, request: newRequest });
 });
 
-app.get('/api/service-requests', (req, res) => {
-  const userId = parseInt(req.headers['x-user-id']);
-  const user = users.find(u => u.id === userId);
-  
-  if (!user) {
-    res.status(401).json({ error: 'Unauthorized' });
-    return;
+app.get('/api/service-requests', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    let userRequests;
+    if (user.role === 'client') {
+      userRequests = await ServiceRequest.find({ client: userId }).populate('provider');
+    } else {
+      const provider = await Provider.findOne({ user: userId });
+      if (provider) {
+        userRequests = await ServiceRequest.find({ provider: provider._id }).populate('client');
+      } else {
+        userRequests = [];
+      }
+    }
+    
+    const enrichedRequests = await Promise.all(userRequests.map(async (r) => {
+      let otherUser;
+      if (user.role === 'client') {
+        otherUser = await User.findById(r.provider.user);
+      } else {
+        otherUser = await User.findById(r.client);
+      }
+      return {
+        id: r._id,
+        clientId: r.client,
+        providerId: r.provider._id,
+        serviceName: r.serviceName,
+        description: r.description,
+        status: r.status,
+        createdAt: r.createdAt,
+        otherUserName: otherUser?.name || 'Unknown',
+        otherUserAvatar: otherUser?.avatar || '',
+        otherUserProfession: '',
+      };
+    }));
+    
+    res.json(enrichedRequests);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-  
-  let userRequests;
-  if (user.role === 'client') {
-    userRequests = serviceRequests.filter(r => r.clientId === userId);
-  } else {
-    userRequests = serviceRequests.filter(r => r.providerId === userId);
-  }
-  
-  const enrichedRequests = userRequests.map(r => {
-    const otherUser = users.find(u => u.id === (user.role === 'client' ? r.providerId : r.clientId));
-    return {
-      ...r,
-      otherUserName: otherUser?.name || 'Unknown',
-      otherUserAvatar: otherUser?.avatar || '',
-      otherUserProfession: otherUser?.profession || '',
-    };
-  });
-  
-  res.json(enrichedRequests);
 });
 
-app.put('/api/service-requests/:id', (req, res) => {
-  const userId = parseInt(req.headers['x-user-id']);
-  const requestId = parseInt(req.params.id);
-  const { status } = req.body;
-  
-  const requestIndex = serviceRequests.findIndex(r => r.id === requestId);
-  if (requestIndex === -1) {
-    res.status(404).json({ error: 'Request not found' });
-    return;
+app.put('/api/service-requests/:id', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const { status } = req.body;
+    
+    const serviceRequest = await ServiceRequest.findById(req.params.id).populate('client provider');
+    
+    if (!serviceRequest) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+    
+    serviceRequest.status = status;
+    await serviceRequest.save();
+    
+    await Notification.create({
+      user: serviceRequest.client._id,
+      type: 'request_update',
+      title: 'Service Request Update',
+      text: `Your request for ${serviceRequest.serviceName} has been ${status}`,
+    });
+    
+    res.json({ success: true, request: serviceRequest });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-  
-  serviceRequests[requestIndex].status = status;
-  
-  // Send notification to client
-  const request = serviceRequests[requestIndex];
-  notifications.push({
-    id: notifications.length + 1,
-    userId: request.clientId,
-    type: 'request_update',
-    title: 'Service Request Update',
-    text: `Your request for ${request.serviceName} has been ${status}`,
-    read: false,
-    createdAt: new Date().toISOString(),
-  });
-  
-  res.json({ success: true, request: serviceRequests[requestIndex] });
 });
 
 // ============ MESSAGES ROUTES ============
 
-app.get('/api/conversations', (req, res) => {
-  const userId = parseInt(req.headers['x-user-id']);
-  
-  const conversationMap = new Map();
-  
-  messages.forEach(msg => {
-    const otherId = msg.senderId === userId ? msg.receiverId : msg.senderId;
-    if (msg.senderId === userId || msg.receiverId === userId) {
-      if (!conversationMap.has(otherId) || new Date(msg.createdAt) > new Date(conversationMap.get(otherId).lastMessageTime)) {
-        const otherUser = users.find(u => u.id === otherId);
-        conversationMap.set(otherId, {
-          userId: otherId,
-          userName: otherUser?.name || 'Unknown',
-          userAvatar: otherUser?.avatar || '',
-          userRole: otherUser?.role || '',
-          userProfession: otherUser?.profession || '',
-          lastMessage: msg.text,
-          lastMessageTime: msg.createdAt,
-          unread: msg.receiverId === userId && !msg.read,
-        });
+const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id) && id.toString().length === 24 && /^[a-fA-F0-9]{24}$/.test(id);
+
+app.get('/api/conversations', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+
+    if (!userId || !isValidObjectId(userId)) {
+      return res.json([]);
+    }
+
+    // Get conversations where user is a participant
+    const conversations = await Conversation.find({
+      participants: userId
+    }).sort({ lastMessageAt: -1 });
+
+    const conversationData = await Promise.all(conversations.map(async (conv) => {
+      // Get the other participant
+      const otherUserId = conv.participants.find(p => p.toString() !== userId);
+      const otherUser = await User.findById(otherUserId).select('name avatar role');
+      
+      let profession = '';
+      if (otherUser?.role === 'provider') {
+        const provider = await Provider.findOne({ user: otherUserId });
+        profession = provider?.profession || '';
       }
-    }
-  });
-  
-  const conversations = Array.from(conversationMap.values()).sort((a, b) => 
-    new Date(b.lastMessageTime) - new Date(a.lastMessageTime)
-  );
-  
-  res.json(conversations);
+
+      // Get unread count
+      const unreadCount = await Message.countDocuments({
+        conversationId: conv._id,
+        receiver: userId,
+        read: false
+      });
+
+      return {
+        id: conv._id,
+        conversationId: conv._id,
+        userId: otherUserId,
+        userName: otherUser?.name || 'Unknown',
+        userAvatar: otherUser?.avatar || '',
+        userRole: otherUser?.role || 'user',
+        userProfession: profession,
+        lastMessage: conv.lastMessage || '',
+        lastMessageTime: conv.lastMessageAt,
+        unread: unreadCount,
+      };
+    }));
+
+    res.json(conversationData);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-app.get('/api/messages/:userId', (req, res) => {
-  const currentUserId = parseInt(req.headers['x-user-id']);
-  const otherUserId = parseInt(req.params.userId);
-  
-  const conversation = messages.filter(m => 
-    (m.senderId === currentUserId && m.receiverId === otherUserId) ||
-    (m.senderId === otherUserId && m.receiverId === currentUserId)
-  ).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-  
-  // Mark as read
-  messages.forEach(m => {
-    if (m.senderId === otherUserId && m.receiverId === currentUserId) {
-      m.read = true;
+app.get('/api/messages/:userId', async (req, res) => {
+  try {
+    const currentUserId = req.headers['x-user-id'];
+    const otherUserId = req.params.userId;
+
+    if (!currentUserId || !isValidObjectId(currentUserId) || !isValidObjectId(otherUserId)) {
+      return res.json([]);
     }
-  });
-  
-  res.json(conversation);
+
+    // Find or create conversation
+    let conversation = await Conversation.findOne({
+      participants: { $all: [currentUserId, otherUserId] }
+    });
+
+    if (!conversation) {
+      conversation = await Conversation.create({
+        participants: [currentUserId, otherUserId],
+      });
+    }
+
+    const messages = await Message.find({
+      conversationId: conversation._id
+    })
+      .populate('sender', 'name avatar')
+      .populate('receiver', 'name avatar')
+      .sort({ createdAt: 1 });
+
+    await Message.updateMany(
+      { conversationId: conversation._id, receiver: currentUserId, read: false },
+      { read: true }
+    );
+
+    const messagesData = messages.map(m => ({
+      id: m._id,
+      conversationId: m.conversationId,
+      senderId: m.sender._id,
+      senderName: m.sender.name,
+      senderAvatar: m.sender.avatar,
+      receiverId: m.receiver._id,
+      content: m.content,
+      mediaUrl: m.mediaUrl,
+      audioUrl: m.audioUrl,
+      type: m.type,
+      time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      read: m.read,
+      createdAt: m.createdAt,
+    }));
+
+    res.json(messagesData);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-app.post('/api/messages', (req, res) => {
-  const senderId = parseInt(req.headers['x-user-id']);
-  const { receiverId, text, mediaUrl, type } = req.body;
-  const receiverIdInt = parseInt(receiverId);
-  
-  const newMessage = {
-    id: messages.length + 1,
-    senderId,
-    receiverId: receiverIdInt,
-    text: text || '',
-    mediaUrl: mediaUrl || null,
-    type: type || 'text',
-    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    read: false,
-    createdAt: new Date().toISOString(),
-  };
-  
-  messages.push(newMessage);
-  
-  // Send notification
-  const notificationText = mediaUrl 
-    ? `${type}: ${mediaUrl}` 
-    : (text || 'New message');
-  notifications.push({
-    id: notifications.length + 1,
-    userId: receiverIdInt,
-    type: 'message',
-    title: 'New Message',
-    text: notificationText.substring(0, 50),
-    read: false,
-    createdAt: new Date().toISOString(),
-  });
-  
-  res.json(newMessage);
+app.post('/api/messages', async (req, res) => {
+  try {
+    const senderId = req.headers['x-user-id'];
+    const { receiverId, content, mediaUrl, audioUrl, type } = req.body;
+
+    if (!receiverId) {
+      return res.status(400).json({ error: 'receiverId is required' });
+    }
+
+    // Find or create conversation
+    let conversation = await Conversation.findOne({
+      participants: { $all: [senderId, receiverId] }
+    });
+
+    if (!conversation) {
+      conversation = await Conversation.create({
+        participants: [senderId, receiverId],
+      });
+    }
+
+    const message = await Message.create({
+      conversationId: conversation._id,
+      sender: senderId,
+      receiver: receiverId,
+      content: content || '',
+      mediaUrl: mediaUrl || null,
+      audioUrl: audioUrl || null,
+      type: type || 'text',
+      read: false
+    });
+
+    // Update conversation
+    conversation.lastMessage = content || (mediaUrl ? '[Media]' : '');
+    conversation.lastMessageAt = new Date();
+    await conversation.save();
+
+    // Create notification
+    await Notification.create({
+      user: receiverId,
+      type: 'message',
+      title: 'New Message',
+      text: content?.substring(0, 50) || 'New message',
+      fromUser: senderId,
+    });
+
+    const populatedMessage = await Message.findById(message._id)
+      .populate('sender', 'name avatar')
+      .populate('receiver', 'name avatar');
+
+    res.json({
+      id: populatedMessage._id,
+      conversationId: conversation._id,
+      senderId: populatedMessage.sender._id,
+      senderName: populatedMessage.sender.name,
+      senderAvatar: populatedMessage.sender.avatar,
+      receiverId: populatedMessage.receiver._id,
+      content: populatedMessage.content || '',
+      mediaUrl: populatedMessage.mediaUrl,
+      audioUrl: populatedMessage.audioUrl,
+      type: populatedMessage.type,
+      time: new Date(populatedMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      read: populatedMessage.read,
+      createdAt: populatedMessage.createdAt,
+    });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Upload media endpoint
@@ -1005,42 +1376,57 @@ app.post('/api/messages/media', upload.single('file'), (req, res) => {
 
 // ============ NOTIFICATIONS ROUTES ============
 
-app.get('/api/notifications', (req, res) => {
-  const userId = parseInt(req.headers['x-user-id']);
-  const userNotifications = notifications.filter(n => n.userId === userId)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  res.json(userNotifications);
+app.get('/api/notifications', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const notifications = await Notification.find({ user: userId }).populate('fromUser', 'name avatar').sort({ createdAt: -1 });
+    const notificationsData = notifications.map(n => ({
+      id: n._id,
+      userId: n.user,
+      type: n.type,
+      title: n.title,
+      text: n.text,
+      fromUserId: n.fromUser?._id,
+      fromUserAvatar: n.fromUser?.avatar,
+      fromUserName: n.fromUser?.name,
+      read: n.read,
+      createdAt: n.createdAt,
+    }));
+    res.json(notificationsData);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-app.put('/api/notifications/read', (req, res) => {
-  const userId = parseInt(req.headers['x-user-id']);
-  
-  notifications.forEach(n => {
-    if (n.userId === userId) {
-      n.read = true;
-    }
-  });
-  
-  res.json({ success: true });
+app.put('/api/notifications/read', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    await Notification.updateMany({ user: userId }, { read: true });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-app.get('/api/notifications/unread-count', (req, res) => {
-  const userId = parseInt(req.headers['x-user-id']);
-  const count = notifications.filter(n => n.userId === userId && !n.read).length;
-  res.json({ count });
+app.get('/api/notifications/unread-count', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const count = await Notification.countDocuments({ user: userId, read: false });
+    res.json({ count });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-// ============ CATEGORIES (for backward compatibility) ============
+// ============ CATEGORIES ============
 
-const categories = professions.map(p => ({
-  id: p.id,
-  name: p.name,
-  icon: p.icon,
-  color: `bg-[${p.color}]`,
-}));
-
-app.get('/api/categories', (req, res) => {
-  res.json(categories);
+app.get('/api/categories', async (req, res) => {
+  try {
+    const categories = await Category.find();
+    res.json(categories);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Serve static files in production
@@ -1051,7 +1437,3 @@ if (process.env.NODE_ENV === 'production') {
     res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
   });
 }
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});

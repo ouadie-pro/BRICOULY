@@ -5,6 +5,7 @@ import { api } from '../services/api';
 export default function ProviderProfileScreen({ isDesktop }) {
   const { id } = useParams();
   const [provider, setProvider] = useState(null);
+  const [error, setError] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [activeTab, setActiveTab] = useState('about');
   const [showRequestModal, setShowRequestModal] = useState(false);
@@ -19,18 +20,23 @@ export default function ProviderProfileScreen({ isDesktop }) {
 
   useEffect(() => {
     const fetchData = async () => {
+      setError(null);
       const [providerData, reviewsData, followingData] = await Promise.all([
         api.getProvider(id),
         api.getProviderReviews(id),
         api.getFollowing(),
       ]);
-      setProvider(providerData);
-      setReviews(reviewsData);
-      setFollowingList(followingData);
-      setFollowing(followingData.includes(parseInt(id)));
-      if (providerData.services?.length > 0) {
-        setSelectedService(providerData.services[0].name);
+      if (providerData && !providerData.error) {
+        setProvider(providerData);
+        if (providerData.services?.length > 0) {
+          setSelectedService(providerData.services[0].name);
+        }
+      } else {
+        setError(providerData?.error || 'Provider not found');
       }
+      setReviews(reviewsData || []);
+      setFollowingList(followingData || []);
+      setFollowing(followingData?.includes(parseInt(id)));
     };
     fetchData();
   }, [id]);
@@ -61,6 +67,21 @@ export default function ProviderProfileScreen({ isDesktop }) {
       }
     }
   };
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background-light dark:bg-background-dark p-4">
+        <span className="material-symbols-outlined text-6xl text-slate-300 mb-4">error</span>
+        <p className="text-slate-500 text-lg">{error}</p>
+        <button
+          onClick={() => navigate(-1)}
+          className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
+        >
+          Go Back
+        </button>
+      </div>
+    );
+  }
 
   if (!provider) {
     return (
