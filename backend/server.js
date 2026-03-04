@@ -14,6 +14,22 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+const User = require('./models/User');
+const Provider = require('./models/Provider');
+const Service = require('./models/Service');
+const Portfolio = require('./models/Portfolio');
+const Post = require('./models/Post');
+const Video = require('./models/Video');
+const Article = require('./models/Article');
+const Message = require('./models/Message');
+const Conversation = require('./models/Conversation');
+const Notification = require('./models/Notification');
+const Review = require('./models/Review');
+const Follow = require('./models/Follow');
+const FollowRequest = require('./models/FollowRequest');
+const ServiceRequest = require('./models/ServiceRequest');
+const Category = require('./models/Category');
+
 const seedCategories = async () => {
   try {
     const count = await Category.countDocuments();
@@ -36,22 +52,6 @@ mongoose.connect(process.env.MONGODB_URI)
     });
   })
   .catch(err => console.error('MongoDB Connection Error:', err));
-
-const User = require('./models/User');
-const Provider = require('./models/Provider');
-const Service = require('./models/Service');
-const Portfolio = require('./models/Portfolio');
-const Post = require('./models/Post');
-const Video = require('./models/Video');
-const Article = require('./models/Article');
-const Message = require('./models/Message');
-const Conversation = require('./models/Conversation');
-const Notification = require('./models/Notification');
-const Review = require('./models/Review');
-const Follow = require('./models/Follow');
-const FollowRequest = require('./models/FollowRequest');
-const ServiceRequest = require('./models/ServiceRequest');
-const Category = require('./models/Category');
 
 const multer = require('multer');
 const fs = require('fs');

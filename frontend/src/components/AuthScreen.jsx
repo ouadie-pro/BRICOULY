@@ -12,7 +12,7 @@ export default function AuthScreen({ onAuth }) {
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState('client');
   const [professionId, setProfessionId] = useState('');
-  const [professions, setProfessions] = useState([]);
+  const [professions, setProfessions] = useState(null);
   const [bio, setBio] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -99,7 +99,7 @@ export default function AuthScreen({ onAuth }) {
     try {
       const res = await api.addProfession({ name: newProfessionName.trim() });
       if (res.success) {
-        setProfessions([...professions, res.profession]);
+        setProfessions([...displayedProfessions, res.profession]);
         setProfessionId(res.profession.id);
         setNewProfessionName('');
         setShowAddProfession(false);
@@ -235,11 +235,11 @@ export default function AuthScreen({ onAuth }) {
                       <div className="grid grid-cols-2 gap-3">
                         {professions.map((prof) => (
                           <button
-                            key={prof.id}
+                            key={prof._id}
                             type="button"
-                            onClick={() => setProfessionId(prof.id)}
+                            onClick={() => setProfessionId(prof._id)}
                             className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${
-                              professionId === prof.id
+                              professionId === prof._id
                                 ? 'border-primary bg-blue-50'
                                 : 'border-slate-200 hover:border-slate-300'
                             }`}
