@@ -58,6 +58,7 @@ function App() {
       <Route path="/dashboard" element={<ProtectedRoute><ProviderDashboard isDesktop /></ProtectedRoute>} />
       <Route path="/requests" element={<ProtectedRoute><MyRequestsScreen isDesktop /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><ProfileScreen isDesktop onUserUpdate={handleUserUpdate} /></ProtectedRoute>} />
+      <Route path="/messages" element={<ProtectedRoute><MessagesScreen isDesktop /></ProtectedRoute>} />
       <Route path="/messages/:providerId" element={<ProtectedRoute><MessagesScreen isDesktop /></ProtectedRoute>} />
       <Route path="/review/:providerId" element={<ProtectedRoute><ReviewScreen isDesktop /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />

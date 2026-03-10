@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 
 export default function ReviewScreen({ isDesktop }) {
@@ -22,7 +22,14 @@ export default function ReviewScreen({ isDesktop }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await api.submitReview(providerId, rating, comment, punctuality, professionalism);
+    // Pass a single object — matches the fixed api.submitReview signature
+    await api.submitReview({
+      providerId,
+      rating,
+      comment,
+      punctuality,
+      professionalism,
+    });
     navigate('/home');
   };
 
@@ -60,12 +67,7 @@ export default function ReviewScreen({ isDesktop }) {
   const SmallStarRating = ({ value, onChange }) => (
     <div className="flex gap-0.5">
       {[1, 2, 3, 4, 5].map((star) => (
-        <button
-          key={star}
-          type="button"
-          onClick={() => onChange(star)}
-          className="focus:outline-none"
-        >
+        <button key={star} type="button" onClick={() => onChange(star)} className="focus:outline-none">
           <span
             className={`material-symbols-outlined ${value >= star ? 'text-primary' : 'text-slate-300 dark:text-slate-600'}`}
             style={{ fontSize: '20px', fontVariationSettings: "'FILL' 1" }}
@@ -81,10 +83,15 @@ export default function ReviewScreen({ isDesktop }) {
     return (
       <div className="relative flex h-full min-h-screen w-full flex-col overflow-x-hidden max-w-md mx-auto bg-white dark:bg-background-dark">
         <div className="flex items-center px-4 py-4 justify-between sticky top-0 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md z-10">
-          <button onClick={() => navigate(-1)} className="flex size-10 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex size-10 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
             <span className="material-symbols-outlined text-slate-900 dark:text-white" style={{ fontSize: '24px' }}>close</span>
           </button>
-          <h2 className="text-slate-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] text-center">Write a Review</h2>
+          <h2 className="text-slate-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] text-center">
+            Write a Review
+          </h2>
           <div className="w-10"></div>
         </div>
 
@@ -109,15 +116,23 @@ export default function ReviewScreen({ isDesktop }) {
                 </div>
               </div>
               <div className="flex flex-col items-center justify-center">
-                <p className="text-slate-900 dark:text-white text-xl font-bold leading-tight tracking-tight text-center">{provider.name}</p>
-                <p className="text-slate-500 dark:text-slate-400 text-sm font-medium leading-normal mt-1">{provider.profession} • Job #{providerId}029</p>
+                <p className="text-slate-900 dark:text-white text-xl font-bold leading-tight tracking-tight text-center">
+                  {provider.name}
+                </p>
+                <p className="text-slate-500 dark:text-slate-400 text-sm font-medium leading-normal mt-1">
+                  {provider.profession}
+                </p>
               </div>
             </div>
           </div>
 
           <div className="w-full mt-8 mb-2">
-            <h2 className="text-slate-900 dark:text-white tracking-tight text-2xl font-bold leading-tight text-center">How was your service?</h2>
-            <p className="text-slate-500 dark:text-slate-400 text-center text-sm mt-2">Your feedback helps {provider.name.split(' ')[0]} improve.</p>
+            <h2 className="text-slate-900 dark:text-white tracking-tight text-2xl font-bold leading-tight text-center">
+              How was your service?
+            </h2>
+            <p className="text-slate-500 dark:text-slate-400 text-center text-sm mt-2">
+              Your feedback helps {provider.name.split(' ')[0]} improve.
+            </p>
           </div>
 
           <div className="flex justify-center gap-2 py-4">
@@ -137,12 +152,14 @@ export default function ReviewScreen({ isDesktop }) {
           </div>
 
           <div className="flex w-full flex-col gap-2 mt-6">
-            <label className="text-slate-900 dark:text-white text-base font-semibold leading-normal pl-1">Additional Comments</label>
+            <label className="text-slate-900 dark:text-white text-base font-semibold leading-normal pl-1">
+              Additional Comments
+            </label>
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              className="form-input flex w-full min-w-0 resize-none overflow-hidden rounded-xl text-slate-900 dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:border-primary min-h-[140px] placeholder:text-slate-400 dark:placeholder:text-slate-500 p-4 text-base"
-              placeholder="Share your experience... Was the job done on time? Was the workspace left clean?"
+              className="form-input flex w-full resize-none overflow-hidden rounded-xl text-slate-900 dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:border-primary min-h-[140px] placeholder:text-slate-400 dark:placeholder:text-slate-500 p-4 text-base"
+              placeholder="Share your experience..."
               maxLength={500}
             />
             <div className="flex justify-between px-1">
@@ -202,7 +219,7 @@ export default function ReviewScreen({ isDesktop }) {
             </div>
             <div>
               <p className="text-lg font-bold text-slate-900">{provider.name}</p>
-              <p className="text-slate-500">{provider.profession} • Job #{providerId}029</p>
+              <p className="text-slate-500">{provider.profession}</p>
             </div>
           </div>
 
@@ -233,7 +250,7 @@ export default function ReviewScreen({ isDesktop }) {
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 focus:border-primary focus:ring-2 focus:ring-primary/50 p-4 text-base text-slate-900 placeholder:text-slate-400 min-h-[140px]"
-              placeholder="Share your experience... Was the job done on time? Was the workspace left clean?"
+              placeholder="Share your experience..."
               maxLength={500}
             />
             <div className="flex justify-between">

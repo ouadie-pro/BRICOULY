@@ -25,8 +25,7 @@ export default function Layout({ children, user, onLogout }) {
       setFollowRequests(requestsData);
     };
     loadNotifications();
-    
-    // Refresh every 30 seconds
+
     const interval = setInterval(loadNotifications, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -34,14 +33,13 @@ export default function Layout({ children, user, onLogout }) {
   const handleMarkRead = async () => {
     await api.markNotificationsRead();
     setUnreadCount(0);
-    setNotifications(notifications.map(n => ({ ...n, read: true })));
+    setNotifications(notifications.map((n) => ({ ...n, read: true })));
   };
 
   const handleFollowResponse = async (requestId, action) => {
     const res = await api.respondToFollowRequest(requestId, action);
     if (res.success) {
-      setFollowRequests(followRequests.filter(r => r.id !== requestId));
-      // Refresh notifications
+      setFollowRequests(followRequests.filter((r) => r.id !== requestId));
       const notifData = await api.getNotifications();
       setNotifications(notifData);
     }
@@ -61,8 +59,10 @@ export default function Layout({ children, user, onLogout }) {
         api.getProviders({ search: query }),
       ]);
       const combinedResults = [
-        ...users.map(u => ({ ...u, type: u.role === 'provider' ? 'provider' : 'client' })),
-        ...providers.filter(p => !users.find(u => u.id === p.id)).map(p => ({ ...p, type: 'provider' })),
+        ...users.map((u) => ({ ...u, type: u.role === 'provider' ? 'provider' : 'client' })),
+        ...providers
+          .filter((p) => !users.find((u) => String(u.id) === String(p.id)))
+          .map((p) => ({ ...p, type: 'provider' })),
       ];
       setSearchResults(combinedResults.slice(0, 6));
       setShowSearchResults(true);
@@ -102,12 +102,13 @@ export default function Layout({ children, user, onLogout }) {
     }
   };
 
+  // Fixed: messages link goes to /messages (list) instead of hardcoded /messages/1
   const clientNavItems = [
     { path: '/home', icon: 'home', label: 'Home' },
     { path: '/search', icon: 'search', label: 'Search' },
     { path: '/videos', icon: 'play_circle', label: 'Videos' },
     { path: '/requests', icon: 'assignment', label: 'My Requests' },
-    { path: '/messages/1', icon: 'chat_bubble', label: 'Messages' },
+    { path: '/messages', icon: 'chat_bubble', label: 'Messages' },
     { path: '/profile', icon: 'person', label: 'Profile' },
   ];
 
@@ -116,7 +117,7 @@ export default function Layout({ children, user, onLogout }) {
     { path: '/search', icon: 'search', label: 'Find Work' },
     { path: '/videos', icon: 'play_circle', label: 'Videos' },
     { path: '/dashboard', icon: 'dashboard', label: 'Dashboard' },
-    { path: '/messages/1', icon: 'chat_bubble', label: 'Messages' },
+    { path: '/messages', icon: 'chat_bubble', label: 'Messages' },
     { path: '/profile', icon: 'person', label: 'Profile' },
   ];
 
@@ -137,9 +138,7 @@ export default function Layout({ children, user, onLogout }) {
             <NavLink
               key={item.path}
               to={item.path}
-              className={({ isActive }) =>
-                `sidebar-item ${isActive ? 'active' : ''}`
-              }
+              className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}
             >
               <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>
                 {item.icon}
@@ -159,8 +158,8 @@ export default function Layout({ children, user, onLogout }) {
             {user?.avatar && user.avatar.length > 0 ? (
               <div
                 className="w-10 h-10 rounded-full bg-cover bg-center border-2 border-slate-200"
-                style={{ 
-                  backgroundImage: `url("${user.avatar.startsWith('http') ? user.avatar : window.location.origin + user.avatar}")` 
+                style={{
+                  backgroundImage: `url("${user.avatar.startsWith('http') ? user.avatar : window.location.origin + user.avatar}")`,
                 }}
               />
             ) : (
@@ -215,7 +214,11 @@ export default function Layout({ children, user, onLogout }) {
                     >
                       <div
                         className="w-10 h-10 rounded-full bg-cover bg-center bg-slate-200"
-                        style={{ backgroundImage: result.avatar ? `url("${result.avatar.startsWith('http') ? result.avatar : window.location.origin + result.avatar}")` : undefined }}
+                        style={{
+                          backgroundImage: result.avatar
+                            ? `url("${result.avatar.startsWith('http') ? result.avatar : window.location.origin + result.avatar}")`
+                            : undefined,
+                        }}
                       >
                         {!result.avatar && (
                           <div className="w-full h-full rounded-full flex items-center justify-center">
@@ -228,12 +231,14 @@ export default function Layout({ children, user, onLogout }) {
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-slate-900 truncate">{result.name}</p>
                         <p className="text-xs text-slate-500 truncate">
-                          {result.type === 'provider' ? (result.profession || 'Service Provider') : 'Client'}
+                          {result.type === 'provider' ? result.profession || 'Service Provider' : 'Client'}
                         </p>
                       </div>
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                        result.type === 'provider' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
-                      }`}>
+                      <span
+                        className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          result.type === 'provider' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                        }`}
+                      >
                         {result.type === 'provider' ? 'Provider' : 'Client'}
                       </span>
                     </button>
@@ -245,7 +250,7 @@ export default function Layout({ children, user, onLogout }) {
 
           <div className="flex items-center gap-3">
             <div className="relative">
-              <button 
+              <button
                 onClick={() => setShowNotifications(!showNotifications)}
                 className="relative p-2 rounded-full hover:bg-slate-100 transition-colors"
               >
@@ -254,7 +259,7 @@ export default function Layout({ children, user, onLogout }) {
                   <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
                 )}
               </button>
-              
+
               {showNotifications && (
                 <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-lg border border-slate-200 z-50">
                   <div className="flex items-center justify-between p-4 border-b border-slate-200">
@@ -265,8 +270,8 @@ export default function Layout({ children, user, onLogout }) {
                       </button>
                     )}
                   </div>
-                  
-                  {/* Follow Requests Section */}
+
+                  {/* Follow Requests */}
                   {followRequests.length > 0 && (
                     <div className="p-3 border-b border-slate-200 bg-blue-50">
                       <p className="text-xs font-semibold text-slate-600 mb-2">Follow Requests</p>
@@ -274,7 +279,11 @@ export default function Layout({ children, user, onLogout }) {
                         <div key={req.id} className="flex items-center gap-3 mb-3">
                           <div
                             className="w-10 h-10 rounded-full bg-cover bg-center bg-slate-200 shrink-0"
-                            style={{ backgroundImage: req.fromUserAvatar ? `url("${window.location.origin}${req.fromUserAvatar}")` : undefined }}
+                            style={{
+                              backgroundImage: req.fromUserAvatar
+                                ? `url("${window.location.origin}${req.fromUserAvatar}")`
+                                : undefined,
+                            }}
                           >
                             {!req.fromUserAvatar && (
                               <div className="w-full h-full rounded-full flex items-center justify-center">
@@ -286,9 +295,7 @@ export default function Layout({ children, user, onLogout }) {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-slate-900 truncate">{req.fromUserName}</p>
-                            <p className="text-xs text-slate-500">
-                              {req.fromUserRole === 'provider' ? req.fromUserProfession : 'Client'}
-                            </p>
+                            <p className="text-xs text-slate-500">wants to follow you</p>
                           </div>
                           <div className="flex gap-2 shrink-0">
                             <button
@@ -308,21 +315,23 @@ export default function Layout({ children, user, onLogout }) {
                       ))}
                     </div>
                   )}
-                  
+
                   <div className="max-h-80 overflow-y-auto">
                     {notifications.length === 0 ? (
                       <p className="p-4 text-center text-slate-500 text-sm">No notifications</p>
                     ) : (
                       notifications.slice(0, 10).map((notif) => (
-                        <div 
-                          key={notif.id} 
+                        <div
+                          key={notif.id}
                           className={`p-3 border-b border-slate-100 hover:bg-slate-50 ${!notif.read ? 'bg-blue-50' : ''}`}
                         >
                           <div className="flex items-start gap-3">
                             {notif.type === 'follow_request' && notif.fromUserAvatar ? (
                               <div
                                 className="w-8 h-8 rounded-full bg-cover bg-center bg-slate-200 shrink-0"
-                                style={{ backgroundImage: `url("${window.location.origin}${notif.fromUserAvatar}")` }}
+                                style={{
+                                  backgroundImage: `url("${window.location.origin}${notif.fromUserAvatar}")`,
+                                }}
                               />
                             ) : notif.type === 'follow_request' ? (
                               <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center shrink-0">
@@ -352,6 +361,7 @@ export default function Layout({ children, user, onLogout }) {
                 </div>
               )}
             </div>
+
             <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors">
               <span className="material-symbols-outlined text-slate-600" style={{ fontSize: '18px' }}>location_on</span>
               <span className="text-sm font-medium text-slate-700">Downtown, NY</span>
@@ -359,9 +369,7 @@ export default function Layout({ children, user, onLogout }) {
           </div>
         </header>
 
-        <div className="content-area">
-          {children}
-        </div>
+        <div className="content-area">{children}</div>
       </main>
     </div>
   );

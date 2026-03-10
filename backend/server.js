@@ -924,8 +924,8 @@ app.post('/api/follow/:userId', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Cannot follow yourself' });
     }
     
-    const existingFollow = await Follow.findOne({ user: userId, targetUser: targetUserId });
-    const existingRequest = await FollowRequest.findOne({ fromUser: userId, toUser: targetUserId, status: 'pending' });
+    const existingFollow = await Follow.findOne({ user: new mongoose.Types.ObjectId(userId), targetUser: new mongoose.Types.ObjectId(targetUserId) });
+    const existingRequest = await FollowRequest.findOne({ fromUser: new mongoose.Types.ObjectId(userId), toUser: new mongoose.Types.ObjectId(targetUserId), status: 'pending' });
     
     if (existingFollow) {
       await Follow.findByIdAndDelete(existingFollow._id);
@@ -938,17 +938,17 @@ app.post('/api/follow/:userId', async (req, res) => {
       const targetUser = await User.findById(targetUserId);
       
       await FollowRequest.create({
-        fromUser: userId,
-        toUser: targetUserId,
+        fromUser: new mongoose.Types.ObjectId(userId),
+        toUser: new mongoose.Types.ObjectId(targetUserId),
         status: 'pending',
       });
       
       await Notification.create({
-        user: targetUserId,
+        user: new mongoose.Types.ObjectId(targetUserId),
         type: 'follow_request',
         title: 'New Follow Request',
         text: `${fromUser?.name || 'Someone'} wants to follow you`,
-        fromUser: userId,
+        fromUser: new mongoose.Types.ObjectId(userId),
       });
       
       res.json({ success: true, following: false, message: 'Follow request sent' });
@@ -963,7 +963,7 @@ app.post('/api/follow/respond', async (req, res) => {
     const userId = req.headers['x-user-id'];
     const { requestId, action } = req.body;
     
-    const request = await FollowRequest.findOne({ _id: requestId, toUser: userId });
+    const request = await FollowRequest.findOne({ _id: new mongoose.Types.ObjectId(requestId), toUser: new mongoose.Types.ObjectId(userId) });
     
     if (!request) {
       return res.status(404).json({ success: false, error: 'Request not found' });
@@ -999,7 +999,7 @@ app.post('/api/follow/respond', async (req, res) => {
 app.get('/api/follow/requests', async (req, res) => {
   try {
     const userId = req.headers['x-user-id'];
-    const pendingRequests = await FollowRequest.find({ toUser: userId, status: 'pending' }).populate('fromUser', 'name avatar');
+    const pendingRequests = await FollowRequest.find({ toUser: new mongoose.Types.ObjectId(userId), status: 'pending' }).populate('fromUser', 'name avatar');
     const requestsData = pendingRequests.map(r => ({
       id: r._id,
       fromUserId: r.fromUser._id,
@@ -1018,7 +1018,7 @@ app.get('/api/follow/requests', async (req, res) => {
 app.get('/api/following', async (req, res) => {
   try {
     const userId = req.headers['x-user-id'];
-    const following = await Follow.find({ user: userId });
+    const following = await Follow.find({ user: new mongoose.Types.ObjectId(userId) });
     res.json(following.map(f => f.targetUser));
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1028,7 +1028,7 @@ app.get('/api/following', async (req, res) => {
 app.get('/api/users/:id/followers', async (req, res) => {
   try {
     const userId = req.params.id;
-    const follows = await Follow.find({ targetUser: userId }).populate('user', 'name avatar location');
+    const follows = await Follow.find({ targetUser: new mongoose.Types.ObjectId(userId) }).populate('user', 'name avatar location');
     const followers = follows.map(f => ({
       id: f.user._id,
       name: f.user.name,
@@ -1046,7 +1046,7 @@ app.get('/api/users/:id/followers', async (req, res) => {
 app.get('/api/users/:id/following', async (req, res) => {
   try {
     const userId = req.params.id;
-    const following = await Follow.find({ user: userId }).populate('targetUser', 'name avatar location');
+    const following = await Follow.find({ user: new mongoose.Types.ObjectId(userId) }).populate('targetUser', 'name avatar location');
     const followingData = following.map(f => ({
       id: f.targetUser._id,
       name: f.targetUser.name,
@@ -1197,7 +1197,7 @@ app.get('/api/conversations', async (req, res) => {
 
     // Get conversations where user is a participant
     const conversations = await Conversation.find({
-      participants: userId
+      participants: new mongoose.Types.ObjectId(userId)
     }).sort({ lastMessageAt: -1 });
 
     const conversationData = await Promise.all(conversations.map(async (conv) => {
@@ -1214,7 +1214,7 @@ app.get('/api/conversations', async (req, res) => {
       // Get unread count
       const unreadCount = await Message.countDocuments({
         conversationId: conv._id,
-        receiver: userId,
+        receiver: new mongoose.Types.ObjectId(userId),
         read: false
       });
 
@@ -1249,12 +1249,12 @@ app.get('/api/messages/:userId', async (req, res) => {
 
     // Find or create conversation
     let conversation = await Conversation.findOne({
-      participants: { $all: [currentUserId, otherUserId] }
+      participants: { $all: [new mongoose.Types.ObjectId(currentUserId), new mongoose.Types.ObjectId(otherUserId)] }
     });
 
     if (!conversation) {
       conversation = await Conversation.create({
-        participants: [currentUserId, otherUserId],
+        participants: [new mongoose.Types.ObjectId(currentUserId), new mongoose.Types.ObjectId(otherUserId)],
       });
     }
 
@@ -1266,7 +1266,7 @@ app.get('/api/messages/:userId', async (req, res) => {
       .sort({ createdAt: 1 });
 
     await Message.updateMany(
-      { conversationId: conversation._id, receiver: currentUserId, read: false },
+      { conversationId: conversation._id, receiver: new mongoose.Types.ObjectId(currentUserId), read: false },
       { read: true }
     );
 
@@ -1303,19 +1303,19 @@ app.post('/api/messages', async (req, res) => {
 
     // Find or create conversation
     let conversation = await Conversation.findOne({
-      participants: { $all: [senderId, receiverId] }
+      participants: { $all: [new mongoose.Types.ObjectId(senderId), new mongoose.Types.ObjectId(receiverId)] }
     });
 
     if (!conversation) {
       conversation = await Conversation.create({
-        participants: [senderId, receiverId],
+        participants: [new mongoose.Types.ObjectId(senderId), new mongoose.Types.ObjectId(receiverId)],
       });
     }
 
     const message = await Message.create({
       conversationId: conversation._id,
-      sender: senderId,
-      receiver: receiverId,
+      sender: new mongoose.Types.ObjectId(senderId),
+      receiver: new mongoose.Types.ObjectId(receiverId),
       content: content || '',
       mediaUrl: mediaUrl || null,
       audioUrl: audioUrl || null,
@@ -1330,11 +1330,11 @@ app.post('/api/messages', async (req, res) => {
 
     // Create notification
     await Notification.create({
-      user: receiverId,
+      user: new mongoose.Types.ObjectId(receiverId),
       type: 'message',
       title: 'New Message',
       text: content?.substring(0, 50) || 'New message',
-      fromUser: senderId,
+      fromUser: new mongoose.Types.ObjectId(senderId),
     });
 
     const populatedMessage = await Message.findById(message._id)

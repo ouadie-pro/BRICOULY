@@ -1,6 +1,6 @@
 const API_BASE = '/api';
 
-const getUserId = () => {
+export const getUserId = () => {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   return user.id;
 };
@@ -35,7 +35,7 @@ export const api = {
   updateProfile: async (updates) => {
     const res = await fetch(`${API_BASE}/users/profile`, {
       method: 'PUT',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'x-user-id': getUserId(),
       },
@@ -48,15 +48,12 @@ export const api = {
     const formData = new FormData();
     formData.append('file', file);
     const userId = getUserId();
-    console.log('Uploading avatar, userId:', userId);
     const res = await fetch(`${API_BASE}/users/avatar`, {
       method: 'POST',
       headers: { 'x-user-id': userId },
       body: formData,
     });
-    const result = await res.json();
-    console.log('Upload response:', result);
-    return result;
+    return res.json();
   },
 
   // Professions
@@ -80,7 +77,7 @@ export const api = {
     if (params.profession) queryParams.append('profession', params.profession);
     if (params.search) queryParams.append('search', params.search);
     if (params.sort) queryParams.append('sort', params.sort);
-    
+
     const res = await fetch(`${API_BASE}/providers?${queryParams}`);
     return res.json();
   },
@@ -99,7 +96,7 @@ export const api = {
   addService: async (serviceData) => {
     const res = await fetch(`${API_BASE}/services`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'x-user-id': getUserId(),
       },
@@ -111,7 +108,7 @@ export const api = {
   updateService: async (serviceId, serviceData) => {
     const res = await fetch(`${API_BASE}/services/${serviceId}`, {
       method: 'PUT',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'x-user-id': getUserId(),
       },
@@ -137,7 +134,7 @@ export const api = {
   addPortfolio: async (portfolioData) => {
     const res = await fetch(`${API_BASE}/portfolio`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'x-user-id': getUserId(),
       },
@@ -158,7 +155,7 @@ export const api = {
   createServiceRequest: async (requestData) => {
     const res = await fetch(`${API_BASE}/service-requests`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'x-user-id': getUserId(),
       },
@@ -177,7 +174,7 @@ export const api = {
   updateServiceRequest: async (requestId, status) => {
     const res = await fetch(`${API_BASE}/service-requests/${requestId}`, {
       method: 'PUT',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'x-user-id': getUserId(),
       },
@@ -195,7 +192,7 @@ export const api = {
   createPost: async (postData) => {
     const res = await fetch(`${API_BASE}/posts`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'x-user-id': getUserId(),
       },
@@ -290,10 +287,11 @@ export const api = {
     return res.json();
   },
 
+  // Fixed: now accepts an object to match ReviewScreen usage
   submitReview: async (reviewData) => {
     const res = await fetch(`${API_BASE}/reviews`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'x-user-id': getUserId(),
       },
@@ -302,9 +300,18 @@ export const api = {
     return res.json();
   },
 
-  // Follow
-  followProvider: async (providerId) => {
-    const res = await fetch(`${API_BASE}/follow/${providerId}`, {
+  // Follow — works for any user (client, provider, etc.)
+  followUser: async (targetUserId) => {
+    const res = await fetch(`${API_BASE}/follow/${targetUserId}`, {
+      method: 'POST',
+      headers: { 'x-user-id': getUserId() },
+    });
+    return res.json();
+  },
+
+  // Keep old name as alias so existing callers still work
+  followProvider: async (targetUserId) => {
+    const res = await fetch(`${API_BASE}/follow/${targetUserId}`, {
       method: 'POST',
       headers: { 'x-user-id': getUserId() },
     });
@@ -314,7 +321,7 @@ export const api = {
   respondToFollowRequest: async (requestId, action) => {
     const res = await fetch(`${API_BASE}/follow/respond`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'x-user-id': getUserId(),
       },
@@ -330,7 +337,8 @@ export const api = {
     return res.json();
   },
 
-  getFollowing: async () => {
+  // Get IDs of users the CURRENT user follows (no param)
+  getMyFollowing: async () => {
     const res = await fetch(`${API_BASE}/following`, {
       headers: { 'x-user-id': getUserId() },
     });
@@ -355,7 +363,7 @@ export const api = {
   sendMessage: async (receiverId, content) => {
     const res = await fetch(`${API_BASE}/messages`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'x-user-id': getUserId(),
       },
@@ -372,24 +380,19 @@ export const api = {
       headers: { 'x-user-id': getUserId() },
       body: formData,
     });
-    const result = await res.json();
-    console.log('Upload response:', result);
-    return result;
+    return res.json();
   },
 
   sendMediaMessage: async (receiverId, mediaUrl, type, content = '') => {
-    console.log('Sending media message:', { receiverId, mediaUrl, type, content });
     const res = await fetch(`${API_BASE}/messages`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'x-user-id': getUserId(),
       },
       body: JSON.stringify({ receiverId, content, mediaUrl, type }),
     });
-    const result = await res.json();
-    console.log('Send message response:', result);
-    return result;
+    return res.json();
   },
 
   // Notifications
@@ -415,7 +418,7 @@ export const api = {
     return res.json();
   },
 
-  // Categories (backward compatibility)
+  // Categories
   getCategories: async () => {
     const res = await fetch(`${API_BASE}/categories`);
     return res.json();
@@ -433,7 +436,7 @@ export const api = {
     return res.json();
   },
 
-  // Followers
+  // Followers / Following for a specific user profile
   getFollowers: async (userId) => {
     const res = await fetch(`${API_BASE}/users/${userId}/followers`);
     return res.json();
