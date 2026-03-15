@@ -283,11 +283,24 @@ export default function MessagesScreen({ isDesktop }) {
         <main className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
           {messages.map((msg) => {
             const isOwn = String(msg.senderId) === String(currentUser.id) || String(msg.sender) === String(currentUser.id);
+            const avatarUrl = isOwn ? currentUser.avatar : (provider?.avatar);
             return (
             <div
               key={msg.id || msg._id}
               className={`flex items-end gap-2 ${isOwn ? 'flex-row-reverse' : ''}`}
             >
+              {avatarUrl ? (
+                <div
+                  className="w-8 h-8 rounded-full bg-cover bg-center shrink-0"
+                  style={{ backgroundImage: `url("${avatarUrl}")` }}
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-slate-300 shrink-0 flex items-center justify-center">
+                  <span className="text-xs font-bold text-slate-500">
+                    {isOwn ? (currentUser.name?.charAt(0) || '?') : (provider?.name?.charAt(0) || '?')}
+                  </span>
+                </div>
+              )}
               <div className={`max-w-[80%] px-4 py-3 rounded-2xl text-[15px] ${
                 isOwn
                   ? 'bg-primary text-white rounded-tr-sm' 
@@ -463,24 +476,23 @@ export default function MessagesScreen({ isDesktop }) {
             <main className="flex-1 overflow-y-auto p-6 space-y-4">
               {messages.map((msg) => {
                 const isOwn = String(msg.senderId) === String(currentUser.id) || String(msg.sender) === String(currentUser.id);
+                const avatarUrl = isOwn ? currentUser.avatar : (provider?.avatar);
                 return (
                 <div
                   key={msg.id || msg._id}
                   className={`flex items-end gap-3 ${isOwn ? 'flex-row-reverse' : ''}`}
                 >
-                  {!isOwn && (
-                    provider?.avatar ? (
-                      <div
-                        className="w-8 h-8 rounded-full bg-cover bg-center shrink-0"
-                        style={{ backgroundImage: `url("${provider.avatar}")` }}
-                      />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-slate-300 shrink-0 flex items-center justify-center">
-                        <span className="text-xs font-bold text-slate-500">
-                          {provider?.name ? provider.name.charAt(0).toUpperCase() : '?'}
-                        </span>
-                      </div>
-                    )
+                  {avatarUrl ? (
+                    <div
+                      className="w-8 h-8 rounded-full bg-cover bg-center shrink-0"
+                      style={{ backgroundImage: `url("${avatarUrl}")` }}
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-slate-300 shrink-0 flex items-center justify-center">
+                      <span className="text-xs font-bold text-slate-500">
+                        {isOwn ? (currentUser.name?.charAt(0) || '?') : (provider?.name?.charAt(0) || '?')}
+                      </span>
+                    </div>
                   )}
         
                   <div className={`flex flex-col gap-1 max-w-[60%] ${isOwn ? 'items-end' : 'items-start'}`}>
@@ -547,6 +559,38 @@ export default function MessagesScreen({ isDesktop }) {
                   <span className="material-symbols-outlined text-[20px]">send</span>
                 </button>
               </form>
+              {showMediaPicker && (
+                <div className="absolute bottom-20 left-6 bg-white dark:bg-slate-800 rounded-lg shadow-lg p-2 flex gap-2 z-10">
+                  <input
+                    type="file"
+                    ref={imageInputRef}
+                    onChange={(e) => handleMediaSelect(e, 'image')}
+                    accept="image/*"
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => imageInputRef.current?.click()}
+                    className="flex flex-col items-center p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
+                  >
+                    <span className="material-symbols-outlined text-primary">image</span>
+                    <span className="text-xs">Image</span>
+                  </button>
+                  <input
+                    type="file"
+                    ref={videoInputRef}
+                    onChange={(e) => handleMediaSelect(e, 'video')}
+                    accept="video/*"
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => videoInputRef.current?.click()}
+                    className="flex flex-col items-center p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
+                  >
+                    <span className="material-symbols-outlined text-purple-500">videocam</span>
+                    <span className="text-xs">Video</span>
+                  </button>
+                </div>
+              )}
             </footer>
           </>
         ) : (

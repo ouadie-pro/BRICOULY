@@ -24,8 +24,15 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
   const [articleImagePreview, setArticleImagePreview] = useState(null);
   const [isSubmittingArticle, setIsSubmittingArticle] = useState(false);
   const [activeTab, setActiveTab] = useState('info');
+  const [portfolio, setPortfolio] = useState([]);
+  const [showPortfolioForm, setShowPortfolioForm] = useState(false);
+  const [portfolioImage, setPortfolioImage] = useState(null);
+  const [portfolioImagePreview, setPortfolioImagePreview] = useState(null);
+  const [portfolioCaption, setPortfolioCaption] = useState('');
+  const [isUploadingPortfolio, setIsUploadingPortfolio] = useState(false);
   const avatarInputRef = useRef(null);
   const articleImageInputRef = useRef(null);
+  const portfolioImageInputRef = useRef(null);
   const navigate = useNavigate();
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const targetUserId = isViewingOther ? userId : currentUser.id;
@@ -65,6 +72,12 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
         setArticles(userArticles);
         setFollowers(userFollowers);
         setFollowing(userFollowing);
+
+        // Fetch portfolio if user is a provider
+        if (userData?.role === 'provider' || currentUser.role === 'provider') {
+          const portfolioData = await api.getProviderPortfolio(targetUserId);
+          setPortfolio(portfolioData || []);
+        }
 
         // Check if current user already follows this profile
         if (isViewingOther && currentUser.id) {
@@ -167,6 +180,44 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
     const res = await api.likeArticle(articleId);
     if (res.success) {
       setArticles(articles.map((a) => (a.id === articleId ? { ...a, likes: res.likes } : a)));
+    }
+  };
+
+  const handlePortfolioImageSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setPortfolioImage(file);
+      setPortfolioImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleAddPortfolio = async () => {
+    if (!portfolioImage) return;
+    setIsUploadingPortfolio(true);
+    try {
+      const result = await api.uploadPortfolio(portfolioImage, portfolioCaption);
+      if (result.success) {
+        setPortfolio([result.portfolio, ...portfolio]);
+        setShowPortfolioForm(false);
+        setPortfolioImage(null);
+        setPortfolioImagePreview(null);
+        setPortfolioCaption('');
+      }
+    } catch (err) {
+      console.error('Error uploading portfolio:', err);
+    } finally {
+      setIsUploadingPortfolio(false);
+    }
+  };
+
+  const handleDeletePortfolio = async (portfolioId) => {
+    try {
+      const result = await api.deletePortfolio(portfolioId);
+      if (result.success) {
+        setPortfolio(portfolio.filter((p) => p._id !== portfolioId));
+      }
+    } catch (err) {
+      console.error('Error deleting portfolio:', err);
     }
   };
 
@@ -412,161 +463,157 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
 
   // ---- DESKTOP ----
   return (
-    <div className="p-8 max-w-4xl mx-auto w-full">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">{isViewingOther ? user?.name : 'My Profile'}</h1>
-        {isViewingOther ? (
-          <div className="flex gap-3">
-            <button
-              onClick={() => navigate(`/messages/${targetUserId}`)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-primary text-primary hover:bg-blue-50 transition-colors font-medium"
-            >
-              <span className="material-symbols-outlined">chat_bubble</span>
-              Message
-            </button>
-            <button
-              onClick={handleFollow}
-              disabled={followRequestSent}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                isFollowing || followRequestSent
-                  ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                  : 'bg-primary text-white hover:bg-blue-600'
-              }`}
-            >
-              <span className="material-symbols-outlined">{isFollowing ? 'person_remove' : 'person_add'}</span>
-              {followLabel}
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setIsEditing(!isEditing)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-              isEditing ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' : 'bg-primary text-white hover:bg-blue-600'
-            }`}
-          >
-            <span className="material-symbols-outlined">{isEditing ? 'close' : 'edit'}</span>
-            {isEditing ? 'Cancel' : 'Edit Profile'}
-          </button>
-        )}
+    <div className="p-8 max-w-5xl mx-auto w-full">
+      {/* Banner */}
+      <div className="h-40 rounded-t-2xl bg-gradient-to-r from-primary via-blue-500 to-purple-600 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgdmlld0JveD0iMCAwIDYwIDYwIj48ZyBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMtNi42MjcgMC0xMiA1LjM3My0xMiAxMnM1LjM3MyAxMiAxMiAxMiAxMi01LjM3MyAxMi0xMi01LjM3My0xMi0xMi0xMnptMCAxOGMtMy4zMTQgMC02LTIuNjg2LTYtNnMyLjY4Ni02IDYtNiA2IDIuNjg2IDYgNi0yLjY4NiA2LTYgNnoiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjEiLz48L2c+PC9zdmc+')] opacity-30"></div>
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Left column */}
-        <div className="md:col-span-1">
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-            <div className="flex flex-col items-center">
-              <div className="relative mb-4">
-                {hasAvatar ? (
-                  <div
-                    className="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-40 w-40 border-4 border-slate-100 shadow-md"
-                    style={{ backgroundImage: `url("${displayAvatar}")` }}
-                  />
+      
+      <div className="bg-white rounded-b-2xl shadow-sm border border-slate-200 border-t-0 px-8 pb-8">
+        {/* Avatar overlapping banner */}
+        <div className="relative -mt-16 mb-4 flex justify-between items-end">
+          <div className="relative">
+            {hasAvatar ? (
+              <div
+                className="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-32 w-32 border-4 border-white shadow-lg"
+                style={{ backgroundImage: `url("${displayAvatar}")` }}
+              />
+            ) : (
+              <div className="bg-slate-300 aspect-square rounded-full h-32 w-32 border-4 border-white shadow-lg flex items-center justify-center">
+                <span className="text-5xl font-bold text-slate-500">
+                  {user.name ? user.name.charAt(0).toUpperCase() : '?'}
+                </span>
+              </div>
+            )}
+            {isEditing && !isViewingOther && (
+              <button
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={isUploading}
+                className="absolute bottom-1 right-1 bg-primary rounded-full p-2 border-4 border-white hover:bg-blue-600 transition-colors shadow-md"
+              >
+                {isUploading ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                 ) : (
-                  <div className="bg-slate-300 aspect-square rounded-full h-40 w-40 border-4 border-slate-100 shadow-md flex items-center justify-center">
-                    <span className="text-5xl font-bold text-slate-500">
-                      {user.name ? user.name.charAt(0).toUpperCase() : '?'}
-                    </span>
-                  </div>
+                  <span className="material-symbols-outlined text-white text-sm">camera_alt</span>
                 )}
-                {isEditing && !isViewingOther && (
-                  <button
-                    onClick={() => avatarInputRef.current?.click()}
-                    disabled={isUploading}
-                    className="absolute bottom-2 right-2 bg-primary rounded-full p-2 border-4 border-white hover:bg-blue-600 transition-colors shadow-md"
-                  >
-                    {isUploading ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    ) : (
-                      <span className="material-symbols-outlined text-white text-sm">camera_alt</span>
-                    )}
-                  </button>
-                )}
-                <input
-                  type="file"
-                  ref={avatarInputRef}
-                  onChange={handleAvatarChange}
-                  accept="image/*"
-                  className="hidden"
-                />
-                {user.verified && (
-                  <div className="absolute bottom-2 left-2 bg-green-500 rounded-full p-1.5 border-4 border-white">
-                    <span className="material-symbols-outlined text-white text-sm">verified</span>
-                  </div>
-                )}
+              </button>
+            )}
+            <input
+              type="file"
+              ref={avatarInputRef}
+              onChange={handleAvatarChange}
+              accept="image/*"
+              className="hidden"
+            />
+            {user.verified && (
+              <div className="absolute bottom-2 left-2 bg-green-500 rounded-full p-1.5 border-4 border-white">
+                <span className="material-symbols-outlined text-white text-sm">verified</span>
               </div>
-
-              {isEditing && !isViewingOther ? (
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="text-center text-xl font-bold bg-transparent border-b border-primary focus:outline-none mb-1 w-full"
-                />
-              ) : (
-                <h2 className="text-xl font-bold text-slate-900 text-center">{user.name}</h2>
-              )}
-              <p className="text-slate-500 text-center mb-4">{user.role === 'provider' ? user.profession : 'Client'}</p>
-
-              <div className="flex justify-around w-full py-4 border-t border-b border-slate-100 mb-4">
+            )}
+          </div>
+          
+          <div className="flex gap-3 mb-2">
+            {isViewingOther ? (
+              <>
                 <button
-                  onClick={() => setActiveTab('followers')}
-                  className="flex flex-col items-center hover:text-primary transition-colors"
+                  onClick={() => navigate(`/messages/${targetUserId}`)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg border border-primary text-primary hover:bg-blue-50 transition-colors font-medium"
                 >
-                  <p className="text-lg font-bold text-slate-900">{followers.length}</p>
-                  <p className="text-xs text-slate-500">Followers</p>
+                  <span className="material-symbols-outlined">chat_bubble</span>
+                  Message
                 </button>
-                <div className="w-px bg-slate-200"></div>
                 <button
-                  onClick={() => setActiveTab('following')}
-                  className="flex flex-col items-center hover:text-primary transition-colors"
+                  onClick={handleFollow}
+                  disabled={followRequestSent}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                    isFollowing || followRequestSent
+                      ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                      : 'bg-primary text-white hover:bg-blue-600'
+                  }`}
                 >
-                  <p className="text-lg font-bold text-slate-900">{following.length}</p>
-                  <p className="text-xs text-slate-500">Following</p>
+                  <span className="material-symbols-outlined">{isFollowing ? 'person_remove' : 'person_add'}</span>
+                  {followLabel}
                 </button>
-                {user.role === 'provider' && (
-                  <>
-                    <div className="w-px bg-slate-200"></div>
-                    <div className="flex flex-col items-center">
-                      <p className="text-lg font-bold text-slate-900">{user.jobsDone || 0}</p>
-                      <p className="text-xs text-slate-500">Jobs Done</p>
-                    </div>
-                    <div className="w-px bg-slate-200"></div>
-                    <div className="flex flex-col items-center">
-                      <p className="text-lg font-bold text-slate-900">{user.rating || 0}</p>
-                      <p className="text-xs text-slate-500">Rating</p>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {isEditing && !isViewingOther && (
-                <button
-                  onClick={handleSave}
-                  className="w-full py-3 rounded-xl font-medium bg-primary text-white hover:bg-blue-600 transition-colors"
-                >
-                  Save Changes
-                </button>
-              )}
-            </div>
+              </>
+            ) : (
+              <button
+                onClick={() => setIsEditing(!isEditing)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                  isEditing ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' : 'bg-primary text-white hover:bg-blue-600'
+                }`}
+              >
+                <span className="material-symbols-outlined">{isEditing ? 'close' : 'edit'}</span>
+                {isEditing ? 'Cancel' : 'Edit Profile'}
+              </button>
+            )}
           </div>
         </div>
+        
+        {/* Name and title */}
+        <div className="mb-6">
+          {isEditing && !isViewingOther ? (
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="text-2xl font-bold bg-transparent border-b border-primary focus:outline-none w-full mb-1"
+            />
+          ) : (
+            <h1 className="text-2xl font-bold text-slate-900">{user?.name}</h1>
+          )}
+          <p className="text-slate-500">{user?.role === 'provider' ? user?.profession : 'Client'}</p>
+        </div>
+        
+        {/* Stats row */}
+        <div className="flex gap-8 py-4 border-y border-slate-200 mb-6">
+          <button
+            onClick={() => setActiveTab('followers')}
+            className="flex flex-col items-center hover:text-primary transition-colors"
+          >
+            <p className="text-xl font-bold text-slate-900">{followers.length}</p>
+            <p className="text-sm text-slate-500">Followers</p>
+          </button>
+          <button
+            onClick={() => setActiveTab('following')}
+            className="flex flex-col items-center hover:text-primary transition-colors"
+          >
+            <p className="text-xl font-bold text-slate-900">{following.length}</p>
+            <p className="text-sm text-slate-500">Following</p>
+          </button>
+          {user?.role === 'provider' && (
+            <>
+              <div className="flex flex-col items-center">
+                <p className="text-xl font-bold text-slate-900">{user?.jobsDone || 0}</p>
+                <p className="text-sm text-slate-500">Jobs Done</p>
+              </div>
+              <div className="flex flex-col items-center">
+                <p className="text-xl font-bold text-slate-900 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-amber-400 text-lg">star</span>
+                  {user?.rating || 0}
+                </p>
+                <p className="text-sm text-slate-500">Rating</p>
+              </div>
+            </>
+          )}
+        </div>
 
-        {/* Right column */}
-        <div className="md:col-span-2">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+        {/* Left column - Info card */}
+        <div className="md:col-span-1">
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-            <h3 className="text-lg font-semibold text-slate-900 mb-6">Profile Information</h3>
-            <div className="space-y-6">
-              <div className="flex items-center gap-4 p-4 rounded-lg bg-slate-50">
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">About</h3>
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <span className="material-symbols-outlined text-primary">mail</span>
                 </div>
                 <div className="flex-1">
                   <p className="text-xs text-slate-500">Email</p>
-                  <p className="text-sm font-medium text-slate-900">{user.email}</p>
+                  <p className="text-sm font-medium text-slate-900">{user?.email}</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 p-4 rounded-lg bg-slate-50">
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <span className="material-symbols-outlined text-primary">phone</span>
                 </div>
@@ -581,12 +628,12 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                       placeholder="Add phone number"
                     />
                   ) : (
-                    <p className="text-sm font-medium text-slate-900">{user.phone || 'Not set'}</p>
+                    <p className="text-sm font-medium text-slate-900">{user?.phone || 'Not set'}</p>
                   )}
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 p-4 rounded-lg bg-slate-50">
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <span className="material-symbols-outlined text-primary">location_on</span>
                 </div>
@@ -601,50 +648,62 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                       placeholder="Add location"
                     />
                   ) : (
-                    <p className="text-sm font-medium text-slate-900">{user.location || user.address || 'Not set'}</p>
+                    <p className="text-sm font-medium text-slate-900">{user?.location || user?.address || 'Not set'}</p>
                   )}
                 </div>
               </div>
 
-              {(user.role === 'provider' || user.bio) && (
-                <div className="flex items-start gap-4 p-4 rounded-lg bg-slate-50">
+              {(user?.role === 'provider' || user?.bio) && (
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-50">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-primary">description</span>
                   </div>
                   <div className="flex-1">
-                    <p className="text-xs text-slate-500 mb-2">Bio</p>
+                    <p className="text-xs text-slate-500 mb-1">Bio</p>
                     {isEditing && !isViewingOther && currentUser.role === 'provider' ? (
                       <textarea
                         value={bio}
                         onChange={(e) => setBio(e.target.value)}
                         className="text-sm font-medium bg-transparent border border-slate-200 rounded-lg p-2 w-full resize-none focus:outline-none focus:border-primary"
-                        rows={4}
+                        rows={3}
                         placeholder="Add bio"
                       />
                     ) : (
-                      <p className="text-sm font-medium text-slate-900">{user.bio || 'Not set'}</p>
+                      <p className="text-sm font-medium text-slate-900">{user?.bio || 'Not set'}</p>
                     )}
                   </div>
                 </div>
               )}
 
-              <div className="flex items-center gap-4 p-4 rounded-lg bg-slate-50">
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <span className="material-symbols-outlined text-primary">calendar_today</span>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">Member Since</p>
                   <p className="text-sm font-medium text-slate-900">
-                    {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
+                    {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
                   </p>
                 </div>
               </div>
+
+              {isEditing && !isViewingOther && (
+                <button
+                  onClick={handleSave}
+                  className="w-full py-3 rounded-xl font-medium bg-primary text-white hover:bg-blue-600 transition-colors"
+                >
+                  Save Changes
+                </button>
+              )}
             </div>
           </div>
+        </div>
 
+        {/* Right column - Tabs */}
+        <div className="md:col-span-2">
           <div className="mt-6">
             <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
-              {['info', 'followers', 'following', 'articles'].map((tab) => (
+              {['info', 'followers', 'following', ...(user?.role === 'provider' || currentUser.role === 'provider' ? ['portfolio'] : []), 'articles'].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -787,6 +846,122 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
               </div>
             )}
 
+            {activeTab === 'portfolio' && (user?.role === 'provider' || currentUser.role === 'provider') && (
+              <div className="mt-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-slate-900">Portfolio</h3>
+                  {isOwnProfile && (
+                    <button
+                      onClick={() => setShowPortfolioForm(true)}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-primary text-white text-sm rounded-lg hover:bg-blue-600 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">add</span>
+                      Add Work
+                    </button>
+                  )}
+                </div>
+
+                {showPortfolioForm && (
+                  <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-surface-dark rounded-2xl w-full max-w-md p-6">
+                      <h3 className="text-xl font-bold mb-4">Add Portfolio Item</h3>
+                      <div
+                        onClick={() => portfolioImageInputRef.current?.click()}
+                        className="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center cursor-pointer hover:border-primary transition-colors mb-4"
+                      >
+                        {portfolioImagePreview ? (
+                          <img
+                            src={portfolioImagePreview}
+                            alt="Preview"
+                            className="w-full max-h-48 object-contain rounded"
+                          />
+                        ) : (
+                          <>
+                            <span className="material-symbols-outlined text-4xl text-slate-400">add_photo_alternate</span>
+                            <p className="text-slate-500 mt-2">Click to select image</p>
+                          </>
+                        )}
+                      </div>
+                      <input
+                        type="file"
+                        ref={portfolioImageInputRef}
+                        onChange={handlePortfolioImageSelect}
+                        accept="image/*"
+                        className="hidden"
+                      />
+                      <input
+                        type="text"
+                        value={portfolioCaption}
+                        onChange={(e) => setPortfolioCaption(e.target.value)}
+                        placeholder="Caption (optional)"
+                        className="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent mb-3"
+                      />
+                      <div className="flex gap-3 mt-6">
+                        <button
+                          onClick={() => {
+                            setShowPortfolioForm(false);
+                            setPortfolioImage(null);
+                            setPortfolioImagePreview(null);
+                            setPortfolioCaption('');
+                          }}
+                          className="flex-1 py-3 rounded-lg border border-slate-200 font-medium"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleAddPortfolio}
+                          disabled={!portfolioImage || isUploadingPortfolio}
+                          className="flex-1 py-3 rounded-lg bg-primary text-white font-medium disabled:opacity-50"
+                        >
+                          {isUploadingPortfolio ? 'Uploading...' : 'Add'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {portfolio.length === 0 ? (
+                  <div className="text-center py-8 bg-slate-50 rounded-xl">
+                    <span className="material-symbols-outlined text-5xl text-slate-300">photo_library</span>
+                    <p className="text-slate-500 mt-2">No portfolio items yet</p>
+                    {isOwnProfile && (
+                      <button
+                        onClick={() => setShowPortfolioForm(true)}
+                        className="mt-3 px-4 py-2 bg-primary text-white text-sm rounded-lg"
+                      >
+                        Add Your First Work
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {portfolio.map((item) => (
+                      <div key={item._id} className="relative group aspect-square rounded-xl overflow-hidden bg-slate-100">
+                        <img
+                          src={item.imageUrl?.startsWith('http') ? item.imageUrl : `${window.location.origin}${item.imageUrl}`}
+                          alt={item.caption}
+                          className="w-full h-full object-cover"
+                        />
+                        {item.caption && (
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                            <p className="text-white text-xs truncate">{item.caption}</p>
+                          </div>
+                        )}
+                        {isOwnProfile && (
+                          <button
+                            onClick={() => handleDeletePortfolio(item._id)}
+                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 bg-red-500 text-white p-1.5 rounded-full transition-opacity"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">delete</span>
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {activeTab === 'followers' && (
               <div className="mt-4">
                 <h3 className="text-lg font-semibold text-slate-900 mb-4">Followers</h3>
@@ -903,6 +1078,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
               </div>
             )}
           </div>
+        </div>
         </div>
       </div>
     </div>

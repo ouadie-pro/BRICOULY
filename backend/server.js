@@ -534,22 +534,65 @@ app.delete('/api/portfolio/:id', async (req, res) => {
   }
 });
 
+// Portfolio upload endpoint
+app.post('/api/portfolio/upload', upload.single('image'), async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+    
+    const provider = await Provider.findOne({ user: userId });
+    if (!provider) {
+      return res.status(403).json({ error: 'Only providers can upload portfolio' });
+    }
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    
+    const { caption } = req.body;
+    const imageUrl = `/uploads/${req.file.filename}`;
+    
+    const portfolio = await Portfolio.create({
+      provider: provider._id,
+      imageUrl,
+      caption: caption || '',
+    });
+    
+    res.json({ success: true, portfolio });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ============ POSTS ROUTES ============
 
 app.get('/api/posts', async (req, res) => {
   try {
     const posts = await Post.find().populate('author', 'name avatar role').sort({ createdAt: -1 });
-    const postsWithAuthor = posts.map(p => ({
-      id: p._id,
-      authorId: p.author._id,
-      authorName: p.author.name,
-      authorAvatar: p.author.avatar,
-      content: p.content,
-      image: p.image,
-      likes: p.likes,
-      comments: p.comments,
-      type: p.type,
-      createdAt: p.createdAt,
+    const postsWithAuthor = await Promise.all(posts.map(async p => {
+      let authorProfession = null;
+      if (p.author.role === 'provider') {
+        const provider = await Provider.findOne({ user: p.author._id });
+        authorProfession = provider?.profession || null;
+      }
+      return {
+        id: p._id,
+        authorId: p.author._id,
+        authorName: p.author.name,
+        authorAvatar: p.author.avatar,
+        authorRole: p.author.role,
+        authorProfession,
+        content: p.content,
+        image: p.image,
+        likes: p.likes,
+        comments: p.comments,
+        type: p.type,
+        createdAt: p.createdAt,
+      };
     }));
     res.json(postsWithAuthor);
   } catch (error) {
@@ -575,7 +618,13 @@ app.post('/api/posts', async (req, res) => {
       type: 'post',
     });
     
-    const populatedPost = await Post.findById(post._id).populate('author', 'name avatar');
+    const populatedPost = await Post.findById(post._id).populate('author', 'name avatar role');
+    
+    let authorProfession = null;
+    if (user.role === 'provider') {
+      const provider = await Provider.findOne({ user: userId });
+      authorProfession = provider?.profession || null;
+    }
     
     res.json({ 
       success: true, 
@@ -584,6 +633,8 @@ app.post('/api/posts', async (req, res) => {
         authorId: populatedPost.author._id,
         authorName: populatedPost.author.name,
         authorAvatar: populatedPost.author.avatar,
+        authorRole: populatedPost.author.role,
+        authorProfession,
         content: populatedPost.content,
         image: populatedPost.image,
         likes: populatedPost.likes,
@@ -978,11 +1029,13 @@ app.post('/api/follow/respond', async (req, res) => {
       request.status = 'accepted';
       await request.save();
       
+      const currentUserObj = await User.findById(userId);
       await Notification.create({
         user: request.fromUser,
         type: 'follow_accepted',
         title: 'Follow Request Accepted',
-        text: 'accepted your follow request',
+        text: `${currentUserObj?.name || 'Someone'} accepted your follow request`,
+        fromUser: userId,
       });
       
       res.json({ success: true, following: true });

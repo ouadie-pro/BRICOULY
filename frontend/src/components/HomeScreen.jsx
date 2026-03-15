@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 
@@ -14,6 +14,12 @@ export default function HomeScreen({ isDesktop }) {
   const [providers, setProviders] = useState([]);
   const [posts, setPosts] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showPostForm, setShowPostForm] = useState(false);
+  const [postContent, setPostContent] = useState('');
+  const [postImage, setPostImage] = useState(null);
+  const [postImagePreview, setPostImagePreview] = useState(null);
+  const [isPosting, setIsPosting] = useState(false);
+  const postImageInputRef = useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -44,6 +50,40 @@ export default function HomeScreen({ isDesktop }) {
     const res = await api.likePost(postId);
     if (res.success) {
       setPosts(posts.map(p => p.id === postId ? { ...p, likes: res.likes } : p));
+    }
+  };
+
+  const handlePostImageSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setPostImage(file);
+      setPostImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleCreatePost = async () => {
+    if (!postContent.trim() && !postImage) return;
+    setIsPosting(true);
+    try {
+      let imageUrl = null;
+      if (postImage) {
+        const uploadRes = await api.uploadMedia(postImage);
+        if (uploadRes.success) {
+          imageUrl = uploadRes.filePath;
+        }
+      }
+      const result = await api.createPost({ content: postContent, image: imageUrl });
+      if (result.success) {
+        setPosts([result.post, ...posts]);
+        setShowPostForm(false);
+        setPostContent('');
+        setPostImage(null);
+        setPostImagePreview(null);
+      }
+    } catch (err) {
+      console.error('Error creating post:', err);
+    } finally {
+      setIsPosting(false);
     }
   };
 
@@ -149,13 +189,107 @@ export default function HomeScreen({ isDesktop }) {
             </div>
           </section>
 
-          {posts.length > 0 && (
-            <section>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-slate-900 dark:text-white text-lg font-bold">Latest Updates</h2>
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-slate-900 dark:text-white text-lg font-bold">Latest Updates</h2>
+            </div>
+            
+            {/* Create Post Box */}
+            <div className="bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 mb-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-full bg-cover bg-center bg-slate-200"
+                  style={{ backgroundImage: user?.avatar ? `url("${user.avatar}")` : undefined }}
+                >
+                  {!user?.avatar && (
+                    <div className="w-full h-full rounded-full flex items-center justify-center">
+                      <span className="text-sm font-bold text-slate-500">{user?.name?.charAt(0) || '?'}</span>
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => setShowPostForm(true)}
+                  className="flex-1 text-left px-4 py-2.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-sm"
+                >
+                  What's on your mind?
+                </button>
               </div>
+            </div>
+
+            {/* Create Post Modal */}
+            {showPostForm && (
+              <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+                <div className="bg-white dark:bg-surface-dark rounded-2xl w-full max-w-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold">Create Post</h3>
+                    <button onClick={() => setShowPostForm(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full">
+                      <span className="material-symbols-outlined">close</span>
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div
+                      className="w-10 h-10 rounded-full bg-cover bg-center bg-slate-200"
+                      style={{ backgroundImage: user?.avatar ? `url("${user.avatar}")` : undefined }}
+                    >
+                      {!user?.avatar && (
+                        <div className="w-full h-full rounded-full flex items-center justify-center">
+                          <span className="text-sm font-bold text-slate-500">{user?.name?.charAt(0) || '?'}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-900 dark:text-white">{user?.name}</p>
+                      <p className="text-xs text-slate-500">{user?.role === 'provider' ? user?.profession : 'Client'}</p>
+                    </div>
+                  </div>
+                  <textarea
+                    value={postContent}
+                    onChange={(e) => setPostContent(e.target.value)}
+                    placeholder="What's on your mind?"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent resize-none focus:outline-none focus:border-primary"
+                    rows={4}
+                  />
+                  {postImagePreview && (
+                    <div className="relative mt-4">
+                      <img src={postImagePreview} alt="Preview" className="w-full max-h-48 object-contain rounded-lg" />
+                      <button
+                        onClick={() => { setPostImage(null); setPostImagePreview(null); }}
+                        className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">close</span>
+                      </button>
+                    </div>
+                  )}
+                  <div className="flex gap-3 mt-4">
+                    <button
+                      onClick={() => postImageInputRef.current?.click()}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+                    >
+                      <span className="material-symbols-outlined text-primary">image</span>
+                      Photo
+                    </button>
+                    <input
+                      type="file"
+                      ref={postImageInputRef}
+                      onChange={handlePostImageSelect}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <div className="flex-1"></div>
+                    <button
+                      onClick={handleCreatePost}
+                      disabled={(!postContent.trim() && !postImage) || isPosting}
+                      className="px-6 py-2 rounded-lg bg-primary text-white font-medium disabled:opacity-50"
+                    >
+                      {isPosting ? 'Posting...' : 'Post'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
               <div className="space-y-4">
-                {posts.slice(0, 2).map((post) => (
+                {posts.length > 0 && posts.slice(0, 2).map((post) => (
                   <div key={post.id} className="bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-slate-100 dark:border-slate-800">
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-10 h-10 rounded-full bg-cover bg-center" style={{ backgroundImage: `url("${post.authorAvatar}")` }} />
@@ -181,10 +315,9 @@ export default function HomeScreen({ isDesktop }) {
                   </div>
                 ))}
               </div>
-            </section>
-          )}
+        </section>
 
-          <section>
+      <section>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-slate-900 dark:text-white text-lg font-bold">Popular Near You</h2>
               <button className="text-slate-400 dark:text-slate-500 hover:text-primary transition-colors">
@@ -299,27 +432,53 @@ export default function HomeScreen({ isDesktop }) {
         </div>
       </section>
 
-      {posts.length > 0 && (
-        <section>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-slate-900 text-xl font-bold">Latest Updates</h2>
-            <button className="text-primary text-sm font-medium hover:underline">View All</button>
+      <section>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-slate-900 text-xl font-bold">Latest Updates</h2>
+          <button className="text-primary text-sm font-medium hover:underline">View All</button>
+        </div>
+
+        {/* Create Post Box - Desktop */}
+        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200 mb-6">
+          <div className="flex items-center gap-4">
+            <div
+              className="w-12 h-12 rounded-full bg-cover bg-center bg-slate-200"
+              style={{ backgroundImage: user?.avatar ? `url("${user.avatar}")` : undefined }}
+            >
+              {!user?.avatar && (
+                <div className="w-full h-full rounded-full flex items-center justify-center">
+                  <span className="text-sm font-bold text-slate-500">{user?.name?.charAt(0) || '?'}</span>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setShowPostForm(true)}
+              className="flex-1 text-left px-5 py-3 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors text-slate-500 font-medium"
+            >
+              What's on your mind?
+            </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {posts.map((post) => (
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {posts.length > 0 ? posts.map((post) => (
               <div key={post.id} className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-12 h-12 rounded-full bg-cover bg-center" style={{ backgroundImage: `url("${post.authorAvatar}")` }} />
+                  <div className="w-12 h-12 rounded-full bg-cover bg-center bg-slate-200" style={{ backgroundImage: post.authorAvatar ? `url("${post.authorAvatar}")` : undefined }}>
+                    {!post.authorAvatar && (
+                      <div className="w-full h-full rounded-full flex items-center justify-center">
+                        <span className="text-sm font-bold text-slate-500">{post.authorName?.charAt(0) || '?'}</span>
+                      </div>
+                    )}
+                  </div>
                   <div>
                     <p className="font-semibold text-slate-900">{post.authorName}</p>
                     <p className="text-xs text-slate-500">{formatDate(post.createdAt)}</p>
                   </div>
                   <span className={`ml-auto px-2 py-0.5 rounded text-xs font-medium ${
-                    post.type === 'promo' ? 'bg-green-100 text-green-700' :
-                    post.type === 'tip' ? 'bg-blue-100 text-blue-700' :
-                    'bg-slate-100 text-slate-700'
+                    post.authorRole === 'provider' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
                   }`}>
-                    {post.type === 'promo' ? 'Promotion' : post.type === 'tip' ? 'Tip' : 'Post'}
+                    {post.authorRole === 'provider' ? (post.authorProfession || 'Provider') : 'Client'}
                   </span>
                 </div>
                 <p className="text-slate-700 text-sm mb-3">{post.content}</p>
@@ -340,10 +499,9 @@ export default function HomeScreen({ isDesktop }) {
                   </button>
                 </div>
               </div>
-            ))}
+            )) : null}
           </div>
         </section>
-      )}
 
       <section>
         <div className="flex items-center justify-between mb-6">

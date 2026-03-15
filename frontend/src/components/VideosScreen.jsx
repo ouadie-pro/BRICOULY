@@ -119,10 +119,15 @@ export default function VideosScreen({ isDesktop }) {
                         </div>
                       )}
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <p className="text-sm font-semibold text-text-light dark:text-text-dark">{video.userName}</p>
                       <p className="text-xs text-slate-500">{formatDate(video.createdAt)}</p>
                     </div>
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium shrink-0 ${
+                      video.userRole === 'provider' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {video.userRole === 'provider' ? video.userProfession : 'Client'}
+                    </span>
                   </div>
                   <h3 className="font-semibold text-text-light dark:text-text-dark">{video.title}</h3>
                   {video.description && (
@@ -232,7 +237,7 @@ export default function VideosScreen({ isDesktop }) {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {videos.map((video) => (
             <div key={video.id} className="bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200">
               <div className="relative aspect-video bg-slate-900">

@@ -143,6 +143,18 @@ export const api = {
     return res.json();
   },
 
+  uploadPortfolio: async (file, caption = '') => {
+    const formData = new FormData();
+    formData.append('image', file);
+    if (caption) formData.append('caption', caption);
+    const res = await fetch(`${API_BASE}/portfolio/upload`, {
+      method: 'POST',
+      headers: { 'x-user-id': getUserId() },
+      body: formData,
+    });
+    return res.json();
+  },
+
   deletePortfolio: async (portfolioId) => {
     const res = await fetch(`${API_BASE}/portfolio/${portfolioId}`, {
       method: 'DELETE',
