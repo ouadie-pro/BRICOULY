@@ -37,11 +37,22 @@ export default function Layout({ children, user, onLogout }) {
   };
 
   const handleFollowResponse = async (requestId, action) => {
-    const res = await api.respondToFollowRequest(requestId, action);
-    if (res.success) {
-      setFollowRequests(followRequests.filter((r) => r.id !== requestId));
-      const notifData = await api.getNotifications();
-      setNotifications(notifData);
+    console.log('requestId:', requestId);
+    if (!requestId) {
+      alert('Error: request ID is missing');
+      return;
+    }
+    try {
+      const res = await api.respondToFollowRequest(String(requestId), action);
+      if (res.success) {
+        setFollowRequests(prev => prev.filter((r) => String(r._id || r.id) !== String(requestId)));
+        const notifData = await api.getNotifications();
+        setNotifications(notifData);
+      } else {
+        alert('Failed: ' + (res.error || 'Unknown error'));
+      }
+    } catch (err) {
+      alert('Error: ' + err.message);
     }
   };
 
@@ -276,7 +287,7 @@ export default function Layout({ children, user, onLogout }) {
                     <div className="p-3 border-b border-slate-200 bg-blue-50">
                       <p className="text-xs font-semibold text-slate-600 mb-2">Follow Requests</p>
                       {followRequests.map((req) => (
-                        <div key={req.id} className="flex items-center gap-3 mb-3">
+                        <div key={req._id || req.id} className="flex items-center gap-3 mb-3">
                           <div
                             className="w-10 h-10 rounded-full bg-cover bg-center bg-slate-200 shrink-0"
                             style={{
@@ -299,13 +310,13 @@ export default function Layout({ children, user, onLogout }) {
                           </div>
                           <div className="flex gap-2 shrink-0">
                             <button
-                              onClick={() => handleFollowResponse(req.id, 'accept')}
+                              onClick={() => handleFollowResponse(req._id || req.id, 'accept')}
                               className="text-xs px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600"
                             >
                               Accept
                             </button>
                             <button
-                              onClick={() => handleFollowResponse(req.id, 'decline')}
+                              onClick={() => handleFollowResponse(req._id || req.id, 'decline')}
                               className="text-xs px-2 py-1 bg-slate-300 text-slate-700 rounded hover:bg-slate-400"
                             >
                               Decline

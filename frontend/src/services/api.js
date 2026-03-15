@@ -1,8 +1,16 @@
 const API_BASE = '/api';
 
+// Get userId from localStorage
 export const getUserId = () => {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  return user.id;
+  const userId = user.id;
+  
+  // Validate - must be 24 hex characters
+  if (!userId || userId.length !== 24) {
+    console.warn('Invalid userId in localStorage:', userId, '- needs to be 24 chars');
+  }
+  
+  return userId;
 };
 
 export const api = {

@@ -179,7 +179,7 @@ export default function HomeScreen({ isDesktop }) {
             </div>
             <div className="grid grid-cols-4 gap-x-4 gap-y-6">
               {categories.map((cat) => (
-                <button key={cat.id} className="flex flex-col items-center gap-2 group" onClick={() => navigate(`/search?q=${cat.name}`)}>
+                <button key={cat._id || cat.id} className="flex flex-col items-center gap-2 group" onClick={() => navigate(`/search?q=${cat.name}`)}>
                   <div className={`size-14 rounded-2xl flex items-center justify-center shadow-sm transition-colors ${cat.color} group-hover:bg-primary group-hover:text-white`}>
                     <span className="material-symbols-outlined" style={{ fontSize: '28px' }}>{cat.icon}</span>
                   </div>
@@ -290,7 +290,7 @@ export default function HomeScreen({ isDesktop }) {
 
               <div className="space-y-4">
                 {posts.length > 0 && posts.slice(0, 2).map((post) => (
-                  <div key={post.id} className="bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-slate-100 dark:border-slate-800">
+                  <div key={post._id || post.id} className="bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-slate-100 dark:border-slate-800">
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-10 h-10 rounded-full bg-cover bg-center" style={{ backgroundImage: `url("${post.authorAvatar}")` }} />
                       <div>
@@ -303,7 +303,7 @@ export default function HomeScreen({ isDesktop }) {
                       <div className="w-full h-40 rounded-lg bg-cover bg-center mb-2" style={{ backgroundImage: `url("${post.image}")` }} />
                     )}
                     <div className="flex items-center gap-4">
-                      <button onClick={() => handleLikePost(post.id)} className="flex items-center gap-1 text-slate-500 text-sm">
+                      <button onClick={() => handleLikePost(post._id)} className="flex items-center gap-1 text-slate-500 text-sm">
                         <span className="material-symbols-outlined text-[18px]">favorite</span>
                         {post.likes}
                       </button>
@@ -327,8 +327,8 @@ export default function HomeScreen({ isDesktop }) {
             <div className="flex flex-col gap-4">
               {providers.slice(0, 3).map((provider) => (
                 <Link
-                  key={provider.id}
-                  to={`/provider/${provider.id}`}
+                  key={provider._id || provider.id}
+                  to={`/provider/${provider._id || provider.id}`}
                   className="flex gap-4 p-4 rounded-2xl bg-white dark:bg-surface-dark shadow-card border border-transparent dark:border-slate-800"
                 >
                   <div
@@ -422,7 +422,7 @@ export default function HomeScreen({ isDesktop }) {
         </div>
         <div className="grid grid-cols-4 xl:grid-cols-8 gap-4">
           {categories.map((cat) => (
-            <button key={cat.id} className="flex flex-col items-center gap-3 group p-4 rounded-xl hover:bg-slate-50 transition-colors" onClick={() => navigate(`/search?q=${cat.name}`)}>
+            <button key={cat._id || cat.id} className="flex flex-col items-center gap-3 group p-4 rounded-xl hover:bg-slate-50 transition-colors" onClick={() => navigate(`/search?q=${cat.name}`)}>
               <div className={`size-16 rounded-2xl flex items-center justify-center shadow-sm transition-colors ${cat.color} group-hover:bg-primary group-hover:text-white`}>
                 <span className="material-symbols-outlined" style={{ fontSize: '32px' }}>{cat.icon}</span>
               </div>
@@ -486,7 +486,7 @@ export default function HomeScreen({ isDesktop }) {
                   <div className="w-full h-48 rounded-lg bg-cover bg-center mb-3" style={{ backgroundImage: `url("${post.image}")` }} />
                 )}
                 <div className="flex items-center gap-4 pt-3 border-t border-slate-100">
-                  <button onClick={() => handleLikePost(post.id)} className="flex items-center gap-1.5 text-slate-500 hover:text-red-500 text-sm transition-colors">
+                  <button onClick={() => handleLikePost(post._id)} className="flex items-center gap-1.5 text-slate-500 hover:text-red-500 text-sm transition-colors">
                     <span className="material-symbols-outlined text-[20px]">favorite</span>
                     {post.likes}
                   </button>

@@ -1010,55 +1010,105 @@ app.post('/api/follow/:userId', async (req, res) => {
 });
 
 app.post('/api/follow/respond', async (req, res) => {
+  console.log('=== /api/follow/respond START ===');
+  console.log('req.body:', req.body);
+  console.log('x-user-id header:', req.headers['x-user-id']);
+
   try {
     const userId = req.headers['x-user-id'];
     const { requestId, action } = req.body;
-    
-    const request = await FollowRequest.findOne({ _id: new mongoose.Types.ObjectId(requestId), toUser: new mongoose.Types.ObjectId(userId) });
-    
-    if (!request) {
-      return res.status(404).json({ success: false, error: 'Request not found' });
+
+    // 1️⃣ Validate inputs
+    if (!requestId || !userId) {
+      return res.status(400).json({ success: false, error: 'Missing requestId or userId' });
     }
-    
+
+    const isValidObjectId = (id) => /^[a-fA-F0-9]{24}$/.test(id);
+    if (!isValidObjectId(requestId)) {
+      return res.status(400).json({ success: false, error: 'Invalid requestId' });
+    }
+    if (!isValidObjectId(userId)) {
+      return res.status(400).json({ success: false, error: 'Invalid userId' });
+    }
+
+    // 2️⃣ Find follow request
+    const followRequest = await FollowRequest.findById(requestId);
+    if (!followRequest) {
+      return res.status(404).json({ success: false, error: 'Follow request not found' });
+    }
+
+    // 3️⃣ Check authorization
+    if (followRequest.toUser.toString() !== userId) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' });
+    }
+
+    // 4️⃣ Handle accept/decline
     if (action === 'accept') {
-      await Follow.create({
-        user: request.fromUser,
-        targetUser: request.toUser,
-      });
-      
-      request.status = 'accepted';
-      await request.save();
-      
-      const currentUserObj = await User.findById(userId);
-      await Notification.create({
-        user: request.fromUser,
-        type: 'follow_accepted',
-        title: 'Follow Request Accepted',
-        text: `${currentUserObj?.name || 'Someone'} accepted your follow request`,
-        fromUser: userId,
-      });
-      
-      res.json({ success: true, following: true });
+      // Create follow if not exists
+      try {
+        await Follow.updateOne(
+          { user: followRequest.fromUser, targetUser: followRequest.toUser },
+          { user: followRequest.fromUser, targetUser: followRequest.toUser },
+          { upsert: true }
+        );
+        console.log('Follow created or already exists');
+      } catch (e) {
+        console.error('Error creating follow:', e);
+      }
+
+      // Update request status
+      followRequest.status = 'accepted';
+      await followRequest.save();
+      console.log('FollowRequest status set to accepted');
+
+      // Send notification
+      const currentUser = await User.findById(userId);
+      try {
+        await Notification.create({
+          user: followRequest.fromUser,
+          type: 'follow_accepted',
+          title: 'Follow Request Accepted',
+          text: `${currentUser?.name || 'Someone'} accepted your follow request`,
+          fromUser: userId,
+        });
+        console.log('Notification sent');
+      } catch (notifError) {
+        console.error('Notification creation failed:', notifError.message);
+      }
+
+      return res.json({ success: true, message: 'Follow request accepted' });
+
+    } else if (action === 'decline') {
+      followRequest.status = 'declined';
+      await followRequest.save();
+      console.log('FollowRequest status set to declined');
+      return res.json({ success: true, message: 'Follow request declined' });
+
     } else {
-      request.status = 'declined';
-      await request.save();
-      res.json({ success: true, following: false });
+      return res.status(400).json({ success: false, error: 'Invalid action' });
     }
+
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('=== ERROR in /api/follow/respond ===');
+    console.error(error);
+    return res.status(500).json({ success: false, error: 'Server error: ' + error.message });
   }
 });
-
 app.get('/api/follow/requests', async (req, res) => {
   try {
     const userId = req.headers['x-user-id'];
-    const pendingRequests = await FollowRequest.find({ toUser: new mongoose.Types.ObjectId(userId), status: 'pending' }).populate('fromUser', 'name avatar');
+    
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ success: false, error: 'Invalid userId' });
+    }
+    
+    const pendingRequests = await FollowRequest.find({ toUser: new mongoose.Types.ObjectId(userId), status: 'pending' }).populate('fromUser', 'name avatar').lean();
     const requestsData = pendingRequests.map(r => ({
-      id: r._id,
-      fromUserId: r.fromUser._id,
+      id: r._id.toString(),
+      fromUserId: r.fromUser._id.toString(),
       fromUserName: r.fromUser.name,
       fromUserAvatar: r.fromUser.avatar,
-      toUserId: r.toUser,
+      toUserId: r.toUser.toString(),
       status: r.status,
       createdAt: r.createdAt,
     }));
