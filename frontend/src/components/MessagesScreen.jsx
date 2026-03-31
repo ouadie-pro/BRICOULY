@@ -24,7 +24,8 @@ export default function MessagesScreen({ isDesktop }) {
     const fetchConversations = async () => {
       try {
         const data = await api.getConversations();
-        setConversations(data || []);
+        const conversations = Array.isArray(data) ? data : [];
+        setConversations(conversations);
       } catch (error) {
         console.error('Error fetching conversations:', error);
         setConversations([]);
@@ -37,11 +38,13 @@ export default function MessagesScreen({ isDesktop }) {
     if (providerId) {
       const loadChat = async () => {
         try {
-          const [msgs, providerData] = await Promise.all([
-            api.getMessages(providerId),
-            api.getProvider(providerId).catch(() => null),
-          ]);
+          const msgs = await api.getMessages(providerId);
           setMessages(msgs || []);
+          
+          let providerData = await api.getProvider(providerId).catch(() => null);
+          if (!providerData || providerData.error) {
+            providerData = await api.getUser(providerId).catch(() => null);
+          }
           setProvider(providerData);
         } catch (error) {
           console.error('Error loading chat:', error);
@@ -355,7 +358,8 @@ export default function MessagesScreen({ isDesktop }) {
             </div>
             <button
               type="submit"
-              className="flex items-center justify-center size-10 rounded-full bg-primary text-white"
+              disabled={!newMessage.trim() && !mediaPreview}
+              className={`flex items-center justify-center size-10 rounded-full ${(!newMessage.trim() && !mediaPreview) ? 'bg-slate-300' : 'bg-primary text-white'}`}
             >
               <span className="material-symbols-outlined text-[20px]">send</span>
             </button>
@@ -554,7 +558,8 @@ export default function MessagesScreen({ isDesktop }) {
                 </div>
                 <button
                   type="submit"
-                  className="flex items-center justify-center w-12 h-12 rounded-full bg-primary text-white hover:bg-primary/90 shadow-sm transition-all"
+                  disabled={!newMessage.trim() && !mediaPreview}
+                  className={`flex items-center justify-center w-12 h-12 rounded-full shadow-sm transition-all ${(!newMessage.trim() && !mediaPreview) ? 'bg-slate-300 text-slate-400 cursor-not-allowed' : 'bg-primary text-white hover:bg-primary/90'}`}
                 >
                   <span className="material-symbols-outlined text-[20px]">send</span>
                 </button>

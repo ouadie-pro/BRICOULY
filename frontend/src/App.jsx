@@ -15,6 +15,7 @@ import VideosScreen from './components/VideosScreen';
 
 function App() {
   const [user, setUser] = useState(null);
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth > 1024);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -22,6 +23,12 @@ function App() {
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
+
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth > 1024);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const handleLogout = () => {

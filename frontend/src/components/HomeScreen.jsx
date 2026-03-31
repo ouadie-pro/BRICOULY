@@ -12,7 +12,11 @@ export default function HomeScreen({ isDesktop }) {
   const [user, setUser] = useState(null);
   const [categories, setCategories] = useState([]);
   const [providers, setProviders] = useState([]);
-  const [posts, setPosts] = useState([]);
+  const [feed, setFeed] = useState([]); // unified posts + articles
+  const [likedItems, setLikedItems] = useState(new Set());
+  const [itemComments, setItemComments] = useState({});
+  const [expandedItems, setExpandedItems] = useState(new Set());
+  const [commentInputs, setCommentInputs] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [showPostForm, setShowPostForm] = useState(false);
   const [postContent, setPostContent] = useState('');
@@ -22,21 +26,110 @@ export default function HomeScreen({ isDesktop }) {
   const postImageInputRef = useRef(null);
   const navigate = useNavigate();
 
+  // Normalize a post into unified feed item shape
+  const normalizePost = (p) => ({
+    feedId: `post-${p.id}`,
+    type: 'post',
+    id: p.id,
+    authorName: p.authorName,
+    authorAvatar: p.authorAvatar,
+    authorRole: p.authorRole,
+    authorProfession: p.authorProfession,
+    title: null,
+    content: p.content,
+    image: p.image || null,
+    likes: p.likes || 0,
+    liked: p.liked || false,
+    commentsCount: p.commentsCount || 0,
+    createdAt: p.createdAt,
+  });
+
+  // Normalize an article into unified feed item shape
+  const normalizeArticle = (a) => ({
+    feedId: `article-${a.id || a._id}`,
+    type: 'article',
+    id: a.id || a._id,
+    authorName: a.authorName || a.author?.name || 'Unknown',
+    authorAvatar: a.authorAvatar || a.author?.avatar || null,
+    authorRole: a.authorRole || a.author?.role || null,
+    authorProfession: a.authorProfession || a.author?.profession || null,
+    title: a.title || null,
+    content: a.content,
+    image: a.imageUrl
+      ? a.imageUrl.startsWith('http')
+        ? a.imageUrl
+        : `${window.location.origin}${a.imageUrl}`
+      : null,
+    likes: a.likes || 0,
+    liked: a.liked || false,
+    commentsCount: a.commentsCount || 0,
+    createdAt: a.createdAt,
+  });
+
+  const buildFeed = (posts, articles) => {
+    const normalized = [
+      ...posts.map(normalizePost),
+      ...articles.map(normalizeArticle),
+    ];
+    // Sort newest first
+    normalized.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    return normalized;
+  };
+
+  const fetchFeed = async () => {
+    try {
+      const [postsData, articlesData] = await Promise.all([
+        api.getPosts(),
+        api.getArticles(),
+      ]);
+      const posts = Array.isArray(postsData) ? postsData : [];
+      const articles = Array.isArray(articlesData) ? articlesData : [];
+      const unified = buildFeed(posts, articles);
+      setFeed(unified);
+
+      const liked = new Set();
+      unified.forEach((item) => {
+        if (item.liked) liked.add(item.feedId);
+      });
+      setLikedItems(liked);
+    } catch (err) {
+      console.error('Error fetching feed:', err);
+    }
+  };
+
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
     setUser(storedUser);
 
     const fetchData = async () => {
-      const [professionsData, provs, postsData] = await Promise.all([
-        api.getProfessions(),
-        api.getProviders({ sort: 'rating' }),
-        api.getPosts(),
-      ]);
-      setCategories(professionsData);
-      setProviders(provs.slice(0, 6));
-      setPosts(postsData);
+      try {
+        const [professionsData, provs] = await Promise.all([
+          api.getProfessions(),
+          api.getProviders({ sort: 'rating' }),
+        ]);
+        setCategories(Array.isArray(professionsData) ? professionsData : []);
+        setProviders(Array.isArray(provs) ? provs.slice(0, 6) : []);
+      } catch (error) {
+        console.error('Error fetching home data:', error);
+      }
     };
+
     fetchData();
+    fetchFeed();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchFeed();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    const interval = setInterval(fetchFeed, 30000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(interval);
+    };
   }, []);
 
   const handleSearch = (e) => {
@@ -46,10 +139,112 @@ export default function HomeScreen({ isDesktop }) {
     }
   };
 
-  const handleLikePost = async (postId) => {
-    const res = await api.likePost(postId);
+  const handleLikeItem = async (item) => {
+    const { feedId, type, id } = item;
+    const isLiked = likedItems.has(feedId);
+    const newLikes = isLiked
+      ? Math.max(0, (item.likes || 0) - 1)
+      : (item.likes || 0) + 1;
+
+    // Optimistic update
+    setLikedItems((prev) => {
+      const next = new Set(prev);
+      if (isLiked) next.delete(feedId);
+      else next.add(feedId);
+      return next;
+    });
+    setFeed((prev) =>
+      prev.map((f) =>
+        f.feedId === feedId
+          ? { ...f, likes: newLikes, liked: !isLiked }
+          : f
+      )
+    );
+
+    const res =
+      type === 'article'
+        ? await api.likeArticle(id)
+        : await api.likePost(id);
+
     if (res.success) {
-      setPosts(posts.map(p => p.id === postId ? { ...p, likes: res.likes } : p));
+      setFeed((prev) =>
+        prev.map((f) =>
+          f.feedId === feedId
+            ? { ...f, likes: res.likes, liked: res.liked ?? !isLiked }
+            : f
+        )
+      );
+      setLikedItems((prev) => {
+        const next = new Set(prev);
+        if (res.liked ?? !isLiked) next.add(feedId);
+        else next.delete(feedId);
+        return next;
+      });
+    } else {
+      // Revert on failure
+      setLikedItems((prev) => {
+        const next = new Set(prev);
+        if (isLiked) next.add(feedId);
+        else next.delete(feedId);
+        return next;
+      });
+      setFeed((prev) =>
+        prev.map((f) =>
+          f.feedId === feedId
+            ? { ...f, likes: item.likes, liked: isLiked }
+            : f
+        )
+      );
+    }
+  };
+
+  const handleLoadComments = async (item) => {
+    const { feedId, type, id } = item;
+    if (!itemComments[feedId]) {
+      // Articles and posts both use the same comments endpoint keyed by post id
+      // For articles we fall back to getComments if there's a shared endpoint,
+      // otherwise show empty. Adjust if your backend exposes /articles/:id/comments.
+      const comments =
+        type === 'post'
+          ? await api.getComments(id)
+          : await api.getComments(id).catch(() => []);
+      if (Array.isArray(comments)) {
+        setItemComments((prev) => ({ ...prev, [feedId]: comments }));
+      }
+    }
+  };
+
+  const handleToggleComments = async (item) => {
+    const { feedId } = item;
+    const newExpanded = new Set(expandedItems);
+    if (newExpanded.has(feedId)) {
+      newExpanded.delete(feedId);
+    } else {
+      newExpanded.add(feedId);
+      handleLoadComments(item);
+    }
+    setExpandedItems(newExpanded);
+  };
+
+  const handleSubmitComment = async (item) => {
+    const { feedId, type, id } = item;
+    const content = commentInputs[feedId];
+    if (!content?.trim()) return;
+
+    const res = await api.addComment(id, content);
+    if (res.success) {
+      setItemComments((prev) => ({
+        ...prev,
+        [feedId]: [...(prev[feedId] || []), res.comment],
+      }));
+      setCommentInputs((prev) => ({ ...prev, [feedId]: '' }));
+      setFeed((prev) =>
+        prev.map((f) =>
+          f.feedId === feedId
+            ? { ...f, commentsCount: (f.commentsCount || 0) + 1 }
+            : f
+        )
+      );
     }
   };
 
@@ -74,7 +269,7 @@ export default function HomeScreen({ isDesktop }) {
       }
       const result = await api.createPost({ content: postContent, image: imageUrl });
       if (result.success) {
-        setPosts([result.post, ...posts]);
+        setFeed((prev) => [normalizePost(result.post), ...prev]);
         setShowPostForm(false);
         setPostContent('');
         setPostImage(null);
@@ -93,13 +288,250 @@ export default function HomeScreen({ isDesktop }) {
     const diffMs = now - date;
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    
+
     if (diffHours < 1) return 'Just now';
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
     return date.toLocaleDateString();
   };
 
+  // Shared FeedCard component used by both mobile and desktop
+  const FeedCard = ({ item, compact = false }) => {
+    const { feedId, type } = item;
+    const isLiked = likedItems.has(feedId);
+    const isExpanded = expandedItems.has(feedId);
+    const comments = itemComments[feedId] || [];
+    const heartStyle = isLiked
+      ? { fontVariationSettings: "'FILL' 1" }
+      : { fontVariationSettings: "'FILL' 0" };
+
+    return (
+      <div
+        className={`bg-white dark:bg-surface-dark rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 ${
+          compact ? 'p-4' : 'p-5'
+        }`}
+      >
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-3">
+          <div
+            className={`rounded-full bg-cover bg-center bg-slate-200 shrink-0 ${
+              compact ? 'w-10 h-10' : 'w-12 h-12'
+            }`}
+            style={{
+              backgroundImage: item.authorAvatar
+                ? `url("${item.authorAvatar}")`
+                : undefined,
+            }}
+          >
+            {!item.authorAvatar && (
+              <div className="w-full h-full rounded-full flex items-center justify-center">
+                <span
+                  className={`font-bold text-slate-500 ${
+                    compact ? 'text-sm' : 'text-sm'
+                  }`}
+                >
+                  {item.authorName?.charAt(0) || '?'}
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p
+              className={`font-semibold text-slate-900 dark:text-white truncate ${
+                compact ? 'text-sm' : ''
+              }`}
+            >
+              {item.authorName}
+            </p>
+            <p className="text-xs text-slate-500">{formatDate(item.createdAt)}</p>
+          </div>
+          {/* Badge: article vs post + role */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {type === 'article' && (
+              <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
+                Article
+              </span>
+            )}
+            {item.authorRole && (
+              <span
+                className={`px-2 py-0.5 rounded text-xs font-medium ${
+                  item.authorRole === 'provider'
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-blue-100 text-blue-700'
+                }`}
+              >
+                {item.authorRole === 'provider'
+                  ? item.authorProfession || 'Provider'
+                  : 'Client'}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Article title */}
+        {item.title && (
+          <h4
+            className={`font-bold text-slate-900 dark:text-white mb-1 ${
+              compact ? 'text-sm' : 'text-base'
+            }`}
+          >
+            {item.title}
+          </h4>
+        )}
+
+        {/* Content */}
+        <p
+          className={`text-slate-700 dark:text-slate-300 mb-2 ${
+            compact ? 'text-sm line-clamp-3' : 'text-sm'
+          }`}
+        >
+          {item.content}
+        </p>
+
+        {/* Image */}
+        {item.image && (
+          <div
+            className={`w-full rounded-lg bg-cover bg-center mb-3 ${
+              compact ? 'h-40' : 'h-48'
+            }`}
+            style={{ backgroundImage: `url("${item.image}")` }}
+          />
+        )}
+
+        {/* Actions */}
+        <div
+          className={`flex items-center gap-4 ${
+            compact ? '' : 'pt-3 border-t border-slate-100 dark:border-slate-800'
+          }`}
+        >
+          <button
+            onClick={() => handleLikeItem(item)}
+            className={`flex items-center gap-1.5 text-sm transition-colors ${
+              isLiked
+                ? 'text-red-500'
+                : 'text-slate-500 dark:text-slate-400 hover:text-red-500'
+            }`}
+          >
+            <span
+              className="material-symbols-outlined"
+              style={{ ...heartStyle, fontSize: compact ? '18px' : '20px' }}
+            >
+              favorite
+            </span>
+            {item.likes}
+          </button>
+          <button
+            onClick={() => handleToggleComments(item)}
+            className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 hover:text-primary text-sm transition-colors"
+          >
+            <span
+              className="material-symbols-outlined"
+              style={{ fontSize: compact ? '18px' : '20px' }}
+            >
+              chat_bubble
+            </span>
+            {item.commentsCount || 0}
+          </button>
+          {!compact && (
+            <button className="flex items-center gap-1.5 text-slate-500 hover:text-primary text-sm transition-colors ml-auto">
+              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
+                share
+              </span>
+            </button>
+          )}
+        </div>
+
+        {/* Comments section */}
+        {isExpanded && (
+          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+            {comments.length > 0 ? (
+              <div
+                className={`space-y-2 mb-3 ${
+                  !compact ? 'max-h-48 overflow-y-auto space-y-3' : ''
+                }`}
+              >
+                {(compact ? comments.slice(-2) : comments).map((c) => (
+                  <div key={c.id} className="flex gap-2">
+                    <div
+                      className={`rounded-full bg-slate-200 bg-cover bg-center shrink-0 ${
+                        compact ? 'w-6 h-6' : 'w-8 h-8'
+                      }`}
+                      style={{
+                        backgroundImage: c.authorAvatar
+                          ? `url("${c.authorAvatar}")`
+                          : undefined,
+                      }}
+                    >
+                      {!c.authorAvatar && (
+                        <div className="w-full h-full rounded-full flex items-center justify-center">
+                          <span
+                            className={`font-bold text-slate-500 ${
+                              compact ? 'text-[10px]' : 'text-xs'
+                            }`}
+                          >
+                            {c.authorName?.charAt(0)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 bg-slate-100 dark:bg-slate-700 rounded-lg px-3 py-1.5">
+                      <p
+                        className={`font-medium text-slate-900 dark:text-white ${
+                          compact ? 'text-xs' : 'text-sm'
+                        }`}
+                      >
+                        {c.authorName}
+                      </p>
+                      <p
+                        className={`text-slate-600 dark:text-slate-300 ${
+                          compact ? 'text-xs' : 'text-sm'
+                        }`}
+                      >
+                        {c.content}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p
+                className={`text-slate-400 mb-3 ${compact ? 'text-xs' : 'text-sm'}`}
+              >
+                No comments yet
+              </p>
+            )}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={commentInputs[feedId] || ''}
+                onChange={(e) =>
+                  setCommentInputs((prev) => ({
+                    ...prev,
+                    [feedId]: e.target.value,
+                  }))
+                }
+                placeholder="Add a comment..."
+                className={`flex-1 px-3 py-1.5 bg-slate-100 dark:bg-slate-700 rounded-full border-none focus:outline-none focus:ring-2 focus:ring-primary/30 text-slate-900 dark:text-white ${
+                  compact ? 'text-sm' : 'text-sm px-4 py-2'
+                }`}
+                onKeyDown={(e) =>
+                  e.key === 'Enter' && handleSubmitComment(item)
+                }
+              />
+              <button
+                onClick={() => handleSubmitComment(item)}
+                className="text-primary text-sm font-medium hover:underline"
+              >
+                Post
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ── MOBILE ──────────────────────────────────────────────────────────────────
   if (!isDesktop) {
     return (
       <div className="relative flex h-full min-h-screen w-full flex-col overflow-x-hidden pb-24 max-w-md mx-auto bg-background-light dark:bg-background-dark">
@@ -108,7 +540,11 @@ export default function HomeScreen({ isDesktop }) {
             <div className="flex items-center gap-3">
               <div
                 className="bg-center bg-no-repeat bg-cover rounded-full size-12 border-2 border-white dark:border-slate-700 shadow-sm"
-                style={{ backgroundImage: user?.avatar ? `url("${user.avatar}")` : undefined }}
+                style={{
+                  backgroundImage: user?.avatar
+                    ? `url("${user.avatar}")`
+                    : undefined,
+                }}
               >
                 {!user?.avatar && (
                   <div className="w-full h-full rounded-full bg-slate-300 flex items-center justify-center">
@@ -119,21 +555,42 @@ export default function HomeScreen({ isDesktop }) {
                 )}
               </div>
               <div className="flex flex-col">
-                <span className="text-slate-500 dark:text-slate-400 text-xs font-medium">Good Morning 👋</span>
-                <h2 className="text-slate-900 dark:text-white text-lg font-bold leading-tight">{user?.name || 'Guest'}</h2>
+                <span className="text-slate-500 dark:text-slate-400 text-xs font-medium">
+                  Good Morning 👋
+                </span>
+                <h2 className="text-slate-900 dark:text-white text-lg font-bold leading-tight">
+                  {user?.name || 'Guest'}
+                </h2>
               </div>
             </div>
             <button className="relative flex items-center justify-center size-10 rounded-full bg-white dark:bg-surface-dark shadow-card border border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-200">
-              <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>notifications</span>
+              <span
+                className="material-symbols-outlined"
+                style={{ fontSize: '24px' }}
+              >
+                notifications
+              </span>
               <span className="absolute top-2 right-2 size-2 bg-red-500 rounded-full border border-white dark:border-surface-dark"></span>
             </button>
           </div>
 
           <div className="flex items-center">
             <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors">
-              <span className="material-symbols-outlined text-primary" style={{ fontSize: '18px' }}>location_on</span>
-              <span className="text-primary text-sm font-semibold">Downtown, NY</span>
-              <span className="material-symbols-outlined text-primary" style={{ fontSize: '18px' }}>expand_more</span>
+              <span
+                className="material-symbols-outlined text-primary"
+                style={{ fontSize: '18px' }}
+              >
+                location_on
+              </span>
+              <span className="text-primary text-sm font-semibold">
+                Downtown, NY
+              </span>
+              <span
+                className="material-symbols-outlined text-primary"
+                style={{ fontSize: '18px' }}
+              >
+                expand_more
+              </span>
             </button>
           </div>
 
@@ -141,7 +598,12 @@ export default function HomeScreen({ isDesktop }) {
             <div className="flex w-full items-stretch gap-3 h-12">
               <div className="relative flex-1 group">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none">
-                  <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>search</span>
+                  <span
+                    className="material-symbols-outlined"
+                    style={{ fontSize: '24px' }}
+                  >
+                    search
+                  </span>
                 </div>
                 <input
                   type="text"
@@ -151,59 +613,99 @@ export default function HomeScreen({ isDesktop }) {
                   placeholder="What service do you need?"
                 />
               </div>
-              <button type="submit" className="flex items-center justify-center aspect-square h-full bg-primary text-white rounded-xl shadow-lg shadow-primary/30 active:scale-95 transition-transform">
-                <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>tune</span>
+              <button
+                type="submit"
+                className="flex items-center justify-center aspect-square h-full bg-primary text-white rounded-xl shadow-lg shadow-primary/30 active:scale-95 transition-transform"
+              >
+                <span
+                  className="material-symbols-outlined"
+                  style={{ fontSize: '24px' }}
+                >
+                  tune
+                </span>
               </button>
             </div>
           </form>
         </header>
 
         <main className="flex flex-col gap-6 px-5 pb-4">
+          {/* Banner */}
           <div className="w-full rounded-2xl bg-gradient-to-r from-primary to-blue-400 p-5 shadow-lg relative overflow-hidden text-white mt-2">
             <div className="absolute -right-10 -top-10 size-40 rounded-full bg-white/10 blur-2xl"></div>
             <div className="absolute -left-10 -bottom-10 size-32 rounded-full bg-white/10 blur-xl"></div>
             <div className="relative z-10 flex flex-col items-start gap-3">
-              <span className="bg-white/20 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">{banner.badge}</span>
+              <span className="bg-white/20 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                {banner.badge}
+              </span>
               <div className="space-y-1">
                 <h3 className="text-xl font-bold">{banner.title}</h3>
                 <p className="text-blue-50 text-sm opacity-90">{banner.desc}</p>
               </div>
-              <button className="mt-1 px-4 py-2 bg-white text-primary text-xs font-bold rounded-lg shadow-sm">Claim Offer</button>
+              <button className="mt-1 px-4 py-2 bg-white text-primary text-xs font-bold rounded-lg shadow-sm">
+                Claim Offer
+              </button>
             </div>
           </div>
 
+          {/* Categories */}
           <section>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-slate-900 dark:text-white text-lg font-bold">Explore Categories</h2>
-              <a className="text-primary text-sm font-medium" href="#">See All</a>
+              <h2 className="text-slate-900 dark:text-white text-lg font-bold">
+                Explore Categories
+              </h2>
+              <a className="text-primary text-sm font-medium" href="#">
+                See All
+              </a>
             </div>
             <div className="grid grid-cols-4 gap-x-4 gap-y-6">
               {categories.map((cat) => (
-                <button key={cat._id || cat.id} className="flex flex-col items-center gap-2 group" onClick={() => navigate(`/search?q=${cat.name}`)}>
-                  <div className={`size-14 rounded-2xl flex items-center justify-center shadow-sm transition-colors ${cat.color} group-hover:bg-primary group-hover:text-white`}>
-                    <span className="material-symbols-outlined" style={{ fontSize: '28px' }}>{cat.icon}</span>
+                <button
+                  key={cat._id || cat.id}
+                  className="flex flex-col items-center gap-2 group"
+                  onClick={() => navigate(`/search?q=${cat.name}`)}
+                >
+                  <div
+                    className={`size-14 rounded-2xl flex items-center justify-center shadow-sm transition-colors ${cat.color} group-hover:bg-primary group-hover:text-white`}
+                  >
+                    <span
+                      className="material-symbols-outlined"
+                      style={{ fontSize: '28px' }}
+                    >
+                      {cat.icon}
+                    </span>
                   </div>
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300 text-center">{cat.name}</span>
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300 text-center">
+                    {cat.name}
+                  </span>
                 </button>
               ))}
             </div>
           </section>
 
+          {/* Feed */}
           <section>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-slate-900 dark:text-white text-lg font-bold">Latest Updates</h2>
+              <h2 className="text-slate-900 dark:text-white text-lg font-bold">
+                Latest Updates
+              </h2>
             </div>
-            
+
             {/* Create Post Box */}
             <div className="bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 mb-4">
               <div className="flex items-center gap-3">
                 <div
                   className="w-10 h-10 rounded-full bg-cover bg-center bg-slate-200"
-                  style={{ backgroundImage: user?.avatar ? `url("${user.avatar}")` : undefined }}
+                  style={{
+                    backgroundImage: user?.avatar
+                      ? `url("${user.avatar}")`
+                      : undefined,
+                  }}
                 >
                   {!user?.avatar && (
                     <div className="w-full h-full rounded-full flex items-center justify-center">
-                      <span className="text-sm font-bold text-slate-500">{user?.name?.charAt(0) || '?'}</span>
+                      <span className="text-sm font-bold text-slate-500">
+                        {user?.name?.charAt(0) || '?'}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -222,25 +724,12 @@ export default function HomeScreen({ isDesktop }) {
                 <div className="bg-white dark:bg-surface-dark rounded-2xl w-full max-w-lg p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-xl font-bold">Create Post</h3>
-                    <button onClick={() => setShowPostForm(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full">
+                    <button
+                      onClick={() => setShowPostForm(false)}
+                      className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full"
+                    >
                       <span className="material-symbols-outlined">close</span>
                     </button>
-                  </div>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div
-                      className="w-10 h-10 rounded-full bg-cover bg-center bg-slate-200"
-                      style={{ backgroundImage: user?.avatar ? `url("${user.avatar}")` : undefined }}
-                    >
-                      {!user?.avatar && (
-                        <div className="w-full h-full rounded-full flex items-center justify-center">
-                          <span className="text-sm font-bold text-slate-500">{user?.name?.charAt(0) || '?'}</span>
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-slate-900 dark:text-white">{user?.name}</p>
-                      <p className="text-xs text-slate-500">{user?.role === 'provider' ? user?.profession : 'Client'}</p>
-                    </div>
                   </div>
                   <textarea
                     value={postContent}
@@ -251,12 +740,21 @@ export default function HomeScreen({ isDesktop }) {
                   />
                   {postImagePreview && (
                     <div className="relative mt-4">
-                      <img src={postImagePreview} alt="Preview" className="w-full max-h-48 object-contain rounded-lg" />
+                      <img
+                        src={postImagePreview}
+                        alt="Preview"
+                        className="w-full max-h-48 object-contain rounded-lg"
+                      />
                       <button
-                        onClick={() => { setPostImage(null); setPostImagePreview(null); }}
+                        onClick={() => {
+                          setPostImage(null);
+                          setPostImagePreview(null);
+                        }}
                         className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full"
                       >
-                        <span className="material-symbols-outlined text-[18px]">close</span>
+                        <span className="material-symbols-outlined text-[18px]">
+                          close
+                        </span>
                       </button>
                     </div>
                   )}
@@ -265,7 +763,9 @@ export default function HomeScreen({ isDesktop }) {
                       onClick={() => postImageInputRef.current?.click()}
                       className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
                     >
-                      <span className="material-symbols-outlined text-primary">image</span>
+                      <span className="material-symbols-outlined text-primary">
+                        image
+                      </span>
                       Photo
                     </button>
                     <input
@@ -288,40 +788,26 @@ export default function HomeScreen({ isDesktop }) {
               </div>
             )}
 
-              <div className="space-y-4">
-                {posts.length > 0 && posts.slice(0, 2).map((post) => (
-                  <div key={post._id || post.id} className="bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-slate-100 dark:border-slate-800">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-full bg-cover bg-center" style={{ backgroundImage: `url("${post.authorAvatar}")` }} />
-                      <div>
-                        <p className="font-semibold text-slate-900 dark:text-white text-sm">{post.authorName}</p>
-                        <p className="text-xs text-slate-500">{formatDate(post.createdAt)}</p>
-                      </div>
-                    </div>
-                    <p className="text-slate-700 dark:text-slate-300 text-sm mb-2">{post.content}</p>
-                    {post.image && (
-                      <div className="w-full h-40 rounded-lg bg-cover bg-center mb-2" style={{ backgroundImage: `url("${post.image}")` }} />
-                    )}
-                    <div className="flex items-center gap-4">
-                      <button onClick={() => handleLikePost(post._id)} className="flex items-center gap-1 text-slate-500 text-sm">
-                        <span className="material-symbols-outlined text-[18px]">favorite</span>
-                        {post.likes}
-                      </button>
-                      <button className="flex items-center gap-1 text-slate-500 text-sm">
-                        <span className="material-symbols-outlined text-[18px]">chat_bubble</span>
-                        {post.comments}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-        </section>
+            <div className="space-y-4">
+              {feed.slice(0, 5).map((item) => (
+                <FeedCard key={item.feedId} item={item} compact />
+              ))}
+            </div>
+          </section>
 
-      <section>
+          {/* Popular Near You */}
+          <section>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-slate-900 dark:text-white text-lg font-bold">Popular Near You</h2>
+              <h2 className="text-slate-900 dark:text-white text-lg font-bold">
+                Popular Near You
+              </h2>
               <button className="text-slate-400 dark:text-slate-500 hover:text-primary transition-colors">
-                <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>filter_list</span>
+                <span
+                  className="material-symbols-outlined"
+                  style={{ fontSize: '24px' }}
+                >
+                  filter_list
+                </span>
               </button>
             </div>
             <div className="flex flex-col gap-4">
@@ -333,12 +819,18 @@ export default function HomeScreen({ isDesktop }) {
                 >
                   <div
                     className="shrink-0 size-20 rounded-xl bg-center bg-cover bg-no-repeat"
-                    style={{ backgroundImage: provider.avatar ? `url("${provider.avatar}")` : undefined }}
+                    style={{
+                      backgroundImage: provider.avatar
+                        ? `url("${provider.avatar}")`
+                        : undefined,
+                    }}
                   >
                     {!provider.avatar && (
                       <div className="w-full h-full rounded-xl bg-slate-300 flex items-center justify-center">
                         <span className="text-xl font-bold text-slate-500">
-                          {provider.name ? provider.name.charAt(0).toUpperCase() : '?'}
+                          {provider.name
+                            ? provider.name.charAt(0).toUpperCase()
+                            : '?'}
                         </span>
                       </div>
                     )}
@@ -346,22 +838,43 @@ export default function HomeScreen({ isDesktop }) {
                   <div className="flex flex-1 flex-col justify-between">
                     <div>
                       <div className="flex justify-between items-start">
-                        <h3 className="font-bold text-slate-900 dark:text-white">{provider.name}</h3>
+                        <h3 className="font-bold text-slate-900 dark:text-white">
+                          {provider.name}
+                        </h3>
                         <div className="flex items-center gap-1 bg-yellow-100 dark:bg-yellow-900/30 px-1.5 py-0.5 rounded text-xs font-bold text-yellow-700 dark:text-yellow-500">
-                          <span className="material-symbols-outlined text-[14px]">star</span>
+                          <span
+                            className="material-symbols-outlined"
+                            style={{ fontSize: '14px' }}
+                          >
+                            star
+                          </span>
                           {provider.rating}
                         </div>
                       </div>
-                      <p className="text-slate-500 dark:text-slate-400 text-sm">{provider.profession}</p>
+                      <p className="text-slate-500 dark:text-slate-400 text-sm">
+                        {provider.profession}
+                      </p>
                     </div>
                     <div className="flex items-end justify-between mt-2">
                       <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500 text-xs">
-                        <span className="material-symbols-outlined text-[14px]">location_on</span>
+                        <span
+                          className="material-symbols-outlined"
+                          style={{ fontSize: '14px' }}
+                        >
+                          location_on
+                        </span>
                         {provider.distance} km
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="font-bold text-primary">${provider.hourlyRate}<span className="text-xs font-normal text-slate-400 dark:text-slate-500">/hr</span></span>
-                        <button className="bg-primary/10 hover:bg-primary/20 text-primary px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">Book</button>
+                        <span className="font-bold text-primary">
+                          ${provider.hourlyRate}
+                          <span className="text-xs font-normal text-slate-400 dark:text-slate-500">
+                            /hr
+                          </span>
+                        </span>
+                        <button className="bg-primary/10 hover:bg-primary/20 text-primary px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">
+                          Book
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -373,23 +886,43 @@ export default function HomeScreen({ isDesktop }) {
 
         <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/80 dark:bg-surface-dark/80 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 pb-safe pt-2 max-w-md mx-auto">
           <div className="flex items-center justify-around h-16">
-            <button className="flex flex-col items-center gap-1 text-primary w-16" onClick={() => navigate('/home')}>
-              <span className="material-symbols-outlined filled" style={{ fontVariationSettings: "'FILL' 1" }}>home</span>
+            <button
+              className="flex flex-col items-center gap-1 text-primary w-16"
+              onClick={() => navigate('/home')}
+            >
+              <span
+                className="material-symbols-outlined filled"
+                style={{ fontVariationSettings: "'FILL' 1" }}
+              >
+                home
+              </span>
               <span className="text-[10px] font-bold">Home</span>
             </button>
-            <button className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 w-16" onClick={() => navigate('/search')}>
+            <button
+              className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 w-16"
+              onClick={() => navigate('/search')}
+            >
               <span className="material-symbols-outlined">search</span>
               <span className="text-[10px] font-medium">Search</span>
             </button>
-            <button className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 w-16" onClick={() => navigate('/videos')}>
+            <button
+              className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 w-16"
+              onClick={() => navigate('/videos')}
+            >
               <span className="material-symbols-outlined">play_circle</span>
               <span className="text-[10px] font-medium">Videos</span>
             </button>
-            <button className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 w-16" onClick={() => navigate('/messages/1')}>
+            <button
+              className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 w-16"
+              onClick={() => navigate('/messages/1')}
+            >
               <span className="material-symbols-outlined">chat_bubble</span>
               <span className="text-[10px] font-medium">Messages</span>
             </button>
-            <button className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 w-16" onClick={() => navigate('/profile')}>
+            <button
+              className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 w-16"
+              onClick={() => navigate('/profile')}
+            >
               <span className="material-symbols-outlined">person</span>
               <span className="text-[10px] font-medium">Profile</span>
             </button>
@@ -400,54 +933,85 @@ export default function HomeScreen({ isDesktop }) {
     );
   }
 
+  // ── DESKTOP ──────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-6">
+      {/* Banner */}
       <div className="w-full rounded-2xl bg-gradient-to-r from-primary to-blue-400 p-6 shadow-lg relative overflow-hidden text-white">
         <div className="absolute -right-10 -top-10 size-40 rounded-full bg-white/10 blur-2xl"></div>
         <div className="absolute -left-10 -bottom-10 size-32 rounded-full bg-white/10 blur-xl"></div>
         <div className="relative z-10 flex flex-col items-start gap-3">
-          <span className="bg-white/20 px-3 py-1 rounded text-xs font-bold uppercase tracking-wider">{banner.badge}</span>
+          <span className="bg-white/20 px-3 py-1 rounded text-xs font-bold uppercase tracking-wider">
+            {banner.badge}
+          </span>
           <div className="space-y-1">
             <h3 className="text-2xl font-bold">{banner.title}</h3>
             <p className="text-blue-50 text-sm opacity-90">{banner.desc}</p>
           </div>
-          <button className="mt-2 px-5 py-2.5 bg-white text-primary text-sm font-bold rounded-lg shadow-sm hover:bg-blue-50 transition-colors">Claim Offer</button>
+          <button className="mt-2 px-5 py-2.5 bg-white text-primary text-sm font-bold rounded-lg shadow-sm hover:bg-blue-50 transition-colors">
+            Claim Offer
+          </button>
         </div>
       </div>
 
+      {/* Categories */}
       <section>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-slate-900 text-xl font-bold">Explore Categories</h2>
-          <button className="text-primary text-sm font-medium hover:underline">See All</button>
+          <button className="text-primary text-sm font-medium hover:underline">
+            See All
+          </button>
         </div>
         <div className="grid grid-cols-4 xl:grid-cols-8 gap-4">
           {categories.map((cat) => (
-            <button key={cat._id || cat.id} className="flex flex-col items-center gap-3 group p-4 rounded-xl hover:bg-slate-50 transition-colors" onClick={() => navigate(`/search?q=${cat.name}`)}>
-              <div className={`size-16 rounded-2xl flex items-center justify-center shadow-sm transition-colors ${cat.color} group-hover:bg-primary group-hover:text-white`}>
-                <span className="material-symbols-outlined" style={{ fontSize: '32px' }}>{cat.icon}</span>
+            <button
+              key={cat._id || cat.id}
+              className="flex flex-col items-center gap-3 group p-4 rounded-xl hover:bg-slate-50 transition-colors"
+              onClick={() => navigate(`/search?q=${cat.name}`)}
+            >
+              <div
+                className={`size-16 rounded-2xl flex items-center justify-center shadow-sm transition-colors ${cat.color} group-hover:bg-primary group-hover:text-white`}
+              >
+                <span
+                  className="material-symbols-outlined"
+                  style={{ fontSize: '32px' }}
+                >
+                  {cat.icon}
+                </span>
               </div>
-              <span className="text-sm font-medium text-slate-700 text-center">{cat.name}</span>
+              <span className="text-sm font-medium text-slate-700 text-center">
+                {cat.name}
+              </span>
             </button>
           ))}
         </div>
       </section>
 
+      {/* Feed */}
       <section>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-slate-900 text-xl font-bold">Latest Updates</h2>
-          <button className="text-primary text-sm font-medium hover:underline">View All</button>
+          <button className="text-primary text-sm font-medium hover:underline">
+            View All
+          </button>
         </div>
 
-        {/* Create Post Box - Desktop */}
+        {/* Create Post Box */}
         <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200 mb-6">
           <div className="flex items-center gap-4">
             <div
               className="w-12 h-12 rounded-full bg-cover bg-center bg-slate-200"
-              style={{ backgroundImage: user?.avatar ? `url("${user.avatar}")` : undefined }}
+              style={{
+                backgroundImage: user?.avatar
+                  ? `url("${user.avatar}")`
+                  : undefined,
+              }}
             >
               {!user?.avatar && (
                 <div className="w-full h-full rounded-full flex items-center justify-center">
-                  <span className="text-sm font-bold text-slate-500">{user?.name?.charAt(0) || '?'}</span>
+                  <span className="text-sm font-bold text-slate-500">
+                    {user?.name?.charAt(0) || '?'}
+                  </span>
                 </div>
               )}
             </div>
@@ -460,54 +1024,122 @@ export default function HomeScreen({ isDesktop }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {posts.length > 0 ? posts.map((post) => (
-              <div key={post.id} className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-12 h-12 rounded-full bg-cover bg-center bg-slate-200" style={{ backgroundImage: post.authorAvatar ? `url("${post.authorAvatar}")` : undefined }}>
-                    {!post.authorAvatar && (
-                      <div className="w-full h-full rounded-full flex items-center justify-center">
-                        <span className="text-sm font-bold text-slate-500">{post.authorName?.charAt(0) || '?'}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <p className="font-semibold text-slate-900">{post.authorName}</p>
-                    <p className="text-xs text-slate-500">{formatDate(post.createdAt)}</p>
-                  </div>
-                  <span className={`ml-auto px-2 py-0.5 rounded text-xs font-medium ${
-                    post.authorRole === 'provider' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
-                  }`}>
-                    {post.authorRole === 'provider' ? (post.authorProfession || 'Provider') : 'Client'}
-                  </span>
+        {/* Create Post Modal */}
+        {showPostForm && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-surface-dark rounded-2xl w-full max-w-lg p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold">Create Post</h3>
+                <button
+                  onClick={() => setShowPostForm(false)}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+              <div className="flex items-center gap-3 mb-4">
+                <div
+                  className="w-10 h-10 rounded-full bg-cover bg-center bg-slate-200"
+                  style={{
+                    backgroundImage: user?.avatar
+                      ? `url("${user.avatar}")`
+                      : undefined,
+                  }}
+                >
+                  {!user?.avatar && (
+                    <div className="w-full h-full rounded-full flex items-center justify-center">
+                      <span className="text-sm font-bold text-slate-500">
+                        {user?.name?.charAt(0) || '?'}
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <p className="text-slate-700 text-sm mb-3">{post.content}</p>
-                {post.image && (
-                  <div className="w-full h-48 rounded-lg bg-cover bg-center mb-3" style={{ backgroundImage: `url("${post.image}")` }} />
-                )}
-                <div className="flex items-center gap-4 pt-3 border-t border-slate-100">
-                  <button onClick={() => handleLikePost(post._id)} className="flex items-center gap-1.5 text-slate-500 hover:text-red-500 text-sm transition-colors">
-                    <span className="material-symbols-outlined text-[20px]">favorite</span>
-                    {post.likes}
-                  </button>
-                  <button className="flex items-center gap-1.5 text-slate-500 hover:text-primary text-sm transition-colors">
-                    <span className="material-symbols-outlined text-[20px]">chat_bubble</span>
-                    {post.comments} Comments
-                  </button>
-                  <button className="flex items-center gap-1.5 text-slate-500 hover:text-primary text-sm transition-colors ml-auto">
-                    <span className="material-symbols-outlined text-[20px]">share</span>
-                  </button>
+                <div>
+                  <p className="font-semibold text-slate-900 dark:text-white">
+                    {user?.name}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {user?.role === 'provider' ? user?.profession : 'Client'}
+                  </p>
                 </div>
               </div>
-            )) : null}
+              <textarea
+                value={postContent}
+                onChange={(e) => setPostContent(e.target.value)}
+                placeholder="What's on your mind?"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent resize-none focus:outline-none focus:border-primary"
+                rows={4}
+              />
+              {postImagePreview && (
+                <div className="relative mt-4">
+                  <img
+                    src={postImagePreview}
+                    alt="Preview"
+                    className="w-full max-h-48 object-contain rounded-lg"
+                  />
+                  <button
+                    onClick={() => {
+                      setPostImage(null);
+                      setPostImagePreview(null);
+                    }}
+                    className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">
+                      close
+                    </span>
+                  </button>
+                </div>
+              )}
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={() => postImageInputRef.current?.click()}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+                >
+                  <span className="material-symbols-outlined text-primary">
+                    image
+                  </span>
+                  Photo
+                </button>
+                <input
+                  type="file"
+                  ref={postImageInputRef}
+                  onChange={handlePostImageSelect}
+                  accept="image/*"
+                  className="hidden"
+                />
+                <div className="flex-1"></div>
+                <button
+                  onClick={handleCreatePost}
+                  disabled={(!postContent.trim() && !postImage) || isPosting}
+                  className="px-6 py-2 rounded-lg bg-primary text-white font-medium disabled:opacity-50"
+                >
+                  {isPosting ? 'Posting...' : 'Post'}
+                </button>
+              </div>
+            </div>
           </div>
-        </section>
+        )}
 
+        <div className="flex flex-col gap-4">
+          {feed.length > 0
+            ? feed.map((item) => (
+                <FeedCard key={item.feedId} item={item} compact={false} />
+              ))
+            : null}
+        </div>
+      </section>
+
+      {/* Popular Near You */}
       <section>
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-slate-900 text-xl font-bold">Popular Near You</h2>
           <button className="text-slate-400 hover:text-primary transition-colors">
-            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>filter_list</span>
+            <span
+              className="material-symbols-outlined"
+              style={{ fontSize: '24px' }}
+            >
+              filter_list
+            </span>
           </button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -519,7 +1151,11 @@ export default function HomeScreen({ isDesktop }) {
             >
               <div
                 className="shrink-0 size-20 rounded-xl bg-center bg-cover bg-no-repeat"
-                style={{ backgroundImage: provider.avatar ? `url("${provider.avatar}")` : undefined }}
+                style={{
+                  backgroundImage: provider.avatar
+                    ? `url("${provider.avatar}")`
+                    : undefined,
+                }}
               >
                 {!provider.avatar && (
                   <div className="w-full h-full rounded-xl bg-slate-300 flex items-center justify-center">
@@ -534,20 +1170,39 @@ export default function HomeScreen({ isDesktop }) {
                   <div className="flex justify-between items-start">
                     <h3 className="font-bold text-slate-900">{provider.name}</h3>
                     <div className="flex items-center gap-1 bg-yellow-100 px-1.5 py-0.5 rounded text-xs font-bold text-yellow-700">
-                      <span className="material-symbols-outlined text-[14px]">star</span>
+                      <span
+                        className="material-symbols-outlined"
+                        style={{ fontSize: '14px' }}
+                      >
+                        star
+                      </span>
                       {provider.rating}
                     </div>
                   </div>
-                  <p className="text-slate-500 text-sm mt-1">{provider.profession}</p>
+                  <p className="text-slate-500 text-sm mt-1">
+                    {provider.profession}
+                  </p>
                 </div>
                 <div className="flex items-end justify-between mt-3">
                   <div className="flex items-center gap-1 text-slate-400 text-xs">
-                    <span className="material-symbols-outlined text-[14px]">location_on</span>
+                    <span
+                      className="material-symbols-outlined"
+                      style={{ fontSize: '14px' }}
+                    >
+                      location_on
+                    </span>
                     {provider.distance} km
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="font-bold text-primary">${provider.hourlyRate}<span className="text-xs font-normal text-slate-400">/hr</span></span>
-                    <button className="bg-primary hover:bg-primary/90 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">Book</button>
+                    <span className="font-bold text-primary">
+                      ${provider.hourlyRate}
+                      <span className="text-xs font-normal text-slate-400">
+                        /hr
+                      </span>
+                    </span>
+                    <button className="bg-primary hover:bg-primary/90 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">
+                      Book
+                    </button>
                   </div>
                 </div>
               </div>

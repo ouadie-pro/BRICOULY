@@ -12,17 +12,28 @@ export default function Layout({ children, user, onLogout }) {
   const [searchResults, setSearchResults] = useState([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMarkingRead, setIsMarkingRead] = useState(false);
 
   useEffect(() => {
     const loadNotifications = async () => {
-      const [notifData, countData, requestsData] = await Promise.all([
-        api.getNotifications(),
-        api.getUnreadCount(),
-        api.getFollowRequests(),
-      ]);
-      setNotifications(notifData);
-      setUnreadCount(countData.count);
-      setFollowRequests(requestsData);
+      try {
+        const [notifData, countData, requestsData] = await Promise.all([
+          api.getNotifications(),
+          api.getUnreadCount(),
+          api.getFollowRequests(),
+        ]);
+        setNotifications(Array.isArray(notifData) ? notifData : []);
+        setUnreadCount(countData?.count || 0);
+        const validRequests = (Array.isArray(requestsData) ? requestsData : []).map(req => ({
+          ...req,
+          id: req.id || req._id,
+          requestId: req.id || req._id
+        }));
+        setFollowRequests(validRequests);
+      } catch (error) {
+        console.error('Error loading notifications:', error);
+      }
     };
     loadNotifications();
 
@@ -31,27 +42,52 @@ export default function Layout({ children, user, onLogout }) {
   }, []);
 
   const handleMarkRead = async () => {
-    await api.markNotificationsRead();
-    setUnreadCount(0);
-    setNotifications(notifications.map((n) => ({ ...n, read: true })));
+    if (isMarkingRead) return;
+    
+    setIsMarkingRead(true);
+    console.log('Marking all notifications as read...');
+    
+    try {
+      const res = await api.markNotificationsRead();
+      console.log('Mark read response:', res);
+      
+      if (res.success || res.error === 'No notifications to update') {
+        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+        setUnreadCount(0);
+        setShowNotifications(false);
+      } else {
+        console.error('Failed to mark notifications as read:', res.error);
+      }
+    } catch (err) {
+      console.error('Error marking notifications as read:', err);
+    } finally {
+      setIsMarkingRead(false);
+    }
   };
 
   const handleFollowResponse = async (requestId, action) => {
-    console.log('requestId:', requestId);
     if (!requestId) {
+      console.error('No request ID provided');
       alert('Error: request ID is missing');
       return;
     }
+    
+    console.log('Handling follow response:', { requestId, action, type: typeof requestId });
+    
     try {
       const res = await api.respondToFollowRequest(String(requestId), action);
+      console.log('Response from server:', res);
+      
       if (res.success) {
-        setFollowRequests(prev => prev.filter((r) => String(r._id || r.id) !== String(requestId)));
+        setFollowRequests(prev => prev.filter((r) => String(r.id) !== String(requestId)));
         const notifData = await api.getNotifications();
-        setNotifications(notifData);
+        setNotifications(Array.isArray(notifData) ? notifData : []);
+        alert(`Follow request ${action}ed successfully!`);
       } else {
         alert('Failed: ' + (res.error || 'Unknown error'));
       }
     } catch (err) {
+      console.error('Error responding to follow request:', err);
       alert('Error: ' + err.message);
     }
   };
@@ -113,7 +149,6 @@ export default function Layout({ children, user, onLogout }) {
     }
   };
 
-  // Fixed: messages link goes to /messages (list) instead of hardcoded /messages/1
   const clientNavItems = [
     { path: '/home', icon: 'home', label: 'Home' },
     { path: '/search', icon: 'search', label: 'Search' },
@@ -136,7 +171,15 @@ export default function Layout({ children, user, onLogout }) {
 
   return (
     <div className="desktop-layout">
-      <aside className="sidebar">
+      <button className="mobile-menu-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>
+        <span className="material-symbols-outlined text-slate-700">
+          {sidebarOpen ? 'close' : 'menu'}
+        </span>
+      </button>
+
+      <div className={`overlay ${sidebarOpen ? 'show' : ''}`} onClick={() => setSidebarOpen(false)} />
+
+      <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-logo">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white shadow-md shadow-primary/20">
             <span className="material-symbols-outlined text-2xl">handyman</span>
@@ -150,6 +193,7 @@ export default function Layout({ children, user, onLogout }) {
               key={item.path}
               to={item.path}
               className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}
+              onClick={() => setSidebarOpen(false)}
             >
               <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>
                 {item.icon}
@@ -207,8 +251,8 @@ export default function Layout({ children, user, onLogout }) {
               <form onSubmit={handleSearchSubmit}>
                 <input
                   type="text"
-                  placeholder="Search services, professionals, users..."
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-100 border-none focus:ring-2 focus:ring-primary/30 text-sm"
+                  placeholder="Search..."
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-100 border-none focus:ring-2 focus:ring-primary/30 text-sm md:placeholder-search-services"
                   value={searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
                   onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
@@ -276,8 +320,12 @@ export default function Layout({ children, user, onLogout }) {
                   <div className="flex items-center justify-between p-4 border-b border-slate-200">
                     <h3 className="font-semibold text-slate-900">Notifications</h3>
                     {unreadCount > 0 && (
-                      <button onClick={handleMarkRead} className="text-xs text-primary font-medium">
-                        Mark all read
+                      <button 
+                        onClick={handleMarkRead} 
+                        disabled={isMarkingRead}
+                        className="text-xs text-primary font-medium hover:underline disabled:opacity-50"
+                      >
+                        {isMarkingRead ? 'Marking...' : 'Mark all read'}
                       </button>
                     )}
                   </div>
@@ -286,44 +334,49 @@ export default function Layout({ children, user, onLogout }) {
                   {followRequests.length > 0 && (
                     <div className="p-3 border-b border-slate-200 bg-blue-50">
                       <p className="text-xs font-semibold text-slate-600 mb-2">Follow Requests</p>
-                      {followRequests.map((req) => (
-                        <div key={req._id || req.id} className="flex items-center gap-3 mb-3">
-                          <div
-                            className="w-10 h-10 rounded-full bg-cover bg-center bg-slate-200 shrink-0"
-                            style={{
-                              backgroundImage: req.fromUserAvatar
-                                ? `url("${window.location.origin}${req.fromUserAvatar}")`
-                                : undefined,
-                            }}
-                          >
-                            {!req.fromUserAvatar && (
-                              <div className="w-full h-full rounded-full flex items-center justify-center">
-                                <span className="text-sm font-bold text-slate-500">
-                                  {req.fromUserName?.charAt(0).toUpperCase() || '?'}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-slate-900 truncate">{req.fromUserName}</p>
-                            <p className="text-xs text-slate-500">wants to follow you</p>
-                          </div>
-                          <div className="flex gap-2 shrink-0">
-                            <button
-                              onClick={() => handleFollowResponse(req._id || req.id, 'accept')}
-                              className="text-xs px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                      {followRequests.map((req) => {
+                        const requestId = req.id || req._id || req.requestId;
+                        console.log('Rendering follow request:', { req, requestId });
+                        
+                        return (
+                          <div key={requestId} className="flex items-center gap-3 mb-3">
+                            <div
+                              className="w-10 h-10 rounded-full bg-cover bg-center bg-slate-200 shrink-0"
+                              style={{
+                                backgroundImage: req.fromUserAvatar
+                                  ? `url("${req.fromUserAvatar.startsWith('http') ? req.fromUserAvatar : window.location.origin + req.fromUserAvatar}")`
+                                  : undefined,
+                              }}
                             >
-                              Accept
-                            </button>
-                            <button
-                              onClick={() => handleFollowResponse(req._id || req.id, 'decline')}
-                              className="text-xs px-2 py-1 bg-slate-300 text-slate-700 rounded hover:bg-slate-400"
-                            >
-                              Decline
-                            </button>
+                              {!req.fromUserAvatar && (
+                                <div className="w-full h-full rounded-full flex items-center justify-center">
+                                  <span className="text-sm font-bold text-slate-500">
+                                    {req.fromUserName?.charAt(0).toUpperCase() || '?'}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-slate-900 truncate">{req.fromUserName}</p>
+                              <p className="text-xs text-slate-500">wants to follow you</p>
+                            </div>
+                            <div className="flex gap-2 shrink-0">
+                              <button
+                                onClick={() => handleFollowResponse(requestId, 'accept')}
+                                className="text-xs px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                              >
+                                Accept
+                              </button>
+                              <button
+                                onClick={() => handleFollowResponse(requestId, 'decline')}
+                                className="text-xs px-2 py-1 bg-slate-300 text-slate-700 rounded hover:bg-slate-400"
+                              >
+                                Decline
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
 
@@ -373,7 +426,7 @@ export default function Layout({ children, user, onLogout }) {
               )}
             </div>
 
-            <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors">
+            <button className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors">
               <span className="material-symbols-outlined text-slate-600" style={{ fontSize: '18px' }}>location_on</span>
               <span className="text-sm font-medium text-slate-700">Downtown, NY</span>
             </button>
@@ -382,6 +435,22 @@ export default function Layout({ children, user, onLogout }) {
 
         <div className="content-area">{children}</div>
       </main>
+
+      <nav className="mobile-nav">
+        {navItems.slice(0, 5).map((item) => (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}
+            onClick={() => setSidebarOpen(false)}
+          >
+            <span className="material-symbols-outlined">
+              {item.icon}
+            </span>
+            {item.label}
+          </NavLink>
+        ))}
+      </nav>
     </div>
   );
 }
