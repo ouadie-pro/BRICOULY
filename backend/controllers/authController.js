@@ -55,10 +55,19 @@ exports.signup = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const bcrypt = require('bcryptjs');
+    
+    if (!email || !password) {
+      return res.status(400).json({ success: false, error: 'Email and password are required' });
+    }
+    
     const user = await User.findOne({ email }).select('+password');
     
-    if (!user || !(await bcrypt.compare(password, user.password))) {
+    if (!user) {
+      return res.status(401).json({ success: false, error: 'Invalid credentials' });
+    }
+    
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
     
@@ -76,7 +85,8 @@ exports.login = async (req, res) => {
     
     res.json({ success: true, user: responseUser });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    console.error('Login error:', error);
+    res.status(500).json({ success: false, error: 'Login failed: ' + error.message });
   }
 };
 
@@ -94,7 +104,7 @@ exports.getMe = async (req, res) => {
     const { password: _, ...userWithoutPassword } = user.toObject();
     const responseUser = { 
       ...userWithoutPassword, 
-      id: user._id,
+      id: user._id.toString(),
       profession: provider?.profession || '',
       bio: provider?.bio || '',
       rating: provider?.rating || 0,

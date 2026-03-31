@@ -307,14 +307,14 @@ export default function HomeScreen({ isDesktop }) {
 
     return (
       <div
-        className={`bg-white dark:bg-surface-dark rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 ${
+        className={`bg-white rounded-xl border border-slate-200 shadow-soft transition-all hover:shadow-medium ${
           compact ? 'p-4' : 'p-5'
         }`}
       >
         {/* Header */}
         <div className="flex items-center gap-3 mb-3">
           <div
-            className={`rounded-full bg-cover bg-center bg-slate-200 shrink-0 ${
+            className={`rounded-xl bg-cover bg-center bg-slate-100 shrink-0 ${
               compact ? 'w-10 h-10' : 'w-12 h-12'
             }`}
             style={{
@@ -324,7 +324,7 @@ export default function HomeScreen({ isDesktop }) {
             }}
           >
             {!item.authorAvatar && (
-              <div className="w-full h-full rounded-full flex items-center justify-center">
+              <div className="w-full h-full rounded-xl flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
                 <span
                   className={`font-bold text-slate-500 ${
                     compact ? 'text-sm' : 'text-sm'
@@ -337,32 +337,32 @@ export default function HomeScreen({ isDesktop }) {
           </div>
           <div className="flex-1 min-w-0">
             <p
-              className={`font-semibold text-slate-900 dark:text-white truncate ${
-                compact ? 'text-sm' : ''
+              className={`font-semibold text-slate-900 truncate ${
+                compact ? 'text-sm' : 'text-[15px]'
               }`}
             >
               {item.authorName}
             </p>
-            <p className="text-xs text-slate-500">{formatDate(item.createdAt)}</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <p className="text-xs text-slate-500">{formatDate(item.createdAt)}</p>
+              {item.authorRole === 'provider' && (
+                <>
+                  <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                  <span className="text-xs text-primary font-medium">{item.authorProfession}</span>
+                </>
+              )}
+            </div>
           </div>
-          {/* Badge: article vs post + role */}
+          {/* Badge: article vs post */}
           <div className="flex items-center gap-1.5 shrink-0">
             {type === 'article' && (
-              <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
+              <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
                 Article
               </span>
             )}
-            {item.authorRole && (
-              <span
-                className={`px-2 py-0.5 rounded text-xs font-medium ${
-                  item.authorRole === 'provider'
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-blue-100 text-blue-700'
-                }`}
-              >
-                {item.authorRole === 'provider'
-                  ? item.authorProfession || 'Provider'
-                  : 'Client'}
+            {item.authorRole === 'provider' && (
+              <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                Verified Pro
               </span>
             )}
           </div>
@@ -371,8 +371,8 @@ export default function HomeScreen({ isDesktop }) {
         {/* Article title */}
         {item.title && (
           <h4
-            className={`font-bold text-slate-900 dark:text-white mb-1 ${
-              compact ? 'text-sm' : 'text-base'
+            className={`font-bold text-slate-900 mb-2 ${
+              compact ? 'text-sm' : 'text-lg'
             }`}
           >
             {item.title}
@@ -381,8 +381,8 @@ export default function HomeScreen({ isDesktop }) {
 
         {/* Content */}
         <p
-          className={`text-slate-700 dark:text-slate-300 mb-2 ${
-            compact ? 'text-sm line-clamp-3' : 'text-sm'
+          className={`text-slate-600 mb-3 ${
+            compact ? 'text-sm line-clamp-3' : 'text-[15px] leading-relaxed'
           }`}
         >
           {item.content}
@@ -391,25 +391,25 @@ export default function HomeScreen({ isDesktop }) {
         {/* Image */}
         {item.image && (
           <div
-            className={`w-full rounded-lg bg-cover bg-center mb-3 ${
-              compact ? 'h-40' : 'h-48'
+            className={`w-full rounded-xl overflow-hidden bg-slate-100 mb-3 ${
+              compact ? 'h-40' : 'h-56'
             }`}
-            style={{ backgroundImage: `url("${item.image}")` }}
+            style={{ backgroundImage: `url("${item.image}")`, backgroundSize: 'cover', backgroundPosition: 'center' }}
           />
         )}
 
         {/* Actions */}
         <div
-          className={`flex items-center gap-4 ${
-            compact ? '' : 'pt-3 border-t border-slate-100 dark:border-slate-800'
+          className={`flex items-center gap-1 ${
+            compact ? '' : 'pt-3 border-t border-slate-100'
           }`}
         >
           <button
             onClick={() => handleLikeItem(item)}
-            className={`flex items-center gap-1.5 text-sm transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
               isLiked
-                ? 'text-red-500'
-                : 'text-slate-500 dark:text-slate-400 hover:text-red-500'
+                ? 'text-red-500 bg-red-50'
+                : 'text-slate-500 hover:text-red-500 hover:bg-red-50'
             }`}
           >
             <span
@@ -418,11 +418,11 @@ export default function HomeScreen({ isDesktop }) {
             >
               favorite
             </span>
-            {item.likes}
+            <span className="text-sm font-medium">{item.likes}</span>
           </button>
           <button
             onClick={() => handleToggleComments(item)}
-            className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 hover:text-primary text-sm transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-500 hover:text-primary hover:bg-blue-50 transition-all"
           >
             <span
               className="material-symbols-outlined"
@@ -430,10 +430,10 @@ export default function HomeScreen({ isDesktop }) {
             >
               chat_bubble
             </span>
-            {item.commentsCount || 0}
+            <span className="text-sm font-medium">{item.commentsCount || 0}</span>
           </button>
           {!compact && (
-            <button className="flex items-center gap-1.5 text-slate-500 hover:text-primary text-sm transition-colors ml-auto">
+            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-500 hover:text-primary hover:bg-blue-50 transition-all ml-auto">
               <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
                 share
               </span>

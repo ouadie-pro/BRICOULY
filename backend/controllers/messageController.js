@@ -188,3 +188,27 @@ exports.uploadMedia = async (req, res) => {
     filename: req.file.filename,
   });
 };
+
+exports.markAsRead = async (req, res) => {
+  try {
+    const currentUserId = req.headers['x-user-id'];
+    const otherUserId = req.params.providerId;
+
+    if (!currentUserId || !isValidObjectId(currentUserId) || !isValidObjectId(otherUserId)) {
+      return res.status(400).json({ success: false, error: 'Invalid user ID' });
+    }
+
+    await Message.updateMany(
+      {
+        sender: new mongoose.Types.ObjectId(otherUserId),
+        receiver: new mongoose.Types.ObjectId(currentUserId),
+        read: false
+      },
+      { read: true }
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

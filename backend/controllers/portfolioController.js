@@ -1,5 +1,6 @@
 const Provider = require('../models/Provider');
 const Portfolio = require('../models/Portfolio');
+const User = require('../models/User');
 
 exports.getProviderPortfolio = async (req, res) => {
   try {

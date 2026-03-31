@@ -1,4 +1,6 @@
+const mongoose = require('mongoose');
 const Video = require('../models/Video');
+const User = require('../models/User');
 
 exports.getVideos = async (req, res) => {
   try {
@@ -69,16 +71,29 @@ exports.createVideo = async (req, res) => {
 
 exports.likeVideo = async (req, res) => {
   try {
+    const userId = req.headers['x-user-id'];
     const video = await Video.findById(req.params.id);
     
     if (!video) {
       return res.status(404).json({ error: 'Video not found' });
     }
     
-    video.likes += 1;
+    const userIdObj = userId ? new mongoose.Types.ObjectId(userId) : null;
+    const alreadyLiked = userIdObj && video.likedBy.some(id => id.toString() === userId);
+    
+    if (alreadyLiked) {
+      video.likedBy = video.likedBy.filter(id => id.toString() !== userId);
+      video.likes = Math.max(0, video.likes - 1);
+    } else {
+      if (userIdObj) {
+        video.likedBy.push(userIdObj);
+      }
+      video.likes += 1;
+    }
+    
     await video.save();
     
-    res.json({ success: true, likes: video.likes });
+    res.json({ success: true, likes: video.likes, liked: !alreadyLiked });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

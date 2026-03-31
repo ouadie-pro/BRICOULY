@@ -1,14 +1,19 @@
 const API_BASE = '/api';
-const BACKEND_URL = 'http://localhost:5000';
 
-// Helper function for safe fetch with error handling
 async function safeFetch(url, options = {}) {
   try {
     const res = await fetch(url, options);
     const text = await res.text();
     
-    if (!text) {
-      return { success: false, error: 'Server returned empty response' };
+    if (!text || text.trim() === '') {
+      if (res.ok) {
+        return [];
+      }
+      return { 
+        success: false, 
+        error: res.status >= 500 ? 'Server error. Please try again later.' : 'Server returned empty response',
+        status: res.status
+      };
     }
     
     try {
@@ -317,6 +322,21 @@ export const api = {
     return safeFetch(`${API_BASE}/articles/${articleId}/like`, {
       method: 'POST',
       headers: { 'x-user-id': getUserId() },
+    });
+  },
+
+  getArticleComments: async (articleId) => {
+    return safeFetch(`${API_BASE}/articles/${articleId}/comments`);
+  },
+
+  addArticleComment: async (articleId, content) => {
+    return safeFetch(`${API_BASE}/articles/${articleId}/comments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-id': getUserId(),
+      },
+      body: JSON.stringify({ content }),
     });
   },
 

@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
-import { getUserId } from '../services/api';
 
 export default function FollowersScreen({ isDesktop }) {
   const { userId } = useParams();
   const [followers, setFollowers] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const currentUserId = getUserId();
 
   useEffect(() => {
     const fetchFollowers = async () => {
@@ -19,8 +17,6 @@ export default function FollowersScreen({ isDesktop }) {
     };
     fetchFollowers();
   }, [userId]);
-
-  const getUser = () => userId === currentUserId;
 
   if (!isDesktop) {
     return (

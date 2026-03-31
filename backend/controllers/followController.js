@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Follow = require('../models/Follow');
 const FollowRequest = require('../models/FollowRequest');
 const Notification = require('../models/Notification');
+const Provider = require('../models/Provider');
 
 const isValidObjectId = (id) => {
   if (!id || typeof id !== 'string') return false;
@@ -223,9 +224,30 @@ exports.getFollowRequests = async (req, res) => {
 exports.getFollowing = async (req, res) => {
   try {
     const userId = req.headers['x-user-id'];
-    const following = await Follow.find({ user: new mongoose.Types.ObjectId(userId) });
-    res.json(following.map(f => f.targetUser));
+    
+    if (!userId || !isValidObjectId(userId)) {
+      return res.json([]);
+    }
+    
+    const following = await Follow.find({ user: new mongoose.Types.ObjectId(userId) })
+      .populate('targetUser', 'name avatar location role');
+    
+    const followingData = await Promise.all(following.map(async f => {
+      if (!f.targetUser) return null;
+      const provider = await Provider.findOne({ user: f.targetUser._id });
+      return {
+        id: f.targetUser._id.toString(),
+        name: f.targetUser.name,
+        avatar: f.targetUser.avatar,
+        role: provider ? 'provider' : 'user',
+        profession: provider?.profession || '',
+        location: f.targetUser.location || '',
+      };
+    }));
+    
+    res.json(followingData.filter(Boolean));
   } catch (error) {
+    console.error('Error in getFollowing:', error.message);
     res.status(500).json({ error: error.message });
   }
 };
@@ -233,17 +255,27 @@ exports.getFollowing = async (req, res) => {
 exports.getFollowers = async (req, res) => {
   try {
     const userId = req.params.id;
+    
+    if (!userId || !isValidObjectId(userId)) {
+      return res.json([]);
+    }
+    
     const follows = await Follow.find({ targetUser: new mongoose.Types.ObjectId(userId) }).populate('user', 'name avatar location');
-    const followers = follows.map(f => ({
-      id: f.user._id.toString(),
-      name: f.user.name,
-      avatar: f.user.avatar,
-      role: 'user',
-      profession: '',
-      location: f.user.location || '',
+    const followers = await Promise.all(follows.map(async f => {
+      if (!f.user) return null;
+      const provider = await Provider.findOne({ user: f.user._id });
+      return {
+        id: f.user._id.toString(),
+        name: f.user.name,
+        avatar: f.user.avatar,
+        role: provider ? 'provider' : 'user',
+        profession: provider?.profession || '',
+        location: f.user.location || '',
+      };
     }));
-    res.json(followers);
+    res.json(followers.filter(Boolean));
   } catch (error) {
+    console.error('Error in getFollowers:', error.message);
     res.status(500).json({ error: error.message });
   }
 };
@@ -251,17 +283,27 @@ exports.getFollowers = async (req, res) => {
 exports.getFollowingByUserId = async (req, res) => {
   try {
     const userId = req.params.id;
+    
+    if (!userId || !isValidObjectId(userId)) {
+      return res.json([]);
+    }
+    
     const following = await Follow.find({ user: new mongoose.Types.ObjectId(userId) }).populate('targetUser', 'name avatar location');
-    const followingData = following.map(f => ({
-      id: f.targetUser._id.toString(),
-      name: f.targetUser.name,
-      avatar: f.targetUser.avatar,
-      role: 'user',
-      profession: '',
-      location: f.targetUser.location || '',
+    const followingData = await Promise.all(following.map(async f => {
+      if (!f.targetUser) return null;
+      const provider = await Provider.findOne({ user: f.targetUser._id });
+      return {
+        id: f.targetUser._id.toString(),
+        name: f.targetUser.name,
+        avatar: f.targetUser.avatar,
+        role: provider ? 'provider' : 'user',
+        profession: provider?.profession || '',
+        location: f.targetUser.location || '',
+      };
     }));
-    res.json(followingData);
+    res.json(followingData.filter(Boolean));
   } catch (error) {
+    console.error('Error in getFollowingByUserId:', error.message);
     res.status(500).json({ error: error.message });
   }
 };

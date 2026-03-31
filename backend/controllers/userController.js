@@ -203,6 +203,7 @@ exports.getProfessions = async (req, res) => {
     const categories = await Category.find();
     res.json(categories);
   } catch (error) {
+    console.error('getProfessions error:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -224,6 +225,32 @@ exports.getCategories = async (req, res) => {
   try {
     const categories = await Category.find();
     res.json(categories);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getProviderServices = async (req, res) => {
+  try {
+    const provider = await Provider.findOne({ user: req.params.id });
+    if (!provider) {
+      return res.status(404).json({ error: 'Provider not found' });
+    }
+    const services = await Service.find({ provider: provider._id });
+    res.json(services);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getProviderPortfolioById = async (req, res) => {
+  try {
+    const provider = await Provider.findOne({ user: req.params.id });
+    if (!provider) {
+      return res.status(404).json({ error: 'Provider not found' });
+    }
+    const portfolio = await Portfolio.find({ provider: provider._id });
+    res.json(portfolio);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -1,11 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
+const path = require('path');
 const upload = require('../middleware/upload');
 const { 
   getConversations, 
   getMessages, 
-  sendMessage 
+  sendMessage,
+  markAsRead 
 } = require('../controllers/messageController');
 
 router.get('/conversations', getConversations);
@@ -39,5 +41,6 @@ router.post('/media', ...handleUpload, (req, res) => {
 
 router.get('/:userId', getMessages);
 router.post('/', sendMessage);
+router.put('/:providerId/read', markAsRead);
 
 module.exports = router;

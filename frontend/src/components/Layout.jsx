@@ -181,13 +181,13 @@ export default function Layout({ children, user, onLogout }) {
 
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-logo">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white shadow-md shadow-primary/20">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary-dark text-white shadow-md shadow-primary/20">
             <span className="material-symbols-outlined text-2xl">handyman</span>
           </div>
           <span className="text-xl font-black tracking-tight text-slate-900">PRUCOLY</span>
         </div>
 
-        <nav className="sidebar-nav">
+        <nav className="sidebar-nav pt-4">
           {navItems.map((item) => (
             <NavLink
               key={item.path}
@@ -198,9 +198,9 @@ export default function Layout({ children, user, onLogout }) {
               <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>
                 {item.icon}
               </span>
-              {item.label}
+              <span>{item.label}</span>
               {item.label === 'Messages' && unreadCount > 0 && (
-                <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                <span className="ml-auto bg-white/20 text-white text-xs px-2 py-0.5 rounded-full font-medium">
                   {unreadCount}
                 </span>
               )}
@@ -209,17 +209,17 @@ export default function Layout({ children, user, onLogout }) {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="flex items-center gap-3 mb-3">
+          <div className="flex items-center gap-3 mb-3 p-2 -mx-2 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer">
             {user?.avatar && user.avatar.length > 0 ? (
               <div
-                className="w-10 h-10 rounded-full bg-cover bg-center border-2 border-slate-200"
+                className="w-10 h-10 rounded-xl bg-cover bg-center border border-slate-200"
                 style={{
                   backgroundImage: `url("${user.avatar.startsWith('http') ? user.avatar : window.location.origin + user.avatar}")`,
                 }}
               />
             ) : (
-              <div className="w-10 h-10 rounded-full bg-slate-300 border-2 border-slate-200 flex items-center justify-center">
-                <span className="text-sm font-bold text-slate-500">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-200 to-slate-300 border border-slate-200 flex items-center justify-center">
+                <span className="text-sm font-bold text-slate-600">
                   {user?.name ? user.name.charAt(0).toUpperCase() : '?'}
                 </span>
               </div>
@@ -230,12 +230,13 @@ export default function Layout({ children, user, onLogout }) {
                 {user?.role === 'provider' ? user?.profession || 'Provider' : 'Client'}
               </p>
             </div>
+            <span className="material-symbols-outlined text-slate-400">chevron_right</span>
           </div>
           <button
             onClick={onLogout}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors text-sm font-medium"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all text-sm font-medium"
           >
-            <span className="material-symbols-outlined text-[18px]">logout</span>
+            <span className="material-symbols-outlined text-lg">logout</span>
             Sign Out
           </button>
         </div>
@@ -246,13 +247,13 @@ export default function Layout({ children, user, onLogout }) {
           <div className="flex items-center gap-4 flex-1">
             <div className="relative max-w-md w-full">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                <span className="material-symbols-outlined">search</span>
+                <span className="material-symbols-outlined text-xl">search</span>
               </span>
               <form onSubmit={handleSearchSubmit}>
                 <input
                   type="text"
-                  placeholder="Search..."
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-100 border-none focus:ring-2 focus:ring-primary/30 text-sm md:placeholder-search-services"
+                  placeholder="Search services, providers..."
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-100 border-none focus:ring-2 focus:ring-primary/30 text-sm transition-all focus:bg-white"
                   value={searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
                   onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
@@ -260,7 +261,7 @@ export default function Layout({ children, user, onLogout }) {
                 />
               </form>
               {showSearchResults && searchResults.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-slate-200 z-50 max-h-80 overflow-y-auto">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-slate-200 z-50 max-h-80 overflow-y-auto overflow-hidden">
                   {searchResults.map((result) => (
                     <button
                       key={result.id}
@@ -268,7 +269,7 @@ export default function Layout({ children, user, onLogout }) {
                       className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors text-left"
                     >
                       <div
-                        className="w-10 h-10 rounded-full bg-cover bg-center bg-slate-200"
+                        className="w-10 h-10 rounded-full bg-cover bg-center bg-slate-100"
                         style={{
                           backgroundImage: result.avatar
                             ? `url("${result.avatar.startsWith('http') ? result.avatar : window.location.origin + result.avatar}")`
@@ -290,11 +291,11 @@ export default function Layout({ children, user, onLogout }) {
                         </p>
                       </div>
                       <span
-                        className={`px-2 py-0.5 rounded text-xs font-medium ${
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium ${
                           result.type === 'provider' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
                         }`}
                       >
-                        {result.type === 'provider' ? 'Provider' : 'Client'}
+                        {result.type === 'provider' ? 'Pro' : 'Client'}
                       </span>
                     </button>
                   ))}
@@ -303,21 +304,21 @@ export default function Layout({ children, user, onLogout }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <div className="relative">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="relative p-2 rounded-full hover:bg-slate-100 transition-colors"
+                className="relative p-2.5 rounded-xl hover:bg-slate-100 transition-colors"
               >
-                <span className="material-symbols-outlined text-slate-600">notifications</span>
+                <span className="material-symbols-outlined text-slate-600 text-xl">notifications</span>
                 {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
                 )}
               </button>
 
               {showNotifications && (
-                <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-lg border border-slate-200 z-50">
-                  <div className="flex items-center justify-between p-4 border-b border-slate-200">
+                <div className="absolute right-0 top-full mt-2 w-88 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 overflow-hidden">
+                  <div className="flex items-center justify-between p-4 border-b border-slate-100">
                     <h3 className="font-semibold text-slate-900">Notifications</h3>
                     {unreadCount > 0 && (
                       <button 
@@ -332,16 +333,15 @@ export default function Layout({ children, user, onLogout }) {
 
                   {/* Follow Requests */}
                   {followRequests.length > 0 && (
-                    <div className="p-3 border-b border-slate-200 bg-blue-50">
-                      <p className="text-xs font-semibold text-slate-600 mb-2">Follow Requests</p>
+                    <div className="p-3 border-b border-slate-100 bg-slate-50">
+                      <p className="text-xs font-semibold text-slate-500 mb-3 uppercase tracking-wide">Follow Requests</p>
                       {followRequests.map((req) => {
                         const requestId = req.id || req._id || req.requestId;
-                        console.log('Rendering follow request:', { req, requestId });
                         
                         return (
-                          <div key={requestId} className="flex items-center gap-3 mb-3">
+                          <div key={requestId} className="flex items-center gap-3 mb-3 last:mb-0 p-2 bg-white rounded-lg border border-slate-100">
                             <div
-                              className="w-10 h-10 rounded-full bg-cover bg-center bg-slate-200 shrink-0"
+                              className="w-10 h-10 rounded-full bg-cover bg-center bg-slate-100 shrink-0"
                               style={{
                                 backgroundImage: req.fromUserAvatar
                                   ? `url("${req.fromUserAvatar.startsWith('http') ? req.fromUserAvatar : window.location.origin + req.fromUserAvatar}")`
@@ -363,13 +363,13 @@ export default function Layout({ children, user, onLogout }) {
                             <div className="flex gap-2 shrink-0">
                               <button
                                 onClick={() => handleFollowResponse(requestId, 'accept')}
-                                className="text-xs px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                                className="text-xs px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors"
                               >
                                 Accept
                               </button>
                               <button
                                 onClick={() => handleFollowResponse(requestId, 'decline')}
-                                className="text-xs px-2 py-1 bg-slate-300 text-slate-700 rounded hover:bg-slate-400"
+                                className="text-xs px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-lg font-medium transition-colors"
                               >
                                 Decline
                               </button>
@@ -382,41 +382,49 @@ export default function Layout({ children, user, onLogout }) {
 
                   <div className="max-h-80 overflow-y-auto">
                     {notifications.length === 0 ? (
-                      <p className="p-4 text-center text-slate-500 text-sm">No notifications</p>
+                      <div className="p-8 text-center">
+                        <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-slate-100 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-slate-400">notifications_none</span>
+                        </div>
+                        <p className="text-slate-500 text-sm">No notifications yet</p>
+                      </div>
                     ) : (
                       notifications.slice(0, 10).map((notif) => (
                         <div
                           key={notif.id}
-                          className={`p-3 border-b border-slate-100 hover:bg-slate-50 ${!notif.read ? 'bg-blue-50' : ''}`}
+                          className={`p-4 border-b border-slate-50 hover:bg-slate-50 transition-colors ${!notif.read ? 'bg-blue-50/50' : ''}`}
                         >
                           <div className="flex items-start gap-3">
                             {notif.type === 'follow_request' && notif.fromUserAvatar ? (
                               <div
-                                className="w-8 h-8 rounded-full bg-cover bg-center bg-slate-200 shrink-0"
+                                className="w-9 h-9 rounded-full bg-cover bg-center bg-slate-100 shrink-0"
                                 style={{
                                   backgroundImage: `url("${window.location.origin}${notif.fromUserAvatar}")`,
                                 }}
                               />
                             ) : notif.type === 'follow_request' ? (
-                              <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center shrink-0">
-                                <span className="text-xs font-bold text-slate-500">
+                              <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                <span className="text-sm font-bold text-slate-500">
                                   {notif.fromUserName?.charAt(0).toUpperCase() || '?'}
                                 </span>
                               </div>
                             ) : (
-                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                                <span className="material-symbols-outlined text-primary text-[16px]">
+                              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                <span className="material-symbols-outlined text-primary text-lg">
                                   {getNotificationIcon(notif.type)}
                                 </span>
                               </div>
                             )}
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-slate-900">{notif.title}</p>
-                              <p className="text-xs text-slate-500 truncate">{notif.text}</p>
+                              <p className="text-xs text-slate-500 mt-0.5 truncate">{notif.text}</p>
                               <p className="text-xs text-slate-400 mt-1">
                                 {new Date(notif.createdAt).toLocaleString()}
                               </p>
                             </div>
+                            {!notif.read && (
+                              <span className="w-2 h-2 bg-primary rounded-full shrink-0 mt-1.5"></span>
+                            )}
                           </div>
                         </div>
                       ))
@@ -426,9 +434,10 @@ export default function Layout({ children, user, onLogout }) {
               )}
             </div>
 
-            <button className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors">
+            <button className="hidden md:flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-slate-100 transition-colors">
               <span className="material-symbols-outlined text-slate-600" style={{ fontSize: '18px' }}>location_on</span>
-              <span className="text-sm font-medium text-slate-700">Downtown, NY</span>
+              <span className="text-sm font-medium text-slate-600">Location</span>
+              <span className="material-symbols-outlined text-slate-400 text-lg">expand_more</span>
             </button>
           </div>
         </header>

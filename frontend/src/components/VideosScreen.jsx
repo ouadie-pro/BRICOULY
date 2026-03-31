@@ -100,7 +100,7 @@ export default function VideosScreen({ isDesktop }) {
               <div key={video.id} className="bg-card-light dark:bg-card-dark rounded-xl overflow-hidden shadow-sm">
                 <div className="relative aspect-video bg-slate-900">
                   <video
-                    src={video.videoUrl.startsWith('http') ? video.videoUrl : window.location.origin + video.videoUrl}
+                    src={video.videoUrl && video.videoUrl.startsWith('http') ? video.videoUrl : (video.videoUrl ? window.location.origin + video.videoUrl : '')}
                     className="w-full h-full object-contain"
                     controls
                   />
@@ -242,7 +242,7 @@ export default function VideosScreen({ isDesktop }) {
             <div key={video.id} className="bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200">
               <div className="relative aspect-video bg-slate-900">
                 <video
-                  src={video.videoUrl.startsWith('http') ? video.videoUrl : window.location.origin + video.videoUrl}
+                  src={video.videoUrl && video.videoUrl.startsWith('http') ? video.videoUrl : (video.videoUrl ? window.location.origin + video.videoUrl : '')}
                   className="w-full h-full object-contain"
                   controls
                 />

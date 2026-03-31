@@ -95,6 +95,15 @@ app.use('/api/follow', require('./routers/follow'));
 app.use('/api/service-requests', require('./routers/serviceRequest'));
 app.use('/api/messages', require('./routers/message'));
 app.use('/api/notifications', require('./routers/notification'));
+app.use('/api/bookings', require('./routers/booking'));
+
+// Alias route for getMyFollowing
+app.use('/api/following', require('./routers/follow'));
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 app.use((err, req, res, next) => {
   console.error('\n==========================================');
@@ -134,7 +143,7 @@ app.use((err, req, res, next) => {
     success: false,
     error: 'Internal server error',
     message: err.message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    stack: err.stack
   });
 });
 
@@ -147,14 +156,27 @@ app.use((req, res) => {
   });
 });
 
+console.log('Attempting to connect to MongoDB...');
+console.log('MONGODB_URI:', process.env.MONGODB_URI ? 'set' : 'NOT SET');
+
 mongoose.connect(process.env.MONGODB_URI)
   .then(async () => {
-    console.log('MongoDB Connected');
+    console.log('MongoDB Connected successfully');
     await seedCategories();
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
   })
-  .catch(err => console.error('MongoDB Connection Error:', err));
+  .catch(err => {
+    console.error('MongoDB Connection Error:', err.message);
+    console.error('Full error:', err);
+    if (!process.env.MONGODB_URI) {
+      console.error('Please set MONGODB_URI in your .env file');
+    } else {
+      console.error('Make sure MongoDB is running on your system');
+      console.error('For local MongoDB: brew services start mongodb-community (mac) or mongod (linux/windows)');
+    }
+    process.exit(1);
+  });
 
 module.exports = { app, upload };
