@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { 
-  FiArrowLeft, FiSearch, FiX, FiStar, FiMapPin, FiCheck
+  FiArrowLeft, FiSearch, FiX, FiStar, FiMapPin, FiCheck, FiFilter
 } from 'react-icons/fi';
 
 export default function SearchScreen({ isDesktop }) {
@@ -12,8 +12,25 @@ export default function SearchScreen({ isDesktop }) {
   const [searchQuery, setSearchQuery] = useState(q || '');
   const [selectedProfession, setSelectedProfession] = useState('');
   const [sortBy, setSortBy] = useState('rating');
+  const [distanceFilter, setDistanceFilter] = useState('');
+  const [availabilityFilter, setAvailabilityFilter] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+
+  const distanceOptions = [
+    { value: '', label: 'Any distance' },
+    { value: '5', label: 'Within 5 km' },
+    { value: '10', label: 'Within 10 km' },
+    { value: '20', label: 'Within 20 km' },
+    { value: '50', label: 'Within 50 km' },
+  ];
+
+  const availabilityOptions = [
+    { value: '', label: 'Any time' },
+    { value: 'today', label: 'Available today' },
+    { value: 'week', label: 'This week' },
+  ];
 
   useEffect(() => {
     const loadData = async () => {
@@ -121,15 +138,19 @@ export default function SearchScreen({ isDesktop }) {
                   )}
                 </div>
                 <div className="flex flex-1 flex-col">
-                  <div className="flex justify-between items-start">
+                    <div className="flex justify-between items-start">
                     <h3 className="text-slate-900 dark:text-white text-base font-bold leading-tight">{provider.name}</h3>
-                    <div className="flex items-center gap-1 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded text-amber-700 dark:text-amber-400">
-                      <FiStar className="text-[14px] text-amber-500" />
-                      <span className="text-xs font-bold">{provider.rating || 0}</span>
-                      {provider.reviewCount > 0 && (
-                        <span className="text-[10px] text-amber-600/70">({provider.reviewCount})</span>
-                      )}
-                    </div>
+                    {provider.rating > 0 ? (
+                      <div className="flex items-center gap-1 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded text-amber-700 dark:text-amber-400">
+                        <FiStar className="text-[14px] text-amber-500" />
+                        <span className="text-xs font-bold">{provider.rating}</span>
+                        {provider.reviewCount > 0 && (
+                          <span className="text-[10px] text-amber-600/70">({provider.reviewCount})</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-400 italic">New</span>
+                    )}
                   </div>
                   <p className="text-slate-500 dark:text-slate-400 text-xs font-medium mt-1">{provider.profession}</p>
                 </div>
@@ -212,22 +233,61 @@ export default function SearchScreen({ isDesktop }) {
         </div>
 
         <div className="flex items-center gap-2 ml-auto">
-          <span className="text-sm text-slate-500">Sort by:</span>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex h-9 items-center justify-center rounded-lg px-3 transition-colors ${
+              showFilters || distanceFilter || availabilityFilter ? 'bg-primary text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <FiFilter style={{ fontSize: '16px' }} />
+            <span className="ml-1 text-sm font-medium">Filters</span>
+          </button>
+          <span className="text-sm text-slate-500">Sort:</span>
           {filters.map((f) => (
             <button
               key={f.value}
               onClick={() => setSortBy(f.value)}
               className={`flex h-9 shrink-0 items-center justify-center rounded-lg px-4 transition-colors ${
                 sortBy === f.value
-                  ? 'bg-primary text-white'
+                  ? 'bg-primary text-white shadow-sm'
                   : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
               }`}
             >
               <span className="text-sm font-medium whitespace-nowrap">{f.label}</span>
+              {sortBy === f.value && <FiCheck style={{ fontSize: '14px' }} className="ml-1" />}
             </button>
           ))}
         </div>
       </div>
+
+      {showFilters && (
+        <div className="flex flex-wrap items-center gap-4 p-4 bg-slate-50 rounded-xl">
+          <div>
+            <label className="text-xs text-slate-500 block mb-1">Distance</label>
+            <select
+              value={distanceFilter}
+              onChange={(e) => setDistanceFilter(e.target.value)}
+              className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              {distanceOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 block mb-1">Availability</label>
+            <select
+              value={availabilityFilter}
+              onChange={(e) => setAvailabilityFilter(e.target.value)}
+              className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              {availabilityOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
 
       <p className="text-sm font-semibold text-slate-500">{providers.length} Professionals found</p>
 
@@ -268,14 +328,20 @@ export default function SearchScreen({ isDesktop }) {
             
             <div className="flex items-center justify-between pt-3 border-t border-slate-100">
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded text-amber-700">
-                  <span className="material-symbols-outlined text-[14px] filled">star</span>
-                  <span className="text-xs font-bold">{provider.rating || 0}</span>
-                  {provider.reviewCount > 0 && (
-                    <span className="text-[10px] text-amber-600/70">({provider.reviewCount})</span>
-                  )}
-                </div>
-                <span className="text-slate-400 text-xs">• {provider.jobsDone || 0} jobs</span>
+                {provider.rating > 0 ? (
+                  <div className="flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded text-amber-700">
+                    <span className="material-symbols-outlined text-[14px] filled">star</span>
+                    <span className="text-xs font-bold">{provider.rating}</span>
+                    {provider.reviewCount > 0 && (
+                      <span className="text-[10px] text-amber-600/70">({provider.reviewCount})</span>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-xs text-slate-400 italic">New provider</span>
+                )}
+                {provider.jobsDone > 0 && (
+                  <span className="text-slate-400 text-xs">• {provider.jobsDone} jobs</span>
+                )}
               </div>
               <p className="text-slate-900 font-bold text-lg">${provider.hourlyRate}<span className="text-slate-400 font-normal text-sm">/hr</span></p>
             </div>

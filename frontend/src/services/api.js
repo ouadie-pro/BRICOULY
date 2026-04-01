@@ -123,6 +123,7 @@ export const api = {
 
   // Provider Services
   getProviderServices: async (providerId) => {
+    if (!providerId) return [];
     return safeFetch(`${API_BASE}/providers/${providerId}/services`);
   },
 
@@ -239,6 +240,13 @@ export const api = {
   likePost: async (postId) => {
     return safeFetch(`${API_BASE}/posts/${postId}/like`, {
       method: 'POST',
+      headers: { 'x-user-id': getUserId() },
+    });
+  },
+
+  deletePost: async (postId) => {
+    return safeFetch(`${API_BASE}/posts/${postId}`, {
+      method: 'DELETE',
       headers: { 'x-user-id': getUserId() },
     });
   },

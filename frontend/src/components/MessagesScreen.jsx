@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../services/api';
+import { 
+  FiX, FiImage, FiVideo, FiMic, FiSend, FiPhone, FiInfo, FiMessageCircle,
+  FiArrowLeft, FiVolume2, FiSearch
+} from 'react-icons/fi';
 
 export default function MessagesScreen({ isDesktop }) {
   const { providerId } = useParams();
@@ -12,6 +16,7 @@ export default function MessagesScreen({ isDesktop }) {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [mediaPreview, setMediaPreview] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const imageInputRef = useRef(null);
   const videoInputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -107,7 +112,7 @@ export default function MessagesScreen({ isDesktop }) {
     setNewMessage('');
   };
 
-  const handleMediaSelect = (e, type) => {
+  const handleMediaSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
       const previewUrl = URL.createObjectURL(file);
@@ -209,14 +214,14 @@ export default function MessagesScreen({ isDesktop }) {
     if (msg.type === 'voice' && msg.mediaUrl) {
       return (
         <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary">graphic_eq</span>
+          <FiVolume2 className="text-primary" />
           <audio src={msg.mediaUrl} controls className="h-8" />
           {text && <p className="mt-1">{text}</p>}
         </div>
       );
     }
     
-    return <p>{text}</p>;
+    return <p>{text || '📎 Media'}</p>;
   };
 
   const renderMediaPreview = () => {
@@ -228,7 +233,7 @@ export default function MessagesScreen({ isDesktop }) {
           onClick={cancelMedia}
           className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
         >
-          <span className="material-symbols-outlined text-[16px]">close</span>
+          <FiX style={{ fontSize: '16px' }} />
         </button>
         {mediaPreview.type.startsWith('image') && (
           <img src={mediaPreview.url} alt="Preview" className="h-20 rounded" />
@@ -238,7 +243,7 @@ export default function MessagesScreen({ isDesktop }) {
         )}
         {mediaPreview.type.startsWith('audio') && (
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">graphic_eq</span>
+            <FiVolume2 className="text-primary" />
             <audio src={mediaPreview.url} controls className="h-8" />
           </div>
         )}
@@ -272,7 +277,7 @@ export default function MessagesScreen({ isDesktop }) {
               onClick={() => navigate(-1)}
               className="text-slate-500 hover:text-primary dark:text-slate-400 transition-colors p-1 -ml-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
             >
-              <span className="material-symbols-outlined text-[24px]">arrow_back_ios_new</span>
+              <FiArrowLeft style={{ fontSize: '24px' }} />
             </button>
             <div className="flex flex-col min-w-0">
               <h2 className="text-slate-900 dark:text-white text-base font-bold leading-tight truncate">
@@ -335,7 +340,7 @@ export default function MessagesScreen({ isDesktop }) {
                 onClick={() => setShowMediaPicker(!showMediaPicker)}
                 className="flex items-center justify-center size-10 rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700"
               >
-                <span className="material-symbols-outlined text-[20px]">add_photo_alternate</span>
+                <FiImage style={{ fontSize: '20px' }} />
               </button>
               <button
                 type="button"
@@ -344,7 +349,7 @@ export default function MessagesScreen({ isDesktop }) {
                   isRecording ? 'bg-red-500 text-white' : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
-                <span className="material-symbols-outlined text-[20px]">{isRecording ? 'stop' : 'mic'}</span>
+                {isRecording ? <FiX /> : <FiMic style={{ fontSize: '20px' }} />}
               </button>
             </div>
             <div className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center min-h-[44px] px-4 py-2 focus-within:ring-2 focus-within:ring-primary/50">
@@ -361,7 +366,7 @@ export default function MessagesScreen({ isDesktop }) {
               disabled={!newMessage.trim() && !mediaPreview}
               className={`flex items-center justify-center size-10 rounded-full ${(!newMessage.trim() && !mediaPreview) ? 'bg-slate-300' : 'bg-primary text-white'}`}
             >
-              <span className="material-symbols-outlined text-[20px]">send</span>
+              <FiSend style={{ fontSize: '20px' }} />
             </button>
           </form>
           {showMediaPicker && (
@@ -405,16 +410,31 @@ export default function MessagesScreen({ isDesktop }) {
     <div className="flex gap-6 h-[calc(100vh-64px)]">
       <div className="w-80 bg-white rounded-xl border border-slate-200 flex flex-col shrink-0">
         <div className="p-4 border-b border-slate-200">
-          <h2 className="text-lg font-bold text-slate-900">Messages</h2>
+          <h2 className="text-lg font-bold text-slate-900 mb-3">Messages</h2>
+          <div className="relative">
+            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" style={{ fontSize: '16px' }} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search conversations..."
+              className="w-full h-9 pl-9 pr-3 rounded-lg bg-slate-100 text-sm border-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto">
           {conversations.length === 0 ? (
             <div className="p-4 text-center text-slate-500">
-              <span className="material-symbols-outlined text-4xl mb-2">chat_bubble</span>
+              <FiMessageCircle style={{ fontSize: '40px' }} className="text-4xl mb-2" />
               <p className="text-sm">No conversations yet</p>
             </div>
           ) : (
-            conversations.map((conv) => (
+            conversations
+              .filter((conv) => {
+                if (!searchQuery) return true;
+                return conv.userName?.toLowerCase().includes(searchQuery.toLowerCase());
+              })
+              .map((conv) => (
               <Link
                 key={conv.userId}
                 to={`/messages/${conv.userId}`}
@@ -431,10 +451,17 @@ export default function MessagesScreen({ isDesktop }) {
                     <h3 className="font-semibold text-slate-900 truncate">{conv.userName}</h3>
                     <span className="text-xs text-slate-400">{conv.lastMessageTime?.split('T')[0]}</span>
                   </div>
-                  <p className="text-sm text-slate-500 truncate">{conv.lastMessage}</p>
+                  <p className="text-sm text-slate-500 truncate">
+                    {conv.lastMessageType === 'image' ? '📷 Photo' :
+                     conv.lastMessageType === 'video' ? '🎥 Video' :
+                     conv.lastMessageType === 'voice' ? '🎤 Voice' :
+                     conv.lastMessage || conv.lastMessageContent || ''}
+                  </p>
                 </div>
-                {conv.unread && (
-                  <span className="w-3 h-3 bg-primary rounded-full"></span>
+                {conv.unreadCount > 0 && (
+                  <span className="min-w-[20px] h-5 bg-primary text-white text-xs rounded-full flex items-center justify-center px-1.5">
+                    {conv.unreadCount > 99 ? '99+' : conv.unreadCount}
+                  </span>
                 )}
               </Link>
             ))
@@ -469,10 +496,7 @@ export default function MessagesScreen({ isDesktop }) {
               </div>
               <div className="flex items-center gap-2">
                 <button className="flex items-center justify-center w-10 h-10 rounded-full text-primary hover:bg-primary/10 transition-colors">
-                  <span className="material-symbols-outlined text-[24px]">call</span>
-                </button>
-                <button className="flex items-center justify-center w-10 h-10 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
-                  <span className="material-symbols-outlined text-[24px]">info</span>
+                  <FiPhone style={{ fontSize: '24px' }} />
                 </button>
               </div>
             </header>
@@ -535,7 +559,7 @@ export default function MessagesScreen({ isDesktop }) {
                     onClick={() => setShowMediaPicker(!showMediaPicker)}
                     className="flex items-center justify-center w-10 h-10 rounded-full text-slate-500 hover:bg-slate-200"
                   >
-                    <span className="material-symbols-outlined text-[20px]">add_photo_alternate</span>
+                    <FiImage style={{ fontSize: '20px' }} />
                   </button>
                   <button
                     type="button"
@@ -544,7 +568,7 @@ export default function MessagesScreen({ isDesktop }) {
                       isRecording ? 'bg-red-500 text-white' : 'text-slate-500 hover:bg-slate-200'
                     }`}
                   >
-                    <span className="material-symbols-outlined text-[20px]">{isRecording ? 'stop' : 'mic'}</span>
+                {isRecording ? <FiX /> : <FiMic style={{ fontSize: '20px' }} />}
                   </button>
                 </div>
                 <div className="flex-1 bg-slate-100 rounded-2xl flex items-center px-4 py-3 focus-within:ring-2 focus-within:ring-primary/50">
@@ -561,7 +585,7 @@ export default function MessagesScreen({ isDesktop }) {
                   disabled={!newMessage.trim() && !mediaPreview}
                   className={`flex items-center justify-center w-12 h-12 rounded-full shadow-sm transition-all ${(!newMessage.trim() && !mediaPreview) ? 'bg-slate-300 text-slate-400 cursor-not-allowed' : 'bg-primary text-white hover:bg-primary/90'}`}
                 >
-                  <span className="material-symbols-outlined text-[20px]">send</span>
+                  <FiSend style={{ fontSize: '20px' }} />
                 </button>
               </form>
               {showMediaPicker && (
@@ -577,7 +601,7 @@ export default function MessagesScreen({ isDesktop }) {
                     onClick={() => imageInputRef.current?.click()}
                     className="flex flex-col items-center p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
                   >
-                    <span className="material-symbols-outlined text-primary">image</span>
+                    <FiImage className="text-primary" />
                     <span className="text-xs">Image</span>
                   </button>
                   <input
@@ -591,7 +615,7 @@ export default function MessagesScreen({ isDesktop }) {
                     onClick={() => videoInputRef.current?.click()}
                     className="flex flex-col items-center p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
                   >
-                    <span className="material-symbols-outlined text-purple-500">videocam</span>
+                    <FiVideo className="text-purple-500" />
                     <span className="text-xs">Video</span>
                   </button>
                 </div>
@@ -601,7 +625,7 @@ export default function MessagesScreen({ isDesktop }) {
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <span className="material-symbols-outlined text-6xl text-slate-200">chat</span>
+              <FiMessageCircle style={{ fontSize: '60px' }} className="text-6xl text-slate-200" />
               <p className="text-slate-500 mt-4">Select a conversation to start messaging</p>
             </div>
           </div>

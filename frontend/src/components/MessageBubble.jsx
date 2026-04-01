@@ -1,3 +1,4 @@
+import { FiPlay, FiCheck } from 'react-icons/fi';
 export default function MessageBubble({ message, isOwn, showAvatar }) {
   const formatTime = (date) => {
     const d = new Date(date);
@@ -31,7 +32,7 @@ export default function MessageBubble({ message, isOwn, showAvatar }) {
         return (
           <div className="flex items-center gap-2 min-w-[200px]">
             <button className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined text-white text-sm">play_arrow</span>
+              <FiPlay style={{ fontSize: '14px' }} className="text-white text-sm" />
             </button>
             <div className="flex-1 h-8 bg-white/10 rounded-full overflow-hidden">
               <div className="h-full w-1/3 bg-white/30 rounded-full" />
@@ -82,7 +83,7 @@ export default function MessageBubble({ message, isOwn, showAvatar }) {
             {formatTime(message.createdAt)}
           </span>
           {isOwn && message.read && (
-            <span className="material-symbols-outlined text-[12px] text-primary">done_all</span>
+            <FiCheck style={{ fontSize: '12px' }} className="text-primary" />
           )}
         </div>
       </div>

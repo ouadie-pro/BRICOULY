@@ -12,29 +12,27 @@ export default function AuthScreen({ onAuth }) {
   const [mode, setMode] = useState(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState('client');
-  const [professionId, setProfessionId] = useState('');
+  const [selectedProfessions, setSelectedProfessions] = useState([]);
+  const [hourlyRate, setHourlyRate] = useState('');
   const [professions, setProfessions] = useState(null);
   const [bio, setBio] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [showAddProfession, setShowAddProfession] = useState(false);
   const [newProfessionName, setNewProfessionName] = useState('');
   const navigate = useNavigate();
 
-  const iconMap = {
-    plumbing: FiDroplet,
-    bolt: FiZap,
-    format_paint: FiBox,
-    carpenter: FiTool,
-    cleaning_services: FiFeather,
-    local_shipping: FiTruck,
-    ac_unit: FiWind,
-    grass: FiFeather,
-    roofing: FiHome,
-    kitchen: FiShoppingBag,
+  const toggleProfession = (profId) => {
+    setSelectedProfessions(prev => 
+      prev.includes(profId) 
+        ? prev.filter(id => id !== profId)
+        : [...prev, profId]
+    );
   };
 
   const defaultProfessions = [
@@ -71,8 +69,18 @@ export default function AuthScreen({ onAuth }) {
     e.preventDefault();
     setError('');
     
-    if (mode === 'signup' && role === 'provider' && !professionId) {
-      setError('Please select your specialization');
+    if (mode === 'signup' && role === 'provider' && selectedProfessions.length === 0) {
+      setError('Please select at least one specialization');
+      return;
+    }
+    
+    if (mode === 'signup' && password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+    
+    if (mode === 'signup' && password.length < 6) {
+      setError('Password must be at least 6 characters');
       return;
     }
     
@@ -93,8 +101,10 @@ export default function AuthScreen({ onAuth }) {
           password, 
           role,
           phone,
-          professionId: role === 'provider' ? professionId : null,
+          professionId: role === 'provider' ? selectedProfessions[0] : null,
+          professionIds: role === 'provider' ? selectedProfessions : [],
           bio: role === 'provider' ? bio : '',
+          hourlyRate: role === 'provider' ? parseFloat(hourlyRate) || 0 : undefined,
         });
         if (res.success) {
           localStorage.setItem('user', JSON.stringify(res.user));
@@ -104,7 +114,7 @@ export default function AuthScreen({ onAuth }) {
           setError(res.error || 'Signup failed');
         }
       }
-    } catch (err) {
+    } catch (_err) {
       setError('Something went wrong. Please try again.');
     }
   };
@@ -116,14 +126,15 @@ export default function AuthScreen({ onAuth }) {
     try {
       const res = await api.addProfession({ name: newProfessionName.trim() });
       if (res.success) {
-        setProfessions([...(professions || []), res.profession]);
-        setProfessionId(res.profession._id || res.profession.id);
+        const newProf = res.profession;
+        setProfessions([...(professions || []), newProf]);
+        setSelectedProfessions(prev => [...prev, newProf._id || newProf.id]);
         setNewProfessionName('');
         setShowAddProfession(false);
       } else {
         setError(res.error || 'Failed to add specialization');
       }
-    } catch (err) {
+    } catch (_err) {
       setError('Failed to add specialization');
     }
   };
@@ -148,7 +159,7 @@ export default function AuthScreen({ onAuth }) {
           <div className="space-y-6">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full border border-white/20 w-fit">
               <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-              <span className="text-white/90 text-sm font-medium">Trusted by 10,000+ customers</span>
+              <span className="text-white/90 text-sm font-medium">Serving Morocco</span>
             </div>
             <h2 className="text-white text-4xl font-bold leading-tight max-w-lg">
               Connect with skilled professionals for your home
@@ -205,7 +216,7 @@ export default function AuthScreen({ onAuth }) {
                 onChange={() => {
                   setMode('login');
                   setRole('client');
-                  setProfessionId('');
+                  setSelectedProfessions([]);
                 }}
                 className="invisible w-0 absolute"
               />
@@ -275,16 +286,16 @@ export default function AuthScreen({ onAuth }) {
                 {role === 'provider' && (
                   <>
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-slate-700 text-sm font-medium">Select Your Specialization</label>
-                      <p className="text-xs text-slate-500 mb-2">Choose the service you specialize in</p>
+                      <label className="text-slate-700 text-sm font-medium">Select Your Specialization(s)</label>
+                      <p className="text-xs text-slate-500 mb-2">Choose one or more services you offer</p>
                       <div className="grid grid-cols-2 gap-2.5">
                         {professions.map((prof) => (
                           <button
                             key={prof._id}
                             type="button"
-                            onClick={() => setProfessionId(prof._id)}
+                            onClick={() => toggleProfession(prof._id)}
                             className={`flex items-center gap-2.5 p-2.5 rounded-xl border-2 transition-all ${
-                              professionId === prof._id
+                              selectedProfessions.includes(prof._id)
                                 ? 'border-primary bg-blue-50/50'
                                 : 'border-slate-200 hover:border-slate-300 bg-white'
                             }`}
@@ -299,6 +310,9 @@ export default function AuthScreen({ onAuth }) {
                               />
                             </div>
                             <span className="text-xs font-semibold text-slate-700">{prof.name}</span>
+                            {selectedProfessions.includes(prof._id) && (
+                              <FiCheckCircle className="ml-auto text-primary" style={{ fontSize: '16px' }} />
+                            )}
                           </button>
                         ))}
                       </div>
@@ -346,9 +360,24 @@ export default function AuthScreen({ onAuth }) {
                         </form>
                       )}
                       
-                      {mode === 'signup' && role === 'provider' && !professionId && (
-                        <p className="text-xs text-red-500 mt-1">Please select your specialization</p>
+                      {mode === 'signup' && role === 'provider' && selectedProfessions.length === 0 && (
+                        <p className="text-xs text-red-500 mt-1">Please select at least one specialization</p>
                       )}
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-slate-700 text-sm font-medium">Hourly Rate (MAD)</label>
+                      <div className="relative group">
+                        <input
+                          type="number"
+                          value={hourlyRate}
+                          onChange={(e) => setHourlyRate(e.target.value)}
+                          className="input-field pl-10"
+                          placeholder="e.g., 150"
+                          min="0"
+                        />
+                      </div>
+                      <p className="text-xs text-slate-400">Set your rate in Moroccan Dirhams per hour</p>
                     </div>
 
                     <div className="flex flex-col gap-1.5">
@@ -408,18 +437,41 @@ export default function AuthScreen({ onAuth }) {
             </div>
 
             {mode === 'signup' && (
-              <div className="flex flex-col gap-1.5">
-                <label className="text-slate-700 text-sm font-medium">Phone Number <span className="text-slate-400 font-normal">(optional)</span></label>
-                <div className="relative group">
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="input-field pl-10"
-                    placeholder="+1 (212) 000-0000"
-                  />
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-slate-700 text-sm font-medium">Phone Number <span className="text-slate-400 font-normal">(optional)</span></label>
+                  <div className="relative group">
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="input-field pl-10"
+                      placeholder="+212 6XX XXX XXX"
+                    />
+                  </div>
                 </div>
-              </div>
+                
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-slate-700 text-sm font-medium">Confirm Password</label>
+                  <div className="relative group">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="input-field pl-10 pr-10"
+                      placeholder="Confirm your password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                    >
+                      {showConfirmPassword ? <FiEyeOff className="text-lg" /> : <FiEye className="text-lg" />}
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
 
             {error && (

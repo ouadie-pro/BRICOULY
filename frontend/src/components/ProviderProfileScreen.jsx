@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../services/api';
+import { 
+  FiArrowLeft, FiShare2, FiCheckCircle, FiStar, FiMessageCircle, FiCalendar, FiCheck, FiX,
+  FiMapPin, FiPhone, FiMail, FiUserPlus, FiUserMinus, FiUsers, FiAlertCircle, FiPlay
+} from 'react-icons/fi';
 
 export default function ProviderProfileScreen({ isDesktop }) {
   const { id } = useParams();
@@ -87,7 +91,7 @@ export default function ProviderProfileScreen({ isDesktop }) {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background-light dark:bg-background-dark p-4">
-        <span className="material-symbols-outlined text-6xl text-slate-300 mb-4">error</span>
+        <FiAlertCircle style={{ fontSize: '60px' }} className="text-6xl text-slate-300 mb-4" />
         <p className="text-slate-500 text-lg">{error}</p>
         <button onClick={() => navigate(-1)} className="mt-4 px-4 py-2 bg-primary text-white rounded-lg">
           Go Back
@@ -119,14 +123,14 @@ export default function ProviderProfileScreen({ isDesktop }) {
             onClick={() => navigate(-1)}
             className="flex size-12 shrink-0 items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full justify-center transition-colors"
           >
-            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>arrow_back_ios_new</span>
+            <FiArrowLeft style={{ fontSize: '24px' }} />
           </button>
           <h2 className="text-text-light dark:text-text-dark text-lg font-bold leading-tight tracking-[-0.015em] text-center flex-1">
             Provider Profile
           </h2>
           <div className="flex w-12 items-center justify-end">
             <button className="flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full size-12 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-              <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>ios_share</span>
+              <FiShare2 style={{ fontSize: '24px' }} />
             </button>
           </div>
         </div>
@@ -150,7 +154,7 @@ export default function ProviderProfileScreen({ isDesktop }) {
                 )}
                 {provider.verified && (
                   <div className="absolute bottom-1 right-1 bg-green-500 rounded-full p-1.5 border-4 border-card-light dark:border-card-dark">
-                    <span className="material-symbols-outlined text-white text-sm">verified</span>
+                    <FiCheckCircle style={{ fontSize: '14px' }} className="text-white text-sm" />
                   </div>
                 )}
               </div>
@@ -162,7 +166,7 @@ export default function ProviderProfileScreen({ isDesktop }) {
                   {provider.profession}
                 </p>
                 <div className="flex items-center gap-1 mt-1">
-                  <span className="material-symbols-outlined text-orange-400" style={{ fontSize: '16px' }}>star</span>
+                  <FiStar style={{ fontSize: '16px' }} className="text-orange-400" />
                   <span className="text-text-light dark:text-text-dark font-bold text-sm">{provider.rating || 0}</span>
                   <span className="text-secondary-text-light dark:text-secondary-text-dark text-sm">
                     ({provider.reviewCount || 0} reviews)
@@ -190,7 +194,7 @@ export default function ProviderProfileScreen({ isDesktop }) {
                 to={`/messages/${provider.id}`}
                 className="flex items-center justify-center gap-2 px-5 py-2.5 border border-primary text-primary rounded-xl hover:bg-blue-50 transition-colors"
               >
-                <span className="material-symbols-outlined text-[20px]">chat_bubble</span>
+                <FiMessageCircle style={{ fontSize: '20px' }} />
               </Link>
             </div>
           )}
@@ -284,13 +288,12 @@ export default function ProviderProfileScreen({ isDesktop }) {
                           <p className="text-sm font-bold text-text-light dark:text-text-dark">{review.clientName}</p>
                           <div className="flex gap-0.5">
                             {[1, 2, 3, 4, 5].map((star) => (
-                              <span
+                              <FiStar
                                 key={star}
-                                className={`material-symbols-outlined ${star <= review.rating ? 'text-primary' : 'text-gray-300'}`}
+                                className={star <= review.rating ? 'text-primary' : 'text-gray-300'}
                                 style={{ fontSize: '12px' }}
-                              >
-                                star
-                              </span>
+                                fill={star <= review.rating ? 'currentColor' : 'none'}
+                              />
                             ))}
                           </div>
                         </div>
@@ -319,7 +322,7 @@ export default function ProviderProfileScreen({ isDesktop }) {
                   onClick={() => setShowRequestModal(true)}
                   className="flex-1 bg-primary hover:bg-blue-600 text-white font-bold h-12 rounded-xl shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2"
                 >
-                  <span className="material-symbols-outlined">calendar_month</span>
+                  <FiCalendar style={{ fontSize: '18px' }} />
                   Request Service
                 </button>
               )}
@@ -329,7 +332,7 @@ export default function ProviderProfileScreen({ isDesktop }) {
                   currentUser.role === 'client' ? 'w-12' : 'flex-1'
                 }`}
               >
-                <span className="material-symbols-outlined">chat_bubble</span>
+                <FiMessageCircle style={{ fontSize: '18px' }} />
                 {currentUser.role !== 'client' && <span className="font-bold">Message</span>}
               </Link>
             </div>
@@ -343,7 +346,7 @@ export default function ProviderProfileScreen({ isDesktop }) {
               {requestSent ? (
                 <div className="text-center py-8">
                   <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span className="material-symbols-outlined text-green-600 text-3xl">check</span>
+                    <FiCheck style={{ fontSize: '30px' }} className="text-green-600 text-3xl" />
                   </div>
                   <h3 className="text-xl font-bold text-slate-900 mb-2">Request Sent!</h3>
                   <p className="text-slate-500">The provider will respond to your request soon.</p>
@@ -353,7 +356,7 @@ export default function ProviderProfileScreen({ isDesktop }) {
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-xl font-bold text-slate-900">Request Service</h3>
                     <button onClick={() => setShowRequestModal(false)} className="p-2 hover:bg-slate-100 rounded-full">
-                      <span className="material-symbols-outlined">close</span>
+                      <FiX />
                     </button>
                   </div>
                   <form onSubmit={handleRequestService}>
@@ -425,7 +428,7 @@ export default function ProviderProfileScreen({ isDesktop }) {
                 )}
                 {provider.verified && (
                   <div className="absolute bottom-2 right-2 bg-green-500 rounded-full p-1.5 border-4 border-white">
-                    <span className="material-symbols-outlined text-white text-sm">verified</span>
+                    <FiCheckCircle style={{ fontSize: '14px' }} className="text-white text-sm" />
                   </div>
                 )}
               </div>
@@ -433,7 +436,7 @@ export default function ProviderProfileScreen({ isDesktop }) {
                 <h1 className="text-2xl font-bold text-slate-900 mb-1">{provider.name}</h1>
                 <p className="text-slate-500 text-base">{provider.profession}</p>
                 <div className="flex items-center gap-2 mt-2">
-                  <span className="material-symbols-outlined text-amber-400" style={{ fontSize: '20px' }}>star</span>
+                  <FiStar style={{ fontSize: '20px' }} className="text-amber-400" fill="currentColor" />
                   <span className="font-bold text-slate-900">{provider.rating || 0}</span>
                   <span className="text-slate-500">({provider.reviewCount || 0} reviews)</span>
                 </div>
@@ -459,7 +462,7 @@ export default function ProviderProfileScreen({ isDesktop }) {
                 to={`/messages/${provider.id}`}
                 className="flex items-center gap-2 px-6 py-2.5 border border-primary text-primary rounded-xl hover:bg-blue-50 transition-colors"
               >
-                <span className="material-symbols-outlined">chat_bubble</span>
+                <FiMessageCircle style={{ fontSize: '18px' }} />
                 Message
               </Link>
             </div>
@@ -505,7 +508,7 @@ export default function ProviderProfileScreen({ isDesktop }) {
                   <h3 className="text-lg font-bold text-slate-900 mb-3">About {provider.name.split(' ')[0]}</h3>
                   <p className="text-slate-600 leading-relaxed">{provider.bio || 'No bio available.'}</p>
                   <div className="flex items-center gap-2 mt-3 text-slate-500 text-sm">
-                    <span className="material-symbols-outlined text-[18px]">location_on</span>
+                    <FiMapPin style={{ fontSize: '18px' }} />
                     {provider.location || 'NYC Area'} • {provider.serviceArea || 'Available'}
                   </div>
                 </div>
@@ -553,9 +556,7 @@ export default function ProviderProfileScreen({ isDesktop }) {
                       <p className="text-5xl font-black text-slate-900">{provider.rating || 0}</p>
                       <div className="flex gap-0.5 my-2">
                         {[1, 2, 3, 4, 5].map((star) => (
-                          <span key={star} className="material-symbols-outlined text-primary" style={{ fontSize: '16px' }}>
-                            star
-                          </span>
+                          <FiStar key={star} className="text-primary" style={{ fontSize: '16px' }} fill="currentColor" />
                         ))}
                       </div>
                       <p className="text-xs text-slate-500">Based on {provider.reviewCount || 0} reviews</p>
@@ -573,13 +574,12 @@ export default function ProviderProfileScreen({ isDesktop }) {
                           <p className="font-semibold text-slate-900">{review.clientName}</p>
                           <div className="flex gap-0.5">
                             {[1, 2, 3, 4, 5].map((star) => (
-                              <span
+                              <FiStar
                                 key={star}
-                                className={`material-symbols-outlined ${star <= review.rating ? 'text-primary' : 'text-slate-300'}`}
+                                className={star <= review.rating ? 'text-primary' : 'text-slate-300'}
                                 style={{ fontSize: '14px' }}
-                              >
-                                star
-                              </span>
+                                fill={star <= review.rating ? 'currentColor' : 'none'}
+                              />
                             ))}
                           </div>
                         </div>
@@ -614,7 +614,7 @@ export default function ProviderProfileScreen({ isDesktop }) {
                   onClick={() => setShowRequestModal(true)}
                   className="flex items-center justify-center gap-2 w-full h-12 bg-primary hover:bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/30 transition-all"
                 >
-                  <span className="material-symbols-outlined">calendar_month</span>
+                  <FiCalendar style={{ fontSize: '18px' }} />
                   Request Service
                 </button>
               )}
@@ -622,7 +622,7 @@ export default function ProviderProfileScreen({ isDesktop }) {
                 to={`/messages/${provider.id}`}
                 className="flex items-center justify-center gap-2 w-full h-12 bg-white border border-primary text-primary font-bold rounded-xl hover:bg-blue-50 transition-colors"
               >
-                <span className="material-symbols-outlined">chat_bubble</span>
+                <FiMessageCircle style={{ fontSize: '18px' }} />
                 Send Message
               </Link>
             </div>
@@ -630,10 +630,10 @@ export default function ProviderProfileScreen({ isDesktop }) {
 
           <div className="flex justify-center gap-4 mt-6 pt-6 border-t border-slate-200">
             <button className="flex items-center justify-center w-12 h-12 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors text-slate-600">
-              <span className="material-symbols-outlined">call</span>
+              <FiPhone style={{ fontSize: '18px' }} />
             </button>
             <button className="flex items-center justify-center w-12 h-12 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors text-slate-600">
-              <span className="material-symbols-outlined">ios_share</span>
+              <FiShare2 />
             </button>
             {!isOwnProfile && (
               <button
@@ -645,7 +645,7 @@ export default function ProviderProfileScreen({ isDesktop }) {
                     : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
                 }`}
               >
-                <span className="material-symbols-outlined">{following ? 'person_remove' : 'person_add'}</span>
+                                {following ? <FiUserMinus /> : <FiUserPlus />}
               </button>
             )}
           </div>
@@ -659,7 +659,7 @@ export default function ProviderProfileScreen({ isDesktop }) {
             {requestSent ? (
               <div className="text-center py-8">
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="material-symbols-outlined text-green-600 text-3xl">check</span>
+                  <FiCheck style={{ fontSize: '30px' }} className="text-green-600 text-3xl" />
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 mb-2">Request Sent!</h3>
                 <p className="text-slate-500">The provider will respond to your request soon.</p>
@@ -669,7 +669,7 @@ export default function ProviderProfileScreen({ isDesktop }) {
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-xl font-bold text-slate-900">Request Service</h3>
                   <button onClick={() => setShowRequestModal(false)} className="p-2 hover:bg-slate-100 rounded-full">
-                    <span className="material-symbols-outlined">close</span>
+                    <FiX />
                   </button>
                 </div>
                 <form onSubmit={handleRequestService}>

@@ -4,7 +4,7 @@ import { api } from '../services/api';
 import { 
   FiHeart, FiMessageCircle, FiShare2, FiStar, FiMapPin, FiSearch, 
   FiMenu, FiBell, FiPlayCircle, FiImage, FiX, FiFilter, FiSettings,
-  FiHome, FiUser, FiChevronDown
+  FiHome, FiUser, FiChevronDown, FiTrash2
 } from 'react-icons/fi';
 import { GoTasklist } from 'react-icons/go';
 
@@ -264,6 +264,10 @@ export default function HomeScreen({ isDesktop }) {
 
   const handleCreatePost = async () => {
     if (!postContent.trim() && !postImage) return;
+    if (postContent.trim().length < 10) {
+      alert('Post must be at least 10 characters long');
+      return;
+    }
     setIsPosting(true);
     try {
       let imageUrl = null;
@@ -288,6 +292,19 @@ export default function HomeScreen({ isDesktop }) {
     }
   };
 
+  const handleDeletePost = async (feedId) => {
+    if (!window.confirm('Are you sure you want to delete this post?')) return;
+    try {
+      const postId = feedId.replace('post-', '');
+      const result = await api.deletePost?.(postId);
+      if (result?.success || result?.message === 'Post deleted') {
+        setFeed((prev) => prev.filter((f) => f.feedId !== feedId));
+      }
+    } catch (err) {
+      console.error('Error deleting post:', err);
+    }
+  };
+
   const formatDate = (dateStr) => {
     const date = new Date(dateStr);
     const now = new Date();
@@ -303,10 +320,12 @@ export default function HomeScreen({ isDesktop }) {
 
   // Shared FeedCard component used by both mobile and desktop
   const FeedCard = ({ item, compact = false }) => {
-    const { feedId, type } = item;
+    const { feedId, type, id, authorName, authorId } = item;
     const isLiked = likedItems.has(feedId);
     const isExpanded = expandedItems.has(feedId);
     const comments = itemComments[feedId] || [];
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const isOwnPost = storedUser?.name === authorName || storedUser?.id === authorId;
 
     return (
       <div
@@ -367,6 +386,15 @@ export default function HomeScreen({ isDesktop }) {
               <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
                 Verified Pro
               </span>
+            )}
+            {type === 'post' && isOwnPost && (
+              <button
+                onClick={() => handleDeletePost(feedId)}
+                className="p-1.5 hover:bg-red-50 rounded-full transition-colors text-slate-400 hover:text-red-500"
+                title="Delete post"
+              >
+                <FiTrash2 style={{ fontSize: '16px' }} />
+              </button>
             )}
           </div>
         </div>
@@ -683,7 +711,7 @@ export default function HomeScreen({ isDesktop }) {
                   onClick={() => setShowPostForm(true)}
                   className="flex-1 text-left px-4 py-2.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-sm"
                 >
-                  What's on your mind?
+                  Share an update or tip...
                 </button>
               </div>
             </div>
@@ -704,7 +732,7 @@ export default function HomeScreen({ isDesktop }) {
                   <textarea
                     value={postContent}
                     onChange={(e) => setPostContent(e.target.value)}
-                    placeholder="What's on your mind?"
+                    placeholder="Share an update or tip..."
                     className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent resize-none focus:outline-none focus:border-primary"
                     rows={4}
                   />
@@ -960,12 +988,12 @@ export default function HomeScreen({ isDesktop }) {
                 </div>
               )}
             </div>
-            <button
-              onClick={() => setShowPostForm(true)}
-              className="flex-1 text-left px-5 py-3 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors text-slate-500 font-medium"
-            >
-              What's on your mind?
-            </button>
+              <button
+                onClick={() => setShowPostForm(true)}
+                className="flex-1 text-left px-5 py-3 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors text-slate-500 font-medium"
+              >
+                Share an update or tip...
+              </button>
           </div>
         </div>
 

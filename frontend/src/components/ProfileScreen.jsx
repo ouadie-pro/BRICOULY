@@ -13,6 +13,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedAvatar, setUploadedAvatar] = useState(null);
   const [articles, setArticles] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [followers, setFollowers] = useState([]);
   const [following, setFollowing] = useState([]);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -64,14 +65,16 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
           setBio(userData.bio || '');
         }
 
-        const [userArticles, userFollowers, userFollowing] = await Promise.all([
+        const [userArticles, userFollowers, userFollowing, userReviews] = await Promise.all([
           api.getUserArticles(targetUserId),
           api.getFollowers(targetUserId),
           api.getFollowing(targetUserId),
+          api.getProviderReviews?.(targetUserId).catch(() => []),
         ]);
-        setArticles(userArticles);
-        setFollowers(userFollowers);
-        setFollowing(userFollowing);
+        setArticles(userArticles || []);
+        setFollowers(userFollowers || []);
+        setFollowing(userFollowing || []);
+        setReviews(userReviews || []);
 
         // Fetch portfolio if user is a provider
         if (userData?.role === 'provider' || currentUser.role === 'provider') {
@@ -407,20 +410,30 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
 
               <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
                 <span className="material-symbols-outlined text-slate-400">location_on</span>
-                <div>
+                <div className="flex-1">
                   <p className="text-xs text-slate-500">Location</p>
                   {isEditing ? (
                     <input
                       type="text"
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
-                      className="text-sm font-medium bg-transparent border-b border-primary focus:outline-none"
-                      placeholder="Add location"
+                      className="text-sm font-medium bg-transparent border-b border-primary focus:outline-none w-full"
+                      placeholder="Add location (e.g., Casablanca)"
                     />
                   ) : (
-                    <p className="text-sm font-medium text-text-light dark:text-text-dark">
-                      {user.location || user.address || 'Not set'}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-text-light dark:text-text-dark">
+                        {user.location || user.address || 'Not set'}
+                      </p>
+                      {!user.location && !user.address && !isEditing && !isViewingOther && (
+                        <button
+                          onClick={() => setIsEditing(true)}
+                          className="text-xs text-primary font-medium hover:underline"
+                        >
+                          Add
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -703,7 +716,14 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
         <div className="md:col-span-2">
           <div className="mt-6">
             <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
-              {['info', 'followers', 'following', ...(user?.role === 'provider' || currentUser.role === 'provider' ? ['portfolio'] : []), 'articles'].map((tab) => (
+              {[
+                'info', 
+                'followers', 
+                'following', 
+                ...(user?.role === 'provider' || currentUser.role === 'provider' ? ['portfolio'] : []),
+                ...(isViewingOther && user?.role === 'client' ? ['reviews'] : []),
+                'articles'
+              ].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -717,6 +737,8 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                     ? `Following (${following.length})`
                     : tab === 'articles'
                     ? `Articles (${articles.length})`
+                    : tab === 'reviews'
+                    ? `Reviews (${reviews.length})`
                     : 'Info'}
                 </button>
               ))}
@@ -955,6 +977,50 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                             <span className="material-symbols-outlined text-[16px]">delete</span>
                           </button>
                         )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'reviews' && (
+              <div className="mt-4">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Reviews Received</h3>
+                {reviews.length === 0 ? (
+                  <div className="text-center py-8 bg-slate-50 rounded-xl">
+                    <span className="material-symbols-outlined text-5xl text-slate-300">star</span>
+                    <p className="text-slate-500 mt-2">No reviews yet</p>
+                    <p className="text-slate-400 text-sm mt-1">Reviews from providers will appear here</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {reviews.map((review) => (
+                      <div key={review.id} className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center">
+                            <span className="text-sm font-bold text-slate-500">
+                              {review.reviewerName?.charAt(0) || '?'}
+                            </span>
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-semibold text-slate-900">{review.reviewerName}</p>
+                            <p className="text-xs text-slate-500">{review.reviewerProfession || 'Provider'}</p>
+                          </div>
+                          <div className="flex items-center gap-0.5">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <span key={star} className={`material-symbols-outlined text-sm ${star <= (review.rating || 0) ? 'text-amber-400' : 'text-slate-300'}`}>
+                                star
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        {review.comment && (
+                          <p className="text-sm text-slate-600">{review.comment}</p>
+                        )}
+                        <p className="text-xs text-slate-400 mt-2">
+                          {formatDate(review.createdAt)}
+                        </p>
                       </div>
                     ))}
                   </div>

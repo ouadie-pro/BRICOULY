@@ -8,25 +8,38 @@ export default function ProviderDashboard({ isDesktop }) {
   const [requests, setRequests] = useState([]);
   const [showAddService, setShowAddService] = useState(false);
   const [newService, setNewService] = useState({ name: '', description: '', price: '', category: 'other' });
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+
+  const loadData = async (userId) => {
+    if (!userId) return;
+    setLoading(true);
+    try {
+      const [servicesData, requestsData] = await Promise.all([
+        api.getProviderServices(userId),
+        api.getServiceRequests(),
+      ]);
+      setServices(servicesData || []);
+      setRequests(requestsData || []);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      setServices([]);
+      setRequests([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
     setUser(storedUser);
     
-    if (storedUser.role === 'provider') {
+    if (storedUser.role === 'provider' && storedUser.id) {
       loadData(storedUser.id);
+    } else {
+      setLoading(false);
     }
   }, []);
-
-  const loadData = async (userId) => {
-    const [servicesData, requestsData] = await Promise.all([
-      api.getProviderServices(userId),
-      api.getServiceRequests(),
-    ]);
-    setServices(servicesData);
-    setRequests(requestsData);
-  };
 
   const handleAddService = async (e) => {
     e.preventDefault();
@@ -50,7 +63,7 @@ export default function ProviderDashboard({ isDesktop }) {
     loadData(user.id);
   };
 
-  if (!user) {
+  if (!user || loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -69,8 +82,8 @@ export default function ProviderDashboard({ isDesktop }) {
             <p className="text-slate-500 text-sm">No services added yet.</p>
           ) : (
             <div className="space-y-2">
-              {services.map(service => (
-                <div key={service.id} className="flex justify-between items-center p-2 bg-slate-50 rounded-lg">
+              {services.map((service, index) => (
+                <div key={service._id || service.id || `service-${index}`} className="flex justify-between items-center p-2 bg-slate-50 rounded-lg">
                   <div>
                     <p className="font-medium text-slate-900">{service.name}</p>
                     <p className="text-sm text-slate-500">${service.price}</p>
@@ -129,8 +142,8 @@ export default function ProviderDashboard({ isDesktop }) {
             <p className="text-slate-500 text-sm">No requests yet.</p>
           ) : (
             <div className="space-y-2">
-              {requests.map(request => (
-                <div key={request.id} className="p-2 bg-slate-50 rounded-lg">
+              {requests.map((request, index) => (
+                <div key={request._id || request.id || `request-${index}`} className="p-2 bg-slate-50 rounded-lg">
                   <p className="font-medium text-slate-900">{request.serviceName}</p>
                   <p className="text-sm text-slate-500">{request.description}</p>
                   <div className="flex gap-2 mt-2">
@@ -186,8 +199,8 @@ export default function ProviderDashboard({ isDesktop }) {
             <p className="text-slate-500 text-sm py-4">No services added yet. Add your first service!</p>
           ) : (
             <div className="space-y-3">
-              {services.map(service => (
-                <div key={service.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
+              {services.map((service, index) => (
+                <div key={service._id || service.id || `service-${index}`} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
                   <div className="flex-1">
                     <p className="font-medium text-slate-900">{service.name}</p>
                     <p className="text-sm text-slate-500">{service.description}</p>
@@ -266,8 +279,8 @@ export default function ProviderDashboard({ isDesktop }) {
             <p className="text-slate-500 text-sm py-4">No service requests yet.</p>
           ) : (
             <div className="space-y-3">
-              {requests.map(request => (
-                <div key={request.id} className="p-4 bg-slate-50 rounded-lg">
+              {requests.map((request, index) => (
+                <div key={request._id || request.id || `request-${index}`} className="p-4 bg-slate-50 rounded-lg">
                   <div className="flex items-start justify-between mb-2">
                     <div>
                       <p className="font-medium text-slate-900">{request.serviceName}</p>

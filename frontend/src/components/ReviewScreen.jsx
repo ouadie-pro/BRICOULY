@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
+import { FiX, FiCheck, FiStar } from 'react-icons/fi';
 
 export default function ReviewScreen({ isDesktop }) {
   const { providerId } = useParams();
@@ -53,12 +54,10 @@ export default function ReviewScreen({ isDesktop }) {
           onMouseLeave={() => interactive && onHover(0)}
           className={`transition-transform ${interactive ? 'active:scale-95 focus:outline-none cursor-pointer' : 'cursor-default'}`}
         >
-          <span
-            className={`material-symbols-outlined ${(hoverVal || value) >= star ? 'text-primary' : 'text-slate-300 dark:text-slate-600'} ${interactive ? 'hover:text-primary/50' : ''}`}
-            style={{ fontSize: '40px', fontVariationSettings: "'FILL' 1" }}
-          >
-            star
-          </span>
+          <FiStar
+            className={(hoverVal || value) >= star ? 'text-primary' : 'text-slate-300 dark:text-slate-600'} style={{ fontSize: '40px' }}
+            fill={(hoverVal || value) >= star ? 'currentColor' : 'none'}
+          />
         </button>
       ))}
     </div>
@@ -68,12 +67,11 @@ export default function ReviewScreen({ isDesktop }) {
     <div className="flex gap-0.5">
       {[1, 2, 3, 4, 5].map((star) => (
         <button key={star} type="button" onClick={() => onChange(star)} className="focus:outline-none">
-          <span
-            className={`material-symbols-outlined ${value >= star ? 'text-primary' : 'text-slate-300 dark:text-slate-600'}`}
-            style={{ fontSize: '20px', fontVariationSettings: "'FILL' 1" }}
-          >
-            star
-          </span>
+          <FiStar
+            className={value >= star ? 'text-primary' : 'text-slate-300 dark:text-slate-600'}
+            style={{ fontSize: '20px' }}
+            fill={value >= star ? 'currentColor' : 'none'}
+          />
         </button>
       ))}
     </div>
@@ -87,7 +85,7 @@ export default function ReviewScreen({ isDesktop }) {
             onClick={() => navigate(-1)}
             className="flex size-10 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
-            <span className="material-symbols-outlined text-slate-900 dark:text-white" style={{ fontSize: '24px' }}>close</span>
+            <FiX style={{ fontSize: '24px' }} className="text-slate-900 dark:text-white" />
           </button>
           <h2 className="text-slate-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] text-center">
             Write a Review
@@ -112,7 +110,7 @@ export default function ReviewScreen({ isDesktop }) {
                   </div>
                 )}
                 <div className="absolute bottom-0 right-0 bg-green-500 border-2 border-background-dark w-6 h-6 rounded-full flex items-center justify-center">
-                  <span className="material-symbols-outlined text-white" style={{ fontSize: '14px' }}>check</span>
+                  <FiCheck style={{ fontSize: '14px' }} className="text-white" />
                 </div>
               </div>
               <div className="flex flex-col items-center justify-center">
@@ -194,7 +192,7 @@ export default function ReviewScreen({ isDesktop }) {
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-bold text-slate-900">Write a Review</h2>
           <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-            <span className="material-symbols-outlined text-slate-600">close</span>
+            <FiX className="text-slate-600" />
           </button>
         </div>
 
@@ -214,7 +212,7 @@ export default function ReviewScreen({ isDesktop }) {
                 </div>
               )}
               <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-1 border-2 border-white">
-                <span className="material-symbols-outlined text-white text-xs">check</span>
+                <FiCheck style={{ fontSize: '12px' }} className="text-white text-xs" />
               </div>
             </div>
             <div>

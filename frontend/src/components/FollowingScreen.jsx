@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
+import { FiArrowLeft, FiUserPlus, FiLoader } from 'react-icons/fi';
 
 export default function FollowingScreen({ isDesktop }) {
   const { userId } = useParams();
@@ -27,7 +28,7 @@ export default function FollowingScreen({ isDesktop }) {
               onClick={() => navigate(-1)}
               className="flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
             >
-              <span className="material-symbols-outlined text-[24px]">arrow_back</span>
+              <FiArrowLeft style={{ fontSize: '24px' }} />
             </button>
             <div className="flex flex-col">
               <h1 className="text-lg font-bold text-slate-900">Following</h1>
@@ -39,11 +40,11 @@ export default function FollowingScreen({ isDesktop }) {
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center p-8">
-              <span className="material-symbols-outlined text-4xl text-slate-300 animate-spin">sync</span>
+                            <FiLoader style={{ fontSize: '40px' }} className="text-4xl text-slate-300 animate-spin" />
             </div>
           ) : following.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-8 text-center">
-              <span className="material-symbols-outlined text-5xl text-slate-300 mb-3">person_add</span>
+              <FiUserPlus style={{ fontSize: '50px' }} className="text-5xl text-slate-300 mb-3" />
               <p className="text-slate-500 font-medium">Not following anyone yet</p>
               <p className="text-xs text-slate-400">Find users to follow from the search page</p>
             </div>
@@ -95,7 +96,7 @@ export default function FollowingScreen({ isDesktop }) {
           onClick={() => navigate(-1)}
           className="flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
         >
-          <span className="material-symbols-outlined text-[24px]">arrow_back</span>
+          <FiArrowLeft style={{ fontSize: '24px' }} />
         </button>
         <div className="flex flex-col">
           <h1 className="text-xl font-bold text-slate-900">Following</h1>
@@ -106,7 +107,7 @@ export default function FollowingScreen({ isDesktop }) {
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex items-center justify-center p-8">
-            <span className="material-symbols-outlined text-4xl text-slate-300 animate-spin">sync</span>
+                          <FiLoader style={{ fontSize: '40px' }} className="text-4xl text-slate-300 animate-spin" />
           </div>
         ) : following.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 text-center">

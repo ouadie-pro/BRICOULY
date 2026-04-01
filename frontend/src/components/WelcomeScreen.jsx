@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { FiSearch, FiShield, FiDollarSign, FiHeadphones, FiStar, FiTool } from 'react-icons/fi';
+import { FiSearch, FiShield, FiDollarSign, FiHeadphones, FiStar, FiTool, FiMapPin, FiCheckCircle } from 'react-icons/fi';
 
 const features = [
   {
@@ -21,6 +21,24 @@ const features = [
     icon: FiHeadphones,
     title: '24/7 Support',
     desc: 'Round-the-clock assistance for all your needs.',
+  },
+];
+
+const howItWorks = [
+  {
+    step: '1',
+    title: 'Search',
+    desc: 'Find the right professional for your needs',
+  },
+  {
+    step: '2',
+    title: 'Book',
+    desc: 'Schedule a service at your convenience',
+  },
+  {
+    step: '3',
+    title: 'Done',
+    desc: 'Relax while experts get the job done',
   },
 ];
 
@@ -71,7 +89,7 @@ export default function WelcomeScreen() {
                     <FiStar key={i} className="text-yellow-400 text-lg" />
                   ))}
                 </div>
-                <p className="text-white/70 text-sm">Trusted by 10,000+ customers</p>
+                <p className="text-white/70 text-sm">Trusted by 500+ customers</p>
               </div>
             </div>
           </div>
@@ -137,6 +155,21 @@ export default function WelcomeScreen() {
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="hidden lg:block mb-8">
+            <h3 className="text-lg font-bold text-slate-900 mb-4">How it works</h3>
+            <div className="grid grid-cols-3 gap-4">
+              {howItWorks.map((item, idx) => (
+                <div key={idx} className="text-center">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-2">
+                    <span className="text-xl font-bold text-primary">{item.step}</span>
+                  </div>
+                  <h4 className="font-semibold text-slate-900 text-sm">{item.title}</h4>
+                  <p className="text-xs text-slate-500 mt-1">{item.desc}</p>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="relative my-6 flex items-center">

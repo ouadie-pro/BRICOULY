@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
+import { FiPlus, FiPlay, FiHeart, FiEye, FiVideo, FiX } from 'react-icons/fi';
 
 export default function VideosScreen({ isDesktop }) {
   const [videos, setVideos] = useState([]);
@@ -11,6 +12,8 @@ export default function VideosScreen({ isDesktop }) {
   const [isUploading, setIsUploading] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const videoInputRef = useRef(null);
+
+  const isProvider = currentUser?.role === 'provider';
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -75,25 +78,37 @@ export default function VideosScreen({ isDesktop }) {
       <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-24">
         <div className="sticky top-0 z-50 flex items-center bg-card-light dark:bg-card-dark p-4 pb-2 justify-between border-b border-gray-100 dark:border-gray-800 shadow-sm">
           <h2 className="text-lg font-bold text-text-light dark:text-text-dark flex-1 text-center">Videos</h2>
-          <button
-            onClick={() => setShowUploadModal(true)}
-            className="flex items-center justify-center size-10 rounded-full bg-primary text-white"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>add</span>
-          </button>
+          {isProvider && (
+            <button
+              onClick={() => setShowUploadModal(true)}
+              className="flex items-center justify-center size-10 rounded-full bg-primary text-white"
+            >
+              <FiPlus style={{ fontSize: '24px' }} />
+            </button>
+          )}
         </div>
 
         <div className="p-4 space-y-4">
           {videos.length === 0 ? (
             <div className="text-center py-12">
-              <span className="material-symbols-outlined text-6xl text-slate-300">videocam_off</span>
-              <p className="text-slate-500 mt-4">No videos yet</p>
-              <button
-                onClick={() => setShowUploadModal(true)}
-                className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
-              >
-                Upload First Video
-              </button>
+              <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center mx-auto">
+                <FiVideo style={{ fontSize: '40px' }} className="text-slate-300" />
+              </div>
+              <p className="text-slate-500 mt-4 font-medium">No videos yet</p>
+              <p className="text-slate-400 text-sm mt-1 max-w-xs mx-auto">
+                {isProvider 
+                  ? 'Upload service demos, before/after projects, or tips for clients'
+                  : 'Service videos will appear here'
+                }
+              </p>
+              {isProvider && (
+                <button
+                  onClick={() => setShowUploadModal(true)}
+                  className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
+                >
+                  Upload First Video
+                </button>
+              )}
             </div>
           ) : (
             videos.map((video) => (
@@ -138,11 +153,11 @@ export default function VideosScreen({ isDesktop }) {
                       onClick={() => handleLikeVideo(video.id)}
                       className="flex items-center gap-1 text-slate-500 text-sm"
                     >
-                      <span className="material-symbols-outlined text-[18px]">favorite</span>
+                      <FiHeart style={{ fontSize: '18px' }} />
                       {video.likes}
                     </button>
                     <span className="flex items-center gap-1 text-slate-500 text-sm">
-                      <span className="material-symbols-outlined text-[18px]">visibility</span>
+                                            <FiEye style={{ fontSize: '18px' }} />
                       {video.views}
                     </span>
                   </div>
@@ -164,7 +179,7 @@ export default function VideosScreen({ isDesktop }) {
                   <video src={videoPreview} className="w-full max-h-40 object-contain rounded" />
                 ) : (
                   <>
-                    <span className="material-symbols-outlined text-4xl text-slate-400">videocam</span>
+                    <FiVideo style={{ fontSize: '40px' }} className="text-4xl text-slate-400" />
                     <p className="text-slate-500 mt-2">Tap to select video</p>
                   </>
                 )}
@@ -216,25 +231,37 @@ export default function VideosScreen({ isDesktop }) {
     <div className="p-8 max-w-6xl mx-auto w-full">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold text-slate-900">Videos</h1>
-        <button
-          onClick={() => setShowUploadModal(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white hover:bg-blue-600 transition-colors"
-        >
-          <span className="material-symbols-outlined">videocam</span>
-          Upload Video
-        </button>
+        {isProvider && (
+          <button
+            onClick={() => setShowUploadModal(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white hover:bg-blue-600 transition-colors"
+          >
+            <FiPlus style={{ fontSize: '20px' }} />
+            Upload Video
+          </button>
+        )}
       </div>
 
       {videos.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-slate-200">
-          <span className="material-symbols-outlined text-6xl text-slate-300">videocam_off</span>
-          <p className="text-slate-500 mt-4 text-lg">No videos yet</p>
-          <button
-            onClick={() => setShowUploadModal(true)}
-            className="mt-4 px-6 py-3 bg-primary text-white rounded-lg font-medium"
-          >
-            Upload First Video
-          </button>
+          <div className="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center mx-auto">
+            <FiVideo style={{ fontSize: '48px' }} className="text-slate-300" />
+          </div>
+          <p className="text-slate-500 mt-4 text-lg font-medium">No videos yet</p>
+          <p className="text-slate-400 text-sm mt-2 max-w-md mx-auto">
+            {isProvider 
+              ? 'Share service demos, before/after projects, or helpful tips for clients. Great for showcasing your expertise!'
+              : 'Service demonstration videos from providers will appear here.'
+            }
+          </p>
+          {isProvider && (
+            <button
+              onClick={() => setShowUploadModal(true)}
+              className="mt-6 px-6 py-3 bg-primary text-white rounded-lg font-medium"
+            >
+              Upload First Video
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -294,24 +321,33 @@ export default function VideosScreen({ isDesktop }) {
         </div>
       )}
 
-      {showUploadModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-surface-dark rounded-2xl w-full max-w-lg p-6">
-            <h3 className="text-xl font-bold mb-4">Upload Video</h3>
-            <div
-              onClick={() => videoInputRef.current?.click()}
-              className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center cursor-pointer hover:border-primary transition-colors"
-            >
-              {videoPreview ? (
-                <video src={videoPreview} className="w-full max-h-48 object-contain rounded" />
-              ) : (
-                <>
-                  <span className="material-symbols-outlined text-5xl text-slate-400">videocam</span>
-                  <p className="text-slate-500 mt-2">Click to select video file</p>
-                  <p className="text-xs text-slate-400 mt-1">MP4, WebM, MOV supported</p>
-                </>
-              )}
-            </div>
+        {showUploadModal && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-surface-dark rounded-2xl w-full max-w-lg p-6">
+              <h3 className="text-xl font-bold mb-4">Upload Video</h3>
+              <div className="bg-blue-50 rounded-lg p-3 mb-4">
+                <p className="text-sm text-blue-700 font-medium">Video ideas for providers:</p>
+                <ul className="text-xs text-blue-600 mt-1 space-y-1">
+                  <li>• Service demonstrations</li>
+                  <li>• Before/after project showcases</li>
+                  <li>• Tips and how-to guides</li>
+                  <li>• Quick tips for clients</li>
+                </ul>
+              </div>
+              <div
+                onClick={() => videoInputRef.current?.click()}
+                className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center cursor-pointer hover:border-primary transition-colors"
+              >
+                {videoPreview ? (
+                  <video src={videoPreview} className="w-full max-h-48 object-contain rounded" />
+                ) : (
+                  <>
+                    <FiVideo style={{ fontSize: '48px' }} className="text-slate-400 mx-auto" />
+                    <p className="text-slate-500 mt-2">Click to select video file</p>
+                    <p className="text-xs text-slate-400 mt-1">MP4, WebM, MOV supported</p>
+                  </>
+                )}
+              </div>
             <input
               type="file"
               ref={videoInputRef}
