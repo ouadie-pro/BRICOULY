@@ -98,7 +98,39 @@ app.use('/api/notifications', require('./routers/notification'));
 app.use('/api/bookings', require('./routers/booking'));
 
 // Alias route for getMyFollowing
-app.use('/api/following', require('./routers/follow'));
+app.get('/api/following', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID required' });
+    }
+    const Follow = require('./models/Follow');
+    const Provider = require('./models/Provider');
+    const User = require('./models/User');
+    const mongoose = require('mongoose');
+    
+    const following = await Follow.find({ user: new mongoose.Types.ObjectId(userId) })
+      .populate('targetUser', 'name avatar location role');
+    
+    const followingData = await Promise.all(following.map(async f => {
+      if (!f.targetUser) return null;
+      const provider = await Provider.findOne({ user: f.targetUser._id });
+      return {
+        id: f.targetUser._id.toString(),
+        name: f.targetUser.name,
+        avatar: f.targetUser.avatar,
+        role: provider ? 'provider' : 'user',
+        profession: provider?.profession || '',
+        location: f.targetUser.location || '',
+      };
+    }));
+    
+    res.json(followingData.filter(Boolean));
+  } catch (error) {
+    console.error('Error in /api/following:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

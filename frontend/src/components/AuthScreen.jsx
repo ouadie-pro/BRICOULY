@@ -3,8 +3,9 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { 
   FiTool, FiUser, FiMail, FiLock, FiPhone, FiEye, FiEyeOff, FiAlertCircle, FiPlus, FiAlertTriangle,
-  FiZap, FiDroplet, FiBox, FiTruck, FiWind, FiFeather, FiHome, FiShoppingBag
+  FiZap, FiDroplet, FiBox, FiTruck, FiWind, FiFeather, FiHome, FiShoppingBag, FiCheckCircle
 } from 'react-icons/fi';
+import { getCategoryIcon } from '../utils/categoryIcons.jsx';
 
 export default function AuthScreen({ onAuth }) {
   const [searchParams] = useSearchParams();
@@ -176,13 +177,40 @@ export default function AuthScreen({ onAuth }) {
             </div>
             <div className="w-px h-12 bg-white/20"></div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-white">4.9</div>
-              <div className="text-white/60 text-sm">Avg Rating</div>
+              <div className="text-3xl font-bold text-white">250+</div>
+              <div className="text-white/60 text-sm">Happy Customers</div>
             </div>
             <div className="w-px h-12 bg-white/20"></div>
             <div className="text-center">
               <div className="text-3xl font-bold text-white">24h</div>
               <div className="text-white/60 text-sm">Response Time</div>
+            </div>
+          </div>
+          
+          <div className="mt-12 pt-8 border-t border-white/20">
+            <h3 className="text-white text-lg font-semibold mb-6">How it works</h3>
+            <div className="grid grid-cols-3 gap-6">
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center mx-auto mb-3">
+                  <span className="text-white text-xl font-bold">1</span>
+                </div>
+                <p className="text-white/90 text-sm font-medium">Search</p>
+                <p className="text-white/50 text-xs mt-1">Find the right pro</p>
+              </div>
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center mx-auto mb-3">
+                  <span className="text-white text-xl font-bold">2</span>
+                </div>
+                <p className="text-white/90 text-sm font-medium">Book</p>
+                <p className="text-white/50 text-xs mt-1">Schedule service</p>
+              </div>
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center mx-auto mb-3">
+                  <span className="text-white text-xl font-bold">3</span>
+                </div>
+                <p className="text-white/90 text-sm font-medium">Done</p>
+                <p className="text-white/50 text-xs mt-1">Get it done!</p>
+              </div>
             </div>
           </div>
         </div>
@@ -304,10 +332,7 @@ export default function AuthScreen({ onAuth }) {
                               className="w-9 h-9 rounded-lg flex items-center justify-center"
                               style={{ backgroundColor: prof.color ? `${prof.color}20` : '#f1f5f9' }}
                             >
-                              <prof.icon 
-                                className="text-lg"
-                                style={{ color: prof.color || '#64748b' }}
-                              />
+                              {getCategoryIcon(prof.icon, 20)}
                             </div>
                             <span className="text-xs font-semibold text-slate-700">{prof.name}</span>
                             {selectedProfessions.includes(prof._id) && (

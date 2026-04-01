@@ -333,14 +333,21 @@ export default function MessagesScreen({ isDesktop }) {
               {renderRecorder()}
             </div>
           )}
-          <form onSubmit={handleSend} className="flex items-end gap-2">
-            <div className="flex items-center gap-1">
+          <form onSubmit={handleSend} className="flex items-center gap-2">
+            <div className="flex items-center gap-1 shrink-0">
               <button
                 type="button"
-                onClick={() => setShowMediaPicker(!showMediaPicker)}
+                onClick={() => imageInputRef.current?.click()}
                 className="flex items-center justify-center size-10 rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700"
               >
                 <FiImage style={{ fontSize: '20px' }} />
+              </button>
+              <button
+                type="button"
+                onClick={() => videoInputRef.current?.click()}
+                className="flex items-center justify-center size-10 rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700"
+              >
+                <FiVideo style={{ fontSize: '20px' }} />
               </button>
               <button
                 type="button"
@@ -382,7 +389,7 @@ export default function MessagesScreen({ isDesktop }) {
                 onClick={() => imageInputRef.current?.click()}
                 className="flex flex-col items-center p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
               >
-                <span className="material-symbols-outlined text-primary">image</span>
+                <FiImage className="text-primary" />
                 <span className="text-xs">Image</span>
               </button>
               <input
@@ -396,7 +403,7 @@ export default function MessagesScreen({ isDesktop }) {
                 onClick={() => videoInputRef.current?.click()}
                 className="flex flex-col items-center p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
               >
-                <span className="material-symbols-outlined text-purple-500">videocam</span>
+                <FiVideo className="text-purple-500" />
                 <span className="text-xs">Video</span>
               </button>
             </div>
@@ -494,11 +501,6 @@ export default function MessagesScreen({ isDesktop }) {
                   <p className="text-primary text-sm font-medium">{provider?.profession}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button className="flex items-center justify-center w-10 h-10 rounded-full text-primary hover:bg-primary/10 transition-colors">
-                  <FiPhone style={{ fontSize: '24px' }} />
-                </button>
-              </div>
             </header>
 
             <main className="flex-1 overflow-y-auto p-6 space-y-4">
@@ -552,14 +554,21 @@ export default function MessagesScreen({ isDesktop }) {
                   {renderRecorder()}
                 </div>
               )}
-              <form onSubmit={handleSend} className="flex items-end gap-3">
-                <div className="flex items-center gap-1">
+              <form onSubmit={handleSend} className="flex items-center gap-3">
+                <div className="flex items-center gap-1 shrink-0">
                   <button
                     type="button"
-                    onClick={() => setShowMediaPicker(!showMediaPicker)}
+                    onClick={() => imageInputRef.current?.click()}
                     className="flex items-center justify-center w-10 h-10 rounded-full text-slate-500 hover:bg-slate-200"
                   >
                     <FiImage style={{ fontSize: '20px' }} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => videoInputRef.current?.click()}
+                    className="flex items-center justify-center w-10 h-10 rounded-full text-slate-500 hover:bg-slate-200"
+                  >
+                    <FiVideo style={{ fontSize: '20px' }} />
                   </button>
                   <button
                     type="button"

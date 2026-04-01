@@ -111,7 +111,7 @@ export default function FollowingScreen({ isDesktop }) {
           </div>
         ) : following.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 text-center">
-            <span className="material-symbols-outlined text-6xl text-slate-300 mb-3">person_add</span>
+            <FiUserPlus className="text-6xl text-slate-300 mb-3" />
             <p className="text-slate-500 font-medium text-lg">Not following anyone yet</p>
             <p className="text-sm text-slate-400">Find users to follow from the search page</p>
           </div>

@@ -17,7 +17,16 @@ async function safeFetch(url, options = {}) {
     }
     
     try {
-      return JSON.parse(text);
+      const data = JSON.parse(text);
+      if (!res.ok) {
+        return { 
+          ...data,
+          success: false, 
+          status: res.status,
+          error: data.error || `Request failed with status ${res.status}`
+        };
+      }
+      return data;
     } catch (e) {
       console.error('JSON parse error at:', url, text.substring(0, 200));
       return { success: false, error: 'Invalid server response' };

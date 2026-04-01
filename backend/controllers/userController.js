@@ -13,6 +13,7 @@ exports.getProviders = async (req, res) => {
     
     let providersList = providers.map(p => ({
       id: p.user._id.toString(),
+      providerDbId: p._id.toString(),
       name: p.user.name,
       email: p.user.email,
       avatar: p.user.avatar,
@@ -56,12 +57,12 @@ exports.getProviders = async (req, res) => {
     }
     
     for (let p of providersList) {
-      const services = await Service.find({ provider: p.id });
-      const portfolio = await Portfolio.find({ provider: p.id });
-      const reviews = await Review.find({ provider: p.id });
-      p.services = services;
-      p.portfolio = portfolio;
-      p.reviews = reviews;
+      const services = await Service.find({ provider: p.providerDbId });
+      const portfolio = await Portfolio.find({ provider: p.providerDbId });
+      const reviews = await Review.find({ provider: p.providerDbId });
+      p.services = services || [];
+      p.portfolio = portfolio || [];
+      p.reviews = reviews || [];
     }
     
     res.json(providersList);

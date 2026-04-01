@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { 
-  FiArrowLeft, FiSearch, FiX, FiStar, FiMapPin, FiCheck, FiFilter
+  FiArrowLeft, FiSearch, FiX, FiStar, FiMapPin, FiCheck, FiFilter, FiCheckCircle
 } from 'react-icons/fi';
 
 export default function SearchScreen({ isDesktop }) {
@@ -236,25 +236,25 @@ export default function SearchScreen({ isDesktop }) {
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`flex h-9 items-center justify-center rounded-lg px-3 transition-colors ${
-              showFilters || distanceFilter || availabilityFilter ? 'bg-primary text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+              showFilters || distanceFilter || availabilityFilter ? 'bg-primary text-white border-2 border-primary' : 'bg-white border-2 border-slate-200 text-slate-700 hover:bg-slate-50'
             }`}
           >
             <FiFilter style={{ fontSize: '16px' }} />
             <span className="ml-1 text-sm font-medium">Filters</span>
           </button>
-          <span className="text-sm text-slate-500">Sort:</span>
+          <span className="text-sm text-slate-500 font-medium">Sort:</span>
           {filters.map((f) => (
             <button
               key={f.value}
               onClick={() => setSortBy(f.value)}
-              className={`flex h-9 shrink-0 items-center justify-center rounded-lg px-4 transition-colors ${
+              className={`flex h-9 shrink-0 items-center justify-center rounded-lg px-4 transition-all ${
                 sortBy === f.value
-                  ? 'bg-primary text-white shadow-sm'
-                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                  ? 'bg-primary text-white shadow-md border-2 border-primary font-semibold ring-2 ring-primary/30'
+                  : 'bg-white border-2 border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
               }`}
             >
               <span className="text-sm font-medium whitespace-nowrap">{f.label}</span>
-              {sortBy === f.value && <FiCheck style={{ fontSize: '14px' }} className="ml-1" />}
+              {sortBy === f.value && <FiCheck style={{ fontSize: '14px' }} className="ml-1.5" />}
             </button>
           ))}
         </div>
@@ -310,7 +310,7 @@ export default function SearchScreen({ isDesktop }) {
                 )}
                 {provider.verified && (
                   <div className="absolute -bottom-1 -right-1 bg-primary text-white rounded-full p-0.5">
-                    <span className="material-symbols-outlined text-[12px]">verified</span>
+                    <FiCheckCircle className="text-[12px]" />
                   </div>
                 )}
               </div>
@@ -320,7 +320,7 @@ export default function SearchScreen({ isDesktop }) {
                 </div>
                 <p className="text-slate-500 text-sm">{provider.profession}</p>
                 <div className="flex items-center gap-1 text-slate-400 text-xs mt-1">
-                  <span className="material-symbols-outlined text-[14px]">location_on</span>
+                  <FiMapPin className="text-[14px]" />
                   {provider.location || 'NYC Area'}
                 </div>
               </div>
@@ -330,7 +330,7 @@ export default function SearchScreen({ isDesktop }) {
               <div className="flex items-center gap-2">
                 {provider.rating > 0 ? (
                   <div className="flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded text-amber-700">
-                    <span className="material-symbols-outlined text-[14px] filled">star</span>
+                    <FiStar className="text-[14px]" />
                     <span className="text-xs font-bold">{provider.rating}</span>
                     {provider.reviewCount > 0 && (
                       <span className="text-[10px] text-amber-600/70">({provider.reviewCount})</span>

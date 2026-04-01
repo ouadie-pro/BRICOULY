@@ -7,6 +7,7 @@ import {
   FiHome, FiUser, FiChevronDown, FiTrash2
 } from 'react-icons/fi';
 import { GoTasklist } from 'react-icons/go';
+import { getCategoryIcon, categoryIcons, defaultCategories } from '../utils/categoryIcons.jsx';
 
 const banner = {
   badge: 'New Offer',
@@ -113,10 +114,24 @@ export default function HomeScreen({ isDesktop }) {
           api.getProfessions(),
           api.getProviders({ sort: 'rating' }),
         ]);
-        setCategories(Array.isArray(professionsData) ? professionsData : []);
+        let cats = Array.isArray(professionsData) ? professionsData : [];
+        if (cats.length === 0) {
+          cats = defaultCategories;
+        } else {
+          cats = cats.map(cat => {
+            const defaults = defaultCategories.find(d => d.name.toLowerCase() === cat.name?.toLowerCase());
+            return {
+              ...cat,
+              icon: cat.icon || defaults?.icon || 'more',
+              color: cat.color || defaults?.color || 'bg-slate-100 text-slate-500',
+            };
+          });
+        }
+        setCategories(cats);
         setProviders(Array.isArray(provs) ? provs.slice(0, 6) : []);
       } catch (error) {
         console.error('Error fetching home data:', error);
+        setCategories(defaultCategories);
       }
     };
 
@@ -666,11 +681,7 @@ export default function HomeScreen({ isDesktop }) {
                   <div
                     className={`size-14 rounded-2xl flex items-center justify-center shadow-sm transition-colors ${cat.color} group-hover:bg-primary group-hover:text-white`}
                   >
-                    <span
-                      style={{ fontSize: '28px' }}
-                    >
-                      {cat.icon}
-                    </span>
+                    {getCategoryIcon(cat.icon, 28)}
                   </div>
                   <span className="text-xs font-medium text-slate-700 dark:text-slate-300 text-center">
                     {cat.name}
@@ -946,11 +957,7 @@ export default function HomeScreen({ isDesktop }) {
                   <div
                     className={`size-16 rounded-2xl flex items-center justify-center shadow-sm transition-colors ${cat.color} group-hover:bg-primary group-hover:text-white`}
                   >
-                    <span
-                      style={{ fontSize: '32px' }}
-                    >
-                      {cat.icon}
-                    </span>
+                    {getCategoryIcon(cat.icon, 32)}
                   </div>
               <span className="text-sm font-medium text-slate-700 text-center">
                 {cat.name}

@@ -111,7 +111,7 @@ export default function FollowersScreen({ isDesktop }) {
           </div>
         ) : followers.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 text-center">
-            <span className="material-symbols-outlined text-6xl text-slate-300 mb-3">people_outline</span>
+            <FiUsers className="text-6xl text-slate-300 mb-3" />
             <p className="text-slate-500 font-medium text-lg">No followers yet</p>
             <p className="text-sm text-slate-400">When someone follows you, they'll appear here</p>
           </div>

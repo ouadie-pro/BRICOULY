@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
+import { FiEdit, FiPlus, FiTrash2 } from 'react-icons/fi';
 
 export default function ProviderDashboard({ isDesktop }) {
   const [user, setUser] = useState(null);
@@ -177,7 +178,7 @@ export default function ProviderDashboard({ isDesktop }) {
           onClick={() => navigate('/provider/edit')}
           className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium"
         >
-          <span className="material-symbols-outlined">edit</span>
+          <FiEdit />
           Edit Profile
         </button>
       </div>
@@ -190,7 +191,7 @@ export default function ProviderDashboard({ isDesktop }) {
               onClick={() => setShowAddService(!showAddService)}
               className="flex items-center gap-1 px-3 py-1.5 bg-primary text-white rounded-lg text-sm font-medium"
             >
-              <span className="material-symbols-outlined text-[18px]">add</span>
+              <FiPlus className="text-[18px]" />
               Add
             </button>
           </div>
@@ -210,7 +211,7 @@ export default function ProviderDashboard({ isDesktop }) {
                     onClick={() => handleDeleteService(service.id)}
                     className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
                   >
-                    <span className="material-symbols-outlined text-[20px]">delete</span>
+                    <FiTrash2 className="text-[20px]" />
                   </button>
                 </div>
               ))}

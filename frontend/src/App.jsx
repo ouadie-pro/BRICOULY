@@ -16,13 +16,23 @@ import VideosScreen from './components/VideosScreen';
 function App() {
   const [user, setUser] = useState(null);
   const [isDesktop, setIsDesktop] = useState(window.innerWidth > 1024);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        if (parsedUser && parsedUser.id) {
+          setUser(parsedUser);
+        }
+      } catch (e) {
+        console.error('Error parsing stored user:', e);
+        localStorage.removeItem('user');
+      }
     }
+    setLoading(false);
 
     const handleResize = () => {
       setIsDesktop(window.innerWidth > 1024);
@@ -43,6 +53,13 @@ function App() {
   };
 
   const ProtectedRoute = ({ children }) => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      );
+    }
     if (!user) {
       return <Navigate to="/auth" replace />;
     }

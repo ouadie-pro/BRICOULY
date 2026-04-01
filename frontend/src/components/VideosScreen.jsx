@@ -307,11 +307,11 @@ export default function VideosScreen({ isDesktop }) {
                     onClick={() => handleLikeVideo(video.id)}
                     className="flex items-center gap-1.5 text-slate-500 hover:text-red-500 text-sm transition-colors"
                   >
-                    <span className="material-symbols-outlined text-[20px]">favorite</span>
+                    <FiHeart className="text-[20px]" />
                     {video.likes}
                   </button>
                   <span className="flex items-center gap-1.5 text-slate-500 text-sm">
-                    <span className="material-symbols-outlined text-[20px]">visibility</span>
+                    <FiEye className="text-[20px]" />
                     {video.views}
                   </span>
                 </div>
