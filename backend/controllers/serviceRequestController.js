@@ -5,9 +5,12 @@ const Notification = require('../models/Notification');
 
 exports.createServiceRequest = async (req, res) => {
   try {
+    console.log('[createServiceRequest] Request received', { headers: req.headers, body: req.body });
     const clientId = req.headers['x-user-id'];
+    console.log('[createServiceRequest] clientId:', clientId);
     const { providerId, serviceName, description } = req.body;
     
+    console.log('[createServiceRequest] providerId:', providerId);
     const provider = await Provider.findOne({ user: providerId });
     if (!provider) {
       return res.status(404).json({ error: 'Provider not found' });
@@ -30,21 +33,25 @@ exports.createServiceRequest = async (req, res) => {
     
     res.json({ success: true, request: serviceRequest });
   } catch (error) {
+    console.error('[createServiceRequest] Error:', error.message, error.stack);
     res.status(500).json({ error: error.message });
   }
 };
 
 exports.getServiceRequests = async (req, res) => {
   try {
+    console.log('[getServiceRequests] Request received', { headers: req.headers });
     const userId = req.headers['x-user-id'];
+    console.log('[getServiceRequests] userId:', userId);
     const user = await User.findById(userId);
     
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     
+    // FIXED: #3 - Use 'user' instead of 'client'
     let userRequests;
-    if (user.role === 'client') {
+    if (user.role === 'user') {
       userRequests = await ServiceRequest.find({ client: userId }).populate('provider');
     } else {
       const provider = await Provider.findOne({ user: userId });
@@ -57,7 +64,8 @@ exports.getServiceRequests = async (req, res) => {
     
     const enrichedRequests = await Promise.all(userRequests.map(async (r) => {
       let otherUser;
-      if (user.role === 'client') {
+      // FIXED: #3 - Use 'user' instead of 'client'
+      if (user.role === 'user') {
         otherUser = await User.findById(r.provider.user);
       } else {
         otherUser = await User.findById(r.client);

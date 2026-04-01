@@ -12,77 +12,105 @@ const isValidObjectId = (id) => {
 
 exports.getConversations = async (req, res) => {
   try {
+    console.log('[getConversations] Request received', { headers: req.headers });
     const userId = req.headers['x-user-id'];
+    console.log('[getConversations] userId:', userId);
 
     if (!userId || !isValidObjectId(userId)) {
+      console.log('[getConversations] Invalid userId, returning empty array');
       return res.json([]);
     }
 
+    console.log('[getConversations] Fetching conversations for user:', userId);
     const conversations = await Conversation.find({
       participants: new mongoose.Types.ObjectId(userId)
     }).sort({ lastMessageAt: -1 });
+    console.log('[getConversations] Found conversations:', conversations.length);
 
     const conversationData = await Promise.all(conversations.map(async (conv) => {
-      const otherUserId = conv.participants.find(p => p.toString() !== userId);
-      const otherUser = await User.findById(otherUserId).select('name avatar role');
-      
-      let profession = '';
-      if (otherUser?.role === 'provider') {
-        const provider = await Provider.findOne({ user: otherUserId });
-        profession = provider?.profession || '';
+      try {
+        const otherUserId = conv.participants.find(p => p.toString() !== userId);
+        const otherUser = await User.findById(otherUserId).select('name avatar role');
+        
+        let profession = '';
+        if (otherUser?.role === 'provider') {
+          const provider = await Provider.findOne({ user: otherUserId });
+          profession = provider?.profession || '';
+        }
+
+        const unreadCount = await Message.countDocuments({
+          conversationId: conv._id,
+          receiver: new mongoose.Types.ObjectId(userId),
+          read: false
+        });
+
+        return {
+          id: conv._id,
+          conversationId: conv._id,
+          userId: otherUserId,
+          userName: otherUser?.name || 'Unknown',
+          userAvatar: otherUser?.avatar || '',
+          userRole: otherUser?.role || 'user',
+          userProfession: profession,
+          lastMessage: conv.lastMessage || '',
+          lastMessageTime: conv.lastMessageAt,
+          unread: unreadCount,
+        };
+      } catch (convError) {
+        console.error('[getConversations] Error processing conversation:', convError.message);
+        return null;
       }
-
-      const unreadCount = await Message.countDocuments({
-        conversationId: conv._id,
-        receiver: new mongoose.Types.ObjectId(userId),
-        read: false
-      });
-
-      return {
-        id: conv._id,
-        conversationId: conv._id,
-        userId: otherUserId,
-        userName: otherUser?.name || 'Unknown',
-        userAvatar: otherUser?.avatar || '',
-        userRole: otherUser?.role || 'user',
-        userProfession: profession,
-        lastMessage: conv.lastMessage || '',
-        lastMessageTime: conv.lastMessageAt,
-        unread: unreadCount,
-      };
     }));
 
-    res.json(conversationData);
+    res.json(conversationData.filter(Boolean));
   } catch (error) {
+    console.error('[getConversations] Error:', error.message, error.stack);
     res.status(500).json({ error: error.message });
   }
 };
 
 exports.getMessages = async (req, res) => {
   try {
+    console.log('[getMessages] Request received', { params: req.params, headers: req.headers });
     const currentUserId = req.headers['x-user-id'];
     const otherUserId = req.params.userId;
+    const { page = 1, limit = 50 } = req.query;
+    
+    console.log('[getMessages] currentUserId:', currentUserId, 'otherUserId:', otherUserId);
+    
+    const pageNum = parseInt(page) || 1;
+    const limitNum = parseInt(limit) || 50;
+    const skip = (pageNum - 1) * limitNum;
 
     if (!currentUserId || !isValidObjectId(currentUserId) || !isValidObjectId(otherUserId)) {
-      return res.json([]);
+      console.log('[getMessages] Invalid IDs, returning empty');
+      return res.json({ data: [], pagination: { total: 0, page: 1, limit: 50, pages: 0 } });
     }
 
+    console.log('[getMessages] Finding conversation...');
     let conversation = await Conversation.findOne({
       participants: { $all: [new mongoose.Types.ObjectId(currentUserId), new mongoose.Types.ObjectId(otherUserId)] }
     });
 
     if (!conversation) {
+      console.log('[getMessages] No conversation found, creating new one...');
       conversation = await Conversation.create({
         participants: [new mongoose.Types.ObjectId(currentUserId), new mongoose.Types.ObjectId(otherUserId)],
       });
     }
+    console.log('[getMessages] Conversation:', conversation._id);
 
+    const total = await Message.countDocuments({ conversationId: conversation._id });
+    console.log('[getMessages] Total messages:', total);
+    
     const messages = await Message.find({
       conversationId: conversation._id
     })
       .populate('sender', 'name avatar')
       .populate('receiver', 'name avatar')
-      .sort({ createdAt: 1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
 
     await Message.updateMany(
       { conversationId: conversation._id, receiver: new mongoose.Types.ObjectId(currentUserId), read: false },
@@ -105,8 +133,18 @@ exports.getMessages = async (req, res) => {
       createdAt: m.createdAt,
     }));
 
-    res.json(messagesData);
+    // FIXED: #20 - Add pagination to messages response
+    res.json({
+      data: messagesData.reverse(),
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        pages: Math.ceil(total / limitNum)
+      }
+    });
   } catch (error) {
+    console.error('[getMessages] Error:', error.message, error.stack);
     res.status(500).json({ error: error.message });
   }
 };
@@ -156,6 +194,25 @@ exports.sendMessage = async (req, res) => {
     const populatedMessage = await Message.findById(message._id)
       .populate('sender', 'name avatar')
       .populate('receiver', 'name avatar');
+
+    // FIXED: #15 - Emit new message event to recipient's socket room
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user:${receiverId}`).emit('newMessage', {
+        id: populatedMessage._id.toString(),
+        conversationId: conversation._id.toString(),
+        senderId: populatedMessage.sender._id.toString(),
+        senderName: populatedMessage.sender.name,
+        senderAvatar: populatedMessage.sender.avatar,
+        receiverId: populatedMessage.receiver._id.toString(),
+        receiverName: populatedMessage.receiver.name,
+        content: populatedMessage.content,
+        mediaUrl: populatedMessage.mediaUrl,
+        audioUrl: populatedMessage.audioUrl,
+        type: populatedMessage.type,
+        createdAt: populatedMessage.createdAt,
+      });
+    }
 
     res.json({
       id: populatedMessage._id,

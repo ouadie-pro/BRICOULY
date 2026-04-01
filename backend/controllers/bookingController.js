@@ -2,7 +2,9 @@ const Booking = require('../models/Booking');
 
 exports.getBookings = async (req, res) => {
   try {
-    const userId = req.user.id;
+    console.log('[getBookings] Request received', { headers: req.headers });
+    const userId = req.headers['x-user-id'];
+    console.log('[getBookings] userId:', userId);
     const { status, role } = req.query;
     
     let query = {};
@@ -35,6 +37,7 @@ exports.getBookings = async (req, res) => {
       bookings,
     });
   } catch (error) {
+    console.error('[getBookings] Error:', error.message, error.stack);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -44,7 +47,7 @@ exports.getBookings = async (req, res) => {
 
 exports.createBooking = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.headers['x-user-id']; // FIXED: #1 - Use x-user-id header
     const bookingData = {
       ...req.body,
       user: userId,
@@ -64,6 +67,7 @@ exports.createBooking = async (req, res) => {
       booking: populatedBooking,
     });
   } catch (error) {
+    console.error('[getBookings] Error:', error.message, error.stack);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -83,8 +87,26 @@ exports.updateBookingStatus = async (req, res) => {
       });
     }
 
+    // FIXED: #9 - Increment jobsDone and recalculate successRate on completion
     if (status === 'completed') {
       booking.completedAt = new Date();
+      
+      // Find and update the provider's jobsDone and successRate
+      if (booking.provider) {
+        const Provider = require('../models/Provider');
+        const totalBookings = await Booking.countDocuments({ provider: booking.provider });
+        const completedBookings = await Booking.countDocuments({ 
+          provider: booking.provider, 
+          status: 'completed' 
+        });
+        
+        const successRate = totalBookings > 0 ? Math.round((completedBookings / totalBookings) * 100) : 95;
+        
+        await Provider.findByIdAndUpdate(booking.provider, {
+          $inc: { jobsDone: 1 },
+          successRate: successRate,
+        });
+      }
     }
 
     booking.status = status;
@@ -95,6 +117,7 @@ exports.updateBookingStatus = async (req, res) => {
       booking,
     });
   } catch (error) {
+    console.error('[getBookings] Error:', error.message, error.stack);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -104,7 +127,7 @@ exports.updateBookingStatus = async (req, res) => {
 
 exports.cancelBooking = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.headers['x-user-id']; // FIXED: #1 - Use x-user-id header
     const booking = await Booking.findById(req.params.id);
 
     if (!booking) {
@@ -129,6 +152,7 @@ exports.cancelBooking = async (req, res) => {
       booking,
     });
   } catch (error) {
+    console.error('[getBookings] Error:', error.message, error.stack);
     res.status(500).json({
       success: false,
       error: error.message,

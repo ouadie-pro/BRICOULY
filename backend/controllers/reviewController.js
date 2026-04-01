@@ -4,7 +4,9 @@ const Review = require('../models/Review');
 
 exports.getReviews = async (req, res) => {
   try {
+    console.log('[getReviews] Request received', { params: req.params, headers: req.headers });
     const { providerId } = req.params;
+    console.log('[getReviews] providerId:', providerId);
     const provider = await Provider.findOne({ user: providerId });
     
     if (!provider) {
@@ -33,7 +35,7 @@ exports.getReviews = async (req, res) => {
 
 exports.createReview = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.headers['x-user-id']; // FIXED: #1 - Use x-user-id header
     const user = await User.findById(userId);
     
     if (!user) {
@@ -47,9 +49,10 @@ exports.createReview = async (req, res) => {
       return res.status(404).json({ error: 'Provider not found' });
     }
     
+    // FIXED: #4 - Return 409 Conflict for duplicate review
     const existingReview = await Review.findOne({ user: userId, provider: provider._id });
     if (existingReview) {
-      return res.status(400).json({ message: "You have already reviewed this provider" });
+      return res.status(409).json({ error: 'You have already reviewed this provider. Use PUT to update your existing review.' });
     }
     
     const review = await Review.create({

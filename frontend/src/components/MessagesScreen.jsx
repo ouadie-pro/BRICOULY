@@ -44,7 +44,9 @@ export default function MessagesScreen({ isDesktop }) {
       const loadChat = async () => {
         try {
           const msgs = await api.getMessages(providerId);
-          setMessages(msgs || []);
+          // Handle both array (old format) and object with data (new format)
+          const messagesArray = Array.isArray(msgs) ? msgs : (msgs?.data || []);
+          setMessages(messagesArray || []);
           
           let providerData = await api.getProvider(providerId).catch(() => null);
           if (!providerData || providerData.error) {
@@ -335,6 +337,13 @@ export default function MessagesScreen({ isDesktop }) {
           )}
           <form onSubmit={handleSend} className="flex items-center gap-2">
             <div className="flex items-center gap-1 shrink-0">
+              <input
+                type="file"
+                ref={imageInputRef}
+                onChange={(e) => handleMediaSelect(e)}
+                accept="image/*"
+                className="hidden"
+              />
               <button
                 type="button"
                 onClick={() => imageInputRef.current?.click()}
@@ -342,6 +351,13 @@ export default function MessagesScreen({ isDesktop }) {
               >
                 <FiImage style={{ fontSize: '20px' }} />
               </button>
+              <input
+                type="file"
+                ref={videoInputRef}
+                onChange={(e) => handleMediaSelect(e)}
+                accept="video/*"
+                className="hidden"
+              />
               <button
                 type="button"
                 onClick={() => videoInputRef.current?.click()}
@@ -364,7 +380,7 @@ export default function MessagesScreen({ isDesktop }) {
                 type="text"
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                className="w-full bg-transparent border-none p-0 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-0 text-[15px]"
+                className="w-full bg-transparent border-none p-0 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-0  text-[15px]"
                 placeholder="Type a message..."
               />
             </div>
@@ -376,38 +392,6 @@ export default function MessagesScreen({ isDesktop }) {
               <FiSend style={{ fontSize: '20px' }} />
             </button>
           </form>
-          {showMediaPicker && (
-            <div className="absolute bottom-20 left-4 bg-white dark:bg-slate-800 rounded-lg shadow-lg p-2 flex gap-2">
-              <input
-                type="file"
-                ref={imageInputRef}
-                onChange={(e) => handleMediaSelect(e, 'image')}
-                accept="image/*"
-                className="hidden"
-              />
-              <button
-                onClick={() => imageInputRef.current?.click()}
-                className="flex flex-col items-center p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
-              >
-                <FiImage className="text-primary" />
-                <span className="text-xs">Image</span>
-              </button>
-              <input
-                type="file"
-                ref={videoInputRef}
-                onChange={(e) => handleMediaSelect(e, 'video')}
-                accept="video/*"
-                className="hidden"
-              />
-              <button
-                onClick={() => videoInputRef.current?.click()}
-                className="flex flex-col items-center p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
-              >
-                <FiVideo className="text-purple-500" />
-                <span className="text-xs">Video</span>
-              </button>
-            </div>
-          )}
         </footer>
       </div>
     );
@@ -556,6 +540,13 @@ export default function MessagesScreen({ isDesktop }) {
               )}
               <form onSubmit={handleSend} className="flex items-center gap-3">
                 <div className="flex items-center gap-1 shrink-0">
+                  <input
+                    type="file"
+                    ref={imageInputRef}
+                    onChange={(e) => handleMediaSelect(e)}
+                    accept="image/*"
+                    className="hidden"
+                  />
                   <button
                     type="button"
                     onClick={() => imageInputRef.current?.click()}
@@ -563,6 +554,13 @@ export default function MessagesScreen({ isDesktop }) {
                   >
                     <FiImage style={{ fontSize: '20px' }} />
                   </button>
+                  <input
+                    type="file"
+                    ref={videoInputRef}
+                    onChange={(e) => handleMediaSelect(e)}
+                    accept="video/*"
+                    className="hidden"
+                  />
                   <button
                     type="button"
                     onClick={() => videoInputRef.current?.click()}
@@ -597,38 +595,6 @@ export default function MessagesScreen({ isDesktop }) {
                   <FiSend style={{ fontSize: '20px' }} />
                 </button>
               </form>
-              {showMediaPicker && (
-                <div className="absolute bottom-20 left-6 bg-white dark:bg-slate-800 rounded-lg shadow-lg p-2 flex gap-2 z-10">
-                  <input
-                    type="file"
-                    ref={imageInputRef}
-                    onChange={(e) => handleMediaSelect(e, 'image')}
-                    accept="image/*"
-                    className="hidden"
-                  />
-                  <button
-                    onClick={() => imageInputRef.current?.click()}
-                    className="flex flex-col items-center p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
-                  >
-                    <FiImage className="text-primary" />
-                    <span className="text-xs">Image</span>
-                  </button>
-                  <input
-                    type="file"
-                    ref={videoInputRef}
-                    onChange={(e) => handleMediaSelect(e, 'video')}
-                    accept="video/*"
-                    className="hidden"
-                  />
-                  <button
-                    onClick={() => videoInputRef.current?.click()}
-                    className="flex flex-col items-center p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
-                  >
-                    <FiVideo className="text-purple-500" />
-                    <span className="text-xs">Video</span>
-                  </button>
-                </div>
-              )}
             </footer>
           </>
         ) : (

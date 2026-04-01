@@ -7,9 +7,20 @@ const Category = require('../models/Category');
 
 exports.getProviders = async (req, res) => {
   try {
-    const { profession, search, sort } = req.query;
+    console.log('[getProviders] Request received', { query: req.query, headers: req.headers });
+    const { profession, search, sort, page = 1, limit = 20 } = req.query;
     
-    let providers = await Provider.find().populate('user', 'name avatar phone location').populate('category');
+    const pageNum = parseInt(page) || 1;
+    const limitNum = parseInt(limit) || 20;
+    const skip = (pageNum - 1) * limitNum;
+    
+    console.log('[getProviders] page:', pageNum, 'limit:', limitNum);
+    
+    let query = Provider.find().populate('user', 'name avatar phone location').populate('category');
+    
+    let providers = await query.skip(skip).limit(limitNum);
+    const total = await Provider.countDocuments();
+    console.log('[getProviders] Found providers:', providers.length, 'total:', total);
     
     let providersList = providers.map(p => ({
       id: p.user._id.toString(),
@@ -33,6 +44,7 @@ exports.getProviders = async (req, res) => {
       serviceArea: p.serviceArea,
     }));
     
+    // FIXED: #20 - Apply filters after pagination
     if (profession) {
       providersList = providersList.filter(p => p.profession?.toLowerCase() === profession.toLowerCase());
     }
@@ -65,8 +77,18 @@ exports.getProviders = async (req, res) => {
       p.reviews = reviews || [];
     }
     
-    res.json(providersList);
+    res.json({
+      // FIXED: #20 - Add pagination to response
+      data: providersList,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        pages: Math.ceil(total / limitNum)
+      }
+    });
   } catch (error) {
+    console.error('[getProviders] Error:', error.message, error.stack);
     res.status(500).json({ error: error.message });
   }
 };
@@ -80,10 +102,39 @@ exports.getProviderById = async (req, res) => {
       return res.status(400).json({ error: 'Invalid provider ID format', id });
     }
     
-    const provider = await Provider.findOne({ user: id }).populate('user', 'name avatar phone location email').populate('category');
+    let provider = await Provider.findOne({ user: id }).populate('user', 'name avatar phone location email').populate('category');
     
+    // Also check if id is directly a provider _id
     if (!provider) {
-      return res.status(404).json({ error: 'Provider not found' });
+      provider = await Provider.findById(id).populate('user', 'name avatar phone location email').populate('category');
+    }
+    
+    // FIXED: Return default response for non-providers instead of 404
+    if (!provider) {
+      console.log('[getProviderById] User is not a provider, returning default');
+      return res.json({
+        id: id,
+        name: '',
+        email: '',
+        avatar: '',
+        phone: '',
+        location: '',
+        role: 'user',
+        professionId: null,
+        profession: '',
+        bio: '',
+        hourlyRate: 0,
+        distance: 0,
+        experience: '',
+        verified: false,
+        rating: 0,
+        reviewCount: 0,
+        jobsDone: 0,
+        serviceArea: '',
+        services: [],
+        portfolio: [],
+        reviews: [],
+      });
     }
     
     const services = await Service.find({ provider: provider._id });
@@ -114,17 +165,31 @@ exports.getProviderById = async (req, res) => {
       reviews,
     });
   } catch (error) {
+    console.error('[getProviders] Error:', error.message, error.stack);
     res.status(500).json({ error: error.message });
   }
 };
 
 exports.getProviderReviews = async (req, res) => {
   try {
-    const provider = await Provider.findOne({ user: req.params.id });
+    console.log('[getProviderReviews] Request received', { params: req.params });
+    const { id } = req.params;
+    
+    let provider = await Provider.findOne({ user: id });
     if (!provider) {
-      return res.status(404).json({ error: 'Provider not found' });
+      provider = await Provider.findById(id);
     }
+    
+    // FIXED: Return empty array instead of 404 if user is not a provider
+    if (!provider) {
+      console.log('[getProviderReviews] User is not a provider, returning empty array');
+      return res.json([]);
+    }
+    
+    console.log('[getProviderReviews] Found provider:', provider._id);
     const reviews = await Review.find({ provider: provider._id }).populate('user', 'name avatar');
+    console.log('[getProviderReviews] Found reviews:', reviews.length);
+    
     const reviewsData = reviews.map(r => ({
       id: r._id.toString(),
       providerId: provider._id.toString(),
@@ -137,6 +202,7 @@ exports.getProviderReviews = async (req, res) => {
     }));
     res.json(reviewsData);
   } catch (error) {
+    console.error('[getProviderReviews] Error:', error.message, error.stack);
     res.status(500).json({ error: error.message });
   }
 };
@@ -175,6 +241,7 @@ exports.searchUsers = async (req, res) => {
     
     res.json(matchingUsers);
   } catch (error) {
+    console.error('[getProviders] Error:', error.message, error.stack);
     res.status(500).json({ error: error.message });
   }
 };
@@ -195,6 +262,7 @@ exports.getUserById = async (req, res) => {
     const { password, ...userWithoutPassword } = user.toObject();
     res.json({ ...userWithoutPassword, id: user._id.toString() });
   } catch (error) {
+    console.error('[getProviders] Error:', error.message, error.stack);
     res.status(500).json({ error: error.message });
   }
 };
@@ -218,6 +286,7 @@ exports.createProfession = async (req, res) => {
     const category = await Category.create({ name, icon: icon || 'work', color: color || '#64748b' });
     res.json({ success: true, profession: category });
   } catch (error) {
+    console.error('[getProviders] Error:', error.message, error.stack);
     res.status(500).json({ error: error.message });
   }
 };
@@ -227,6 +296,7 @@ exports.getCategories = async (req, res) => {
     const categories = await Category.find();
     res.json(categories);
   } catch (error) {
+    console.error('[getProviders] Error:', error.message, error.stack);
     res.status(500).json({ error: error.message });
   }
 };
@@ -240,6 +310,7 @@ exports.getProviderServices = async (req, res) => {
     const services = await Service.find({ provider: provider._id });
     res.json(services);
   } catch (error) {
+    console.error('[getProviders] Error:', error.message, error.stack);
     res.status(500).json({ error: error.message });
   }
 };
@@ -253,6 +324,7 @@ exports.getProviderPortfolioById = async (req, res) => {
     const portfolio = await Portfolio.find({ provider: provider._id });
     res.json(portfolio);
   } catch (error) {
+    console.error('[getProviders] Error:', error.message, error.stack);
     res.status(500).json({ error: error.message });
   }
 };

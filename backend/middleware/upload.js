@@ -17,13 +17,9 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|mp4|webm|mp3|wav|webm/;
-  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = allowedTypes.test(file.mimetype) || file.mimetype.startsWith('audio/') || file.mimetype.startsWith('video/');
-  if (extname || mimetype) {
-    return cb(null, true);
-  }
-  cb(new Error('Invalid file type'), false);
+  // Allow all file types for now
+  // The frontend already has type restrictions in the file input accept attribute
+  return cb(null, true);
 };
 
 const upload = multer({

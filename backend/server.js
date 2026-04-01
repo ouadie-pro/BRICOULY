@@ -5,11 +5,38 @@ const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 const multer = require('multer');
 const fs = require('fs');
+const rateLimit = require('express-rate-limit');
+// NOTE: express-mongo-sanitize disabled - incompatible with Express 5
+// const mongoSanitize = require('express-mongo-sanitize');
+const http = require('http');
+const { Server } = require('socket.io');
 
 dotenv.config();
 
 const app = express();
+const server = http.createServer(app);
+// FIXED: #15 - Add Socket.io for real-time messaging
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
+});
+
+// Make io available globally
+app.set('io', io);
+
 const PORT = process.env.PORT || 3001;
+
+// NOTE: express-mongo-sanitize disabled - incompatible with Express 5
+// FIXED: #11 - Add rate limiting
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // limit each IP to 10 requests per windowMs
+  message: { success: false, error: 'Too many attempts. Please try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 app.use(cors());
 app.use(express.json({ limit: '100mb' }));
@@ -37,21 +64,6 @@ app.post('/api/test', (req, res) => {
 if (!fs.existsSync(path.join(__dirname, 'uploads'))) {
   fs.mkdirSync(path.join(__dirname, 'uploads'));
 }
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, 'uploads'));
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  },
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 100 * 1024 * 1024 },
-});
 
 const Category = require('./models/Category');
 
@@ -97,40 +109,7 @@ app.use('/api/messages', require('./routers/message'));
 app.use('/api/notifications', require('./routers/notification'));
 app.use('/api/bookings', require('./routers/booking'));
 
-// Alias route for getMyFollowing
-app.get('/api/following', async (req, res) => {
-  try {
-    const userId = req.headers['x-user-id'];
-    if (!userId) {
-      return res.status(400).json({ error: 'User ID required' });
-    }
-    const Follow = require('./models/Follow');
-    const Provider = require('./models/Provider');
-    const User = require('./models/User');
-    const mongoose = require('mongoose');
-    
-    const following = await Follow.find({ user: new mongoose.Types.ObjectId(userId) })
-      .populate('targetUser', 'name avatar location role');
-    
-    const followingData = await Promise.all(following.map(async f => {
-      if (!f.targetUser) return null;
-      const provider = await Provider.findOne({ user: f.targetUser._id });
-      return {
-        id: f.targetUser._id.toString(),
-        name: f.targetUser.name,
-        avatar: f.targetUser.avatar,
-        role: provider ? 'provider' : 'user',
-        profession: provider?.profession || '',
-        location: f.targetUser.location || '',
-      };
-    }));
-    
-    res.json(followingData.filter(Boolean));
-  } catch (error) {
-    console.error('Error in /api/following:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+// FIXED: #8 - Inline /api/following route removed (now handled by routers/follow.js)
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -175,7 +154,8 @@ app.use((err, req, res, next) => {
     success: false,
     error: 'Internal server error',
     message: err.message,
-    stack: err.stack
+    // FIXED: #13 - Hide stack trace in production
+    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
   });
 });
 
@@ -191,11 +171,12 @@ app.use((req, res) => {
 console.log('Attempting to connect to MongoDB...');
 console.log('MONGODB_URI:', process.env.MONGODB_URI ? 'set' : 'NOT SET');
 
-mongoose.connect(process.env.MONGODB_URI)
+const connectDB = require('./config/db');
+connectDB()
   .then(async () => {
     console.log('MongoDB Connected successfully');
     await seedCategories();
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
   })
@@ -206,9 +187,8 @@ mongoose.connect(process.env.MONGODB_URI)
       console.error('Please set MONGODB_URI in your .env file');
     } else {
       console.error('Make sure MongoDB is running on your system');
-      console.error('For local MongoDB: brew services start mongodb-community (mac) or mongod (linux/windows)');
     }
     process.exit(1);
   });
 
-module.exports = { app, upload };
+module.exports = { app, server, io };

@@ -16,7 +16,7 @@ export default function AuthScreen({ onAuth }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [role, setRole] = useState('client');
+  const [role, setRole] = useState('user'); // FIXED: #3 - Use 'user' instead of 'client'
   const [selectedProfessions, setSelectedProfessions] = useState([]);
   const [hourlyRate, setHourlyRate] = useState('');
   const [professions, setProfessions] = useState(null);
@@ -243,7 +243,7 @@ export default function AuthScreen({ onAuth }) {
                 checked={mode === 'login'}
                 onChange={() => {
                   setMode('login');
-                  setRole('client');
+                  setRole('user'); // FIXED: #3 - Use 'user' instead of 'client'
                   setSelectedProfessions([]);
                 }}
                 className="invisible w-0 absolute"
@@ -269,9 +269,9 @@ export default function AuthScreen({ onAuth }) {
                   <div className="flex gap-3">
                     <button
                       type="button"
-                      onClick={() => setRole('client')}
+                      onClick={() => setRole('user')} // FIXED: #3 - Use 'user' instead of 'client'
                       className={`flex-1 p-4 rounded-xl border-2 transition-all ${
-                        role === 'client' 
+                        role === 'user' 
                           ? 'border-primary bg-blue-50/50' 
                           : 'border-slate-200 hover:border-slate-300 bg-white'
                       }`}

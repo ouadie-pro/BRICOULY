@@ -2,7 +2,9 @@ const Category = require('../models/Category');
 
 exports.getCategories = async (req, res) => {
   try {
+    console.log('[getCategories] Request received', { query: req.query });
     const categories = await Category.find();
+    console.log('[getCategories] Found categories:', categories.length);
 
     res.json({
       success: true,
@@ -10,6 +12,7 @@ exports.getCategories = async (req, res) => {
       categories,
     });
   } catch (error) {
+    console.error('[getCategories] Error:', error.message, error.stack);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -19,7 +22,9 @@ exports.getCategories = async (req, res) => {
 
 exports.getCategory = async (req, res) => {
   try {
+    console.log('[getCategory] Request received', { params: req.params });
     const category = await Category.findById(req.params.id).populate('providers');
+    console.log('[getCategory] Found category:', category?.name);
 
     if (!category) {
       return res.status(404).json({

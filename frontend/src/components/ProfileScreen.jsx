@@ -722,7 +722,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                 'followers', 
                 'following', 
                 ...(user?.role === 'provider' || currentUser.role === 'provider' ? ['portfolio'] : []),
-                ...(isViewingOther && user?.role === 'client' ? ['reviews'] : []),
+                ...(isViewingOther && user?.role === 'user' ? ['reviews'] : []), // FIXED: #3
                 'articles'
               ].map((tab) => (
                 <button

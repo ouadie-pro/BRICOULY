@@ -313,11 +313,11 @@ export default function ProviderProfileScreen({ isDesktop }) {
           </div>
         </div>
 
-        {/* Bottom CTA — only clients can request a service; anyone can message */}
+        {/* Bottom CTA — only users can request a service; anyone can message */}
         {!isOwnProfile && (
           <div className="fixed bottom-0 left-0 right-0 bg-card-light dark:bg-card-dark border-t border-gray-100 dark:border-gray-800 p-4 safe-area-bottom z-50">
             <div className="flex items-center gap-4 max-w-lg mx-auto">
-              {currentUser.role === 'client' && (
+              {currentUser.role === 'user' && (
                 <button
                   onClick={() => setShowRequestModal(true)}
                   className="flex-1 bg-primary hover:bg-blue-600 text-white font-bold h-12 rounded-xl shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2"
@@ -329,11 +329,11 @@ export default function ProviderProfileScreen({ isDesktop }) {
               <Link
                 to={`/messages/${provider.id}`}
                 className={`flex items-center justify-center gap-2 h-12 rounded-xl border border-primary text-primary transition-colors hover:bg-blue-50 ${
-                  currentUser.role === 'client' ? 'w-12' : 'flex-1'
+                  currentUser.role === 'user' ? 'w-12' : 'flex-1'
                 }`}
               >
                 <FiMessageCircle style={{ fontSize: '18px' }} />
-                {currentUser.role !== 'client' && <span className="font-bold">Message</span>}
+                {currentUser.role !== 'user' && <span className="font-bold">Message</span>}
               </Link>
             </div>
           </div>
@@ -609,7 +609,7 @@ export default function ProviderProfileScreen({ isDesktop }) {
 
           {!isOwnProfile && (
             <div className="flex flex-col gap-3">
-              {currentUser.role === 'client' && (
+              {currentUser.role === 'user' && (
                 <button
                   onClick={() => setShowRequestModal(true)}
                   className="flex items-center justify-center gap-2 w-full h-12 bg-primary hover:bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/30 transition-all"

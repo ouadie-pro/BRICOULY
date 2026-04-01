@@ -5,10 +5,13 @@ const { generateToken } = require('../middleware/authMiddleware');
 
 exports.signup = async (req, res) => {
   try {
+    console.log('[signup] Request received', { body: req.body });
     const { name, email, password, role, phone, professionId, bio } = req.body;
+    console.log('[signup] role:', role);
     
     const existingUser = await User.findOne({ email });
     if (existingUser) {
+      console.log('[signup] Email already exists:', email);
       return res.status(400).json({ success: false, error: 'Email already exists' });
     }
     
@@ -50,12 +53,14 @@ exports.signup = async (req, res) => {
     
     res.json({ success: true, user: responseUser, token });
   } catch (error) {
+    console.error('[signup] Error:', error.message, error.stack);
     res.status(500).json({ success: false, error: error.message });
   }
 };
 
 exports.login = async (req, res) => {
   try {
+    console.log('[login] Request received', { body: { email: req.body.email } });
     const { email, password } = req.body;
     
     if (!email || !password) {
@@ -63,12 +68,15 @@ exports.login = async (req, res) => {
     }
     
     const user = await User.findOne({ email }).select('+password');
+    console.log('[login] User found:', user ? user.email : null);
     
     if (!user) {
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
     
     const isMatch = await user.comparePassword(password);
+    console.log('[login] Password match:', isMatch);
+    
     if (!isMatch) {
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
@@ -135,11 +143,14 @@ exports.updateProfile = async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    if (updates.bio || updates.profession) {
+    // FIXED: #10 - Guard provider profile updates by role
+    if ((updates.bio || updates.profession) && user.role === 'provider') {
       await Provider.findOneAndUpdate(
         { user: user._id },
         { bio: updates.bio, profession: updates.profession }
       );
+    } else if (updates.bio || updates.profession) {
+      return res.status(403).json({ error: 'Only providers can update provider-specific fields (bio, profession)' });
     }
     
     const { password: _, ...userWithoutPassword } = user.toObject();

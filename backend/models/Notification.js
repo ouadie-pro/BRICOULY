@@ -38,3 +38,6 @@ const notificationSchema = new mongoose.Schema({
 });
 
 module.exports = mongoose.model('Notification', notificationSchema);
+
+// FIXED: #18 - Add database index on user field
+notificationSchema.index({ user: 1, createdAt: -1 });

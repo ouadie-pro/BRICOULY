@@ -85,7 +85,7 @@ exports.getProvider = async (req, res) => {
 
 exports.createProvider = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.headers['x-user-id']; // FIXED: #1 - Use x-user-id header
     const providerData = {
       ...req.body,
       user: userId,
