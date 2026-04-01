@@ -83,7 +83,7 @@ const seedCategories = async () => {
 app.use('/api/auth', require('./routers/auth'));
 app.use('/api/categories', require('./routers/category'));
 app.use('/api/professions', require('./routers/profession'));
-app.use('/api/providers', require('./routers/provider'));
+app.use('/api/providers', require('./routers/providers'));
 app.use('/api/users', require('./routers/user'));
 app.use('/api/services', require('./routers/service'));
 app.use('/api/portfolio', require('./routers/portfolio'));

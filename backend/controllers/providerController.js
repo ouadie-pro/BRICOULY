@@ -26,19 +26,35 @@ exports.getProviders = async (req, res) => {
     }
 
     const providers = await Provider.find(query)
-      .populate('user', 'name avatar')
+      .populate('user', 'name avatar phone location')
+      .populate('category')
       .sort(sortOption);
 
-    res.json({
-      success: true,
-      count: providers.length,
-      providers,
-    });
+    const providersList = providers.map(p => ({
+      id: p.user._id.toString(),
+      providerDbId: p._id.toString(),
+      name: p.user.name,
+      email: p.user.email,
+      avatar: p.user.avatar,
+      phone: p.user.phone,
+      location: p.user.location,
+      role: 'provider',
+      professionId: p.category?._id?.toString(),
+      profession: p.profession,
+      bio: p.bio,
+      hourlyRate: p.hourlyRate,
+      distance: Math.random() * 5 + 0.5,
+      experience: p.experience,
+      verified: p.verified,
+      rating: p.rating,
+      reviewCount: p.reviewCount,
+      jobsDone: p.jobsDone,
+      serviceArea: p.serviceArea,
+    }));
+
+    res.json(providersList);
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    res.status(500).json({ error: error.message });
   }
 };
 
@@ -69,9 +85,10 @@ exports.getProvider = async (req, res) => {
 
 exports.createProvider = async (req, res) => {
   try {
+    const userId = req.user.id;
     const providerData = {
       ...req.body,
-      user: req.user.id,
+      user: userId,
     };
 
     const provider = await Provider.create(providerData);

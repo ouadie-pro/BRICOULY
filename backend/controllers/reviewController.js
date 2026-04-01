@@ -33,7 +33,7 @@ exports.getReviews = async (req, res) => {
 
 exports.createReview = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    const userId = req.user.id;
     const user = await User.findById(userId);
     
     if (!user) {
@@ -45,6 +45,11 @@ exports.createReview = async (req, res) => {
     
     if (!provider) {
       return res.status(404).json({ error: 'Provider not found' });
+    }
+    
+    const existingReview = await Review.findOne({ user: userId, provider: provider._id });
+    if (existingReview) {
+      return res.status(400).json({ message: "You have already reviewed this provider" });
     }
     
     const review = await Review.create({

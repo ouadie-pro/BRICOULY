@@ -2,18 +2,19 @@ const Booking = require('../models/Booking');
 
 exports.getBookings = async (req, res) => {
   try {
+    const userId = req.user.id;
     const { status, role } = req.query;
     
     let query = {};
     
     if (role === 'provider') {
       const Provider = require('../models/Provider');
-      const provider = await Provider.findOne({ user: req.user.id });
+      const provider = await Provider.findOne({ user: userId });
       if (provider) {
         query.provider = provider._id;
       }
     } else {
-      query.user = req.user.id;
+      query.user = userId;
     }
 
     if (status) {
@@ -43,9 +44,10 @@ exports.getBookings = async (req, res) => {
 
 exports.createBooking = async (req, res) => {
   try {
+    const userId = req.user.id;
     const bookingData = {
       ...req.body,
-      user: req.user.id,
+      user: userId,
     };
 
     const booking = await Booking.create(bookingData);
@@ -102,6 +104,7 @@ exports.updateBookingStatus = async (req, res) => {
 
 exports.cancelBooking = async (req, res) => {
   try {
+    const userId = req.user.id;
     const booking = await Booking.findById(req.params.id);
 
     if (!booking) {
@@ -111,7 +114,7 @@ exports.cancelBooking = async (req, res) => {
       });
     }
 
-    if (booking.user.toString() !== req.user.id) {
+    if (booking.user.toString() !== userId) {
       return res.status(403).json({
         success: false,
         error: 'Not authorized to cancel this booking',

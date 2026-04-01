@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Provider = require('../models/Provider');
 const Category = require('../models/Category');
+const { generateToken } = require('../middleware/authMiddleware');
 
 exports.signup = async (req, res) => {
   try {
@@ -20,7 +21,7 @@ exports.signup = async (req, res) => {
       name,
       email,
       password,
-      role: role || 'client',
+      role: role || 'user',
       avatar: '',
       phone: phone || '',
       location: '',
@@ -43,10 +44,11 @@ exports.signup = async (req, res) => {
       });
     }
     
+    const token = generateToken(user._id, user.role);
     const { password: _, ...userWithoutPassword } = user.toObject();
     const responseUser = { ...userWithoutPassword, id: user._id.toString() };
     
-    res.json({ success: true, user: responseUser });
+    res.json({ success: true, user: responseUser, token });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -72,6 +74,7 @@ exports.login = async (req, res) => {
     }
     
     const provider = await Provider.findOne({ user: user._id });
+    const token = generateToken(user._id, user.role);
     
     const { password: _, ...userWithoutPassword } = user.toObject();
     const responseUser = { 
@@ -83,7 +86,7 @@ exports.login = async (req, res) => {
       verified: provider?.verified || false,
     };
     
-    res.json({ success: true, user: responseUser });
+    res.json({ success: true, user: responseUser, token });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ success: false, error: 'Login failed: ' + error.message });
