@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
+import { 
+  FiArrowLeft, FiSearch, FiX, FiStar, FiMapPin, FiCheck
+} from 'react-icons/fi';
 
 export default function SearchScreen({ isDesktop }) {
   const { q } = useParams();
@@ -49,10 +52,10 @@ export default function SearchScreen({ isDesktop }) {
               onClick={() => navigate(-1)}
               className="flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-900 dark:text-white"
             >
-              <span className="material-symbols-outlined text-[24px]">arrow_back</span>
+              <FiArrowLeft className="text-[24px]" />
             </button>
             <div className="flex flex-1 items-center h-10 bg-slate-100 dark:bg-surface-dark rounded-lg px-3 gap-2 group focus-within:ring-2 focus-within:ring-primary/50 transition-all">
-              <span className="material-symbols-outlined text-slate-400 dark:text-slate-500 text-[20px]">search</span>
+              <FiSearch className="text-slate-400 dark:text-slate-500 text-[20px]" />
               <input
                 type="text"
                 value={searchQuery}
@@ -62,7 +65,7 @@ export default function SearchScreen({ isDesktop }) {
               />
               {searchQuery && (
                 <button onClick={() => setSearchQuery('')} className="text-slate-400">
-                  <span className="material-symbols-outlined text-[18px]">cancel</span>
+                  <FiX className="text-[18px]" />
                 </button>
               )}
             </div>
@@ -81,7 +84,7 @@ export default function SearchScreen({ isDesktop }) {
             </button>
             {professions.map((prof) => (
               <button
-                key={prof.id}
+                key={prof._id}
                 onClick={() => setSelectedProfession(prof.name)}
                 className={`flex h-8 shrink-0 items-center justify-center rounded-full px-4 transition-colors ${
                   selectedProfession === prof.name
@@ -121,7 +124,7 @@ export default function SearchScreen({ isDesktop }) {
                   <div className="flex justify-between items-start">
                     <h3 className="text-slate-900 dark:text-white text-base font-bold leading-tight">{provider.name}</h3>
                     <div className="flex items-center gap-1 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded text-amber-700 dark:text-amber-400">
-                      <span className="material-symbols-outlined text-[14px] filled">star</span>
+                      <FiStar className="text-[14px] text-amber-500" />
                       <span className="text-xs font-bold">{provider.rating || 0}</span>
                       {provider.reviewCount > 0 && (
                         <span className="text-[10px] text-amber-600/70">({provider.reviewCount})</span>
@@ -161,7 +164,7 @@ export default function SearchScreen({ isDesktop }) {
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-xl">
           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-            <span className="material-symbols-outlined">search</span>
+            <FiSearch />
           </span>
           <input
             type="text"
@@ -175,7 +178,7 @@ export default function SearchScreen({ isDesktop }) {
               onClick={() => setSearchQuery('')} 
               className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
             >
-              <span className="material-symbols-outlined">close</span>
+              <FiX />
             </button>
           )}
         </div>
@@ -195,7 +198,7 @@ export default function SearchScreen({ isDesktop }) {
           </button>
           {professions.map((prof) => (
             <button
-              key={prof.id}
+              key={prof._id}
               onClick={() => setSelectedProfession(prof.name)}
               className={`flex h-9 shrink-0 items-center justify-center rounded-lg px-4 transition-colors ${
                 selectedProfession === prof.name

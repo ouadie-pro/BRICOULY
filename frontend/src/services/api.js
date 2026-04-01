@@ -32,28 +32,20 @@ async function safeFetch(url, options = {}) {
 export const getUserId = () => {
   try {
     const userStr = localStorage.getItem('user');
-    console.log('localStorage userStr:', userStr);
     
     if (!userStr) {
-      console.warn('No user in localStorage');
       return null;
     }
     
     const user = JSON.parse(userStr);
-    console.log('Parsed user:', user);
-    console.log('user.id:', user?.id, 'user._id:', user?._id);
-    
     const userId = user?.id || user?._id;
 
     if (!userId) {
-      console.warn('No userId found in localStorage user object');
       return null;
     }
 
-    console.log('Returning userId:', userId, 'length:', userId.length);
     return userId;
   } catch (e) {
-    console.warn('Error parsing user from localStorage:', e);
     return null;
   }
 };
@@ -266,6 +258,22 @@ export const api = {
     });
   },
 
+  // Article Comments
+  getArticleComments: async (articleId) => {
+    return safeFetch(`${API_BASE}/articles/${articleId}/comments`);
+  },
+
+  addArticleComment: async (articleId, content) => {
+    return safeFetch(`${API_BASE}/articles/${articleId}/comments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-id': getUserId(),
+      },
+      body: JSON.stringify({ content }),
+    });
+  },
+
   // Videos
   getVideos: async () => {
     return safeFetch(`${API_BASE}/videos`);
@@ -322,21 +330,6 @@ export const api = {
     return safeFetch(`${API_BASE}/articles/${articleId}/like`, {
       method: 'POST',
       headers: { 'x-user-id': getUserId() },
-    });
-  },
-
-  getArticleComments: async (articleId) => {
-    return safeFetch(`${API_BASE}/articles/${articleId}/comments`);
-  },
-
-  addArticleComment: async (articleId, content) => {
-    return safeFetch(`${API_BASE}/articles/${articleId}/comments`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': getUserId(),
-      },
-      body: JSON.stringify({ content }),
     });
   },
 

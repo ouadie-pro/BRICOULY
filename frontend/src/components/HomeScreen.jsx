@@ -1,6 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
+import { 
+  FiHeart, FiMessageCircle, FiShare2, FiStar, FiMapPin, FiSearch, 
+  FiMenu, FiBell, FiPlayCircle, FiImage, FiX, FiFilter, FiSettings,
+  FiHome, FiUser, FiChevronDown
+} from 'react-icons/fi';
+import { GoTasklist } from 'react-icons/go';
 
 const banner = {
   badge: 'New Offer',
@@ -201,13 +207,10 @@ export default function HomeScreen({ isDesktop }) {
   const handleLoadComments = async (item) => {
     const { feedId, type, id } = item;
     if (!itemComments[feedId]) {
-      // Articles and posts both use the same comments endpoint keyed by post id
-      // For articles we fall back to getComments if there's a shared endpoint,
-      // otherwise show empty. Adjust if your backend exposes /articles/:id/comments.
       const comments =
         type === 'post'
           ? await api.getComments(id)
-          : await api.getComments(id).catch(() => []);
+          : await api.getArticleComments(id).catch(() => []);
       if (Array.isArray(comments)) {
         setItemComments((prev) => ({ ...prev, [feedId]: comments }));
       }
@@ -231,7 +234,10 @@ export default function HomeScreen({ isDesktop }) {
     const content = commentInputs[feedId];
     if (!content?.trim()) return;
 
-    const res = await api.addComment(id, content);
+    const res = type === 'post' 
+      ? await api.addComment(id, content)
+      : await api.addArticleComment(id, content);
+    
     if (res.success) {
       setItemComments((prev) => ({
         ...prev,
@@ -301,9 +307,6 @@ export default function HomeScreen({ isDesktop }) {
     const isLiked = likedItems.has(feedId);
     const isExpanded = expandedItems.has(feedId);
     const comments = itemComments[feedId] || [];
-    const heartStyle = isLiked
-      ? { fontVariationSettings: "'FILL' 1" }
-      : { fontVariationSettings: "'FILL' 0" };
 
     return (
       <div
@@ -412,31 +415,24 @@ export default function HomeScreen({ isDesktop }) {
                 : 'text-slate-500 hover:text-red-500 hover:bg-red-50'
             }`}
           >
-            <span
-              className="material-symbols-outlined"
-              style={{ ...heartStyle, fontSize: compact ? '18px' : '20px' }}
-            >
-              favorite
-            </span>
+            <FiHeart 
+              style={{ 
+                fontSize: compact ? '18px' : '20px',
+                fill: isLiked ? 'currentColor' : 'none'
+              }} 
+            />
             <span className="text-sm font-medium">{item.likes}</span>
           </button>
           <button
             onClick={() => handleToggleComments(item)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-500 hover:text-primary hover:bg-blue-50 transition-all"
           >
-            <span
-              className="material-symbols-outlined"
-              style={{ fontSize: compact ? '18px' : '20px' }}
-            >
-              chat_bubble
-            </span>
+            <FiMessageCircle style={{ fontSize: compact ? '18px' : '20px' }} />
             <span className="text-sm font-medium">{item.commentsCount || 0}</span>
           </button>
           {!compact && (
             <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-500 hover:text-primary hover:bg-blue-50 transition-all ml-auto">
-              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
-                share
-              </span>
+              <FiShare2 style={{ fontSize: '20px' }} />
             </button>
           )}
         </div>
@@ -564,33 +560,18 @@ export default function HomeScreen({ isDesktop }) {
               </div>
             </div>
             <button className="relative flex items-center justify-center size-10 rounded-full bg-white dark:bg-surface-dark shadow-card border border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-200">
-              <span
-                className="material-symbols-outlined"
-                style={{ fontSize: '24px' }}
-              >
-                notifications
-              </span>
+              <FiBell style={{ fontSize: '24px' }} />
               <span className="absolute top-2 right-2 size-2 bg-red-500 rounded-full border border-white dark:border-surface-dark"></span>
             </button>
           </div>
 
           <div className="flex items-center">
             <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors">
-              <span
-                className="material-symbols-outlined text-primary"
-                style={{ fontSize: '18px' }}
-              >
-                location_on
-              </span>
+              <FiMapPin className="text-primary" style={{ fontSize: '18px' }} />
               <span className="text-primary text-sm font-semibold">
                 Downtown, NY
               </span>
-              <span
-                className="material-symbols-outlined text-primary"
-                style={{ fontSize: '18px' }}
-              >
-                expand_more
-              </span>
+              <FiChevronDown className="text-primary" style={{ fontSize: '18px' }} />
             </button>
           </div>
 
@@ -598,12 +579,7 @@ export default function HomeScreen({ isDesktop }) {
             <div className="flex w-full items-stretch gap-3 h-12">
               <div className="relative flex-1 group">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none">
-                  <span
-                    className="material-symbols-outlined"
-                    style={{ fontSize: '24px' }}
-                  >
-                    search
-                  </span>
+                  <FiSearch style={{ fontSize: '24px' }} />
                 </div>
                 <input
                   type="text"
@@ -617,12 +593,7 @@ export default function HomeScreen({ isDesktop }) {
                 type="submit"
                 className="flex items-center justify-center aspect-square h-full bg-primary text-white rounded-xl shadow-lg shadow-primary/30 active:scale-95 transition-transform"
               >
-                <span
-                  className="material-symbols-outlined"
-                  style={{ fontSize: '24px' }}
-                >
-                  tune
-                </span>
+                <FiSettings style={{ fontSize: '24px' }} />
               </button>
             </div>
           </form>
@@ -668,7 +639,6 @@ export default function HomeScreen({ isDesktop }) {
                     className={`size-14 rounded-2xl flex items-center justify-center shadow-sm transition-colors ${cat.color} group-hover:bg-primary group-hover:text-white`}
                   >
                     <span
-                      className="material-symbols-outlined"
                       style={{ fontSize: '28px' }}
                     >
                       {cat.icon}
@@ -728,7 +698,7 @@ export default function HomeScreen({ isDesktop }) {
                       onClick={() => setShowPostForm(false)}
                       className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full"
                     >
-                      <span className="material-symbols-outlined">close</span>
+                      <FiX />
                     </button>
                   </div>
                   <textarea
@@ -752,9 +722,7 @@ export default function HomeScreen({ isDesktop }) {
                         }}
                         className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full"
                       >
-                        <span className="material-symbols-outlined text-[18px]">
-                          close
-                        </span>
+                        <FiX className="text-[18px]" />
                       </button>
                     </div>
                   )}
@@ -763,9 +731,7 @@ export default function HomeScreen({ isDesktop }) {
                       onClick={() => postImageInputRef.current?.click()}
                       className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
                     >
-                      <span className="material-symbols-outlined text-primary">
-                        image
-                      </span>
+                      <FiImage className="text-primary" />
                       Photo
                     </button>
                     <input
@@ -802,12 +768,7 @@ export default function HomeScreen({ isDesktop }) {
                 Popular Near You
               </h2>
               <button className="text-slate-400 dark:text-slate-500 hover:text-primary transition-colors">
-                <span
-                  className="material-symbols-outlined"
-                  style={{ fontSize: '24px' }}
-                >
-                  filter_list
-                </span>
+                <FiFilter style={{ fontSize: '24px' }} />
               </button>
             </div>
             <div className="flex flex-col gap-4">
@@ -842,12 +803,7 @@ export default function HomeScreen({ isDesktop }) {
                           {provider.name}
                         </h3>
                         <div className="flex items-center gap-1 bg-yellow-100 dark:bg-yellow-900/30 px-1.5 py-0.5 rounded text-xs font-bold text-yellow-700 dark:text-yellow-500">
-                          <span
-                            className="material-symbols-outlined"
-                            style={{ fontSize: '14px' }}
-                          >
-                            star
-                          </span>
+                          <FiStar style={{ fontSize: '14px' }} />
                           {provider.rating}
                         </div>
                       </div>
@@ -856,15 +812,10 @@ export default function HomeScreen({ isDesktop }) {
                       </p>
                     </div>
                     <div className="flex items-end justify-between mt-2">
-                      <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500 text-xs">
-                        <span
-                          className="material-symbols-outlined"
-                          style={{ fontSize: '14px' }}
-                        >
-                          location_on
-                        </span>
-                        {provider.distance} km
-                      </div>
+                        <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500 text-xs">
+                          <FiMapPin style={{ fontSize: '14px' }} />
+                          {provider.distance} km
+                        </div>
                       <div className="flex items-center gap-3">
                         <span className="font-bold text-primary">
                           ${provider.hourlyRate}
@@ -890,40 +841,35 @@ export default function HomeScreen({ isDesktop }) {
               className="flex flex-col items-center gap-1 text-primary w-16"
               onClick={() => navigate('/home')}
             >
-              <span
-                className="material-symbols-outlined filled"
-                style={{ fontVariationSettings: "'FILL' 1" }}
-              >
-                home
-              </span>
+              <FiHome />
               <span className="text-[10px] font-bold">Home</span>
             </button>
             <button
               className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 w-16"
               onClick={() => navigate('/search')}
             >
-              <span className="material-symbols-outlined">search</span>
+              <FiSearch />
               <span className="text-[10px] font-medium">Search</span>
             </button>
             <button
               className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 w-16"
               onClick={() => navigate('/videos')}
             >
-              <span className="material-symbols-outlined">play_circle</span>
+              <FiPlayCircle />
               <span className="text-[10px] font-medium">Videos</span>
             </button>
             <button
               className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 w-16"
               onClick={() => navigate('/messages/1')}
             >
-              <span className="material-symbols-outlined">chat_bubble</span>
+              <FiMessageCircle />
               <span className="text-[10px] font-medium">Messages</span>
             </button>
             <button
               className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 w-16"
               onClick={() => navigate('/profile')}
             >
-              <span className="material-symbols-outlined">person</span>
+              <FiUser />
               <span className="text-[10px] font-medium">Profile</span>
             </button>
           </div>
@@ -969,16 +915,15 @@ export default function HomeScreen({ isDesktop }) {
               className="flex flex-col items-center gap-3 group p-4 rounded-xl hover:bg-slate-50 transition-colors"
               onClick={() => navigate(`/search?q=${cat.name}`)}
             >
-              <div
-                className={`size-16 rounded-2xl flex items-center justify-center shadow-sm transition-colors ${cat.color} group-hover:bg-primary group-hover:text-white`}
-              >
-                <span
-                  className="material-symbols-outlined"
-                  style={{ fontSize: '32px' }}
-                >
-                  {cat.icon}
-                </span>
-              </div>
+                  <div
+                    className={`size-16 rounded-2xl flex items-center justify-center shadow-sm transition-colors ${cat.color} group-hover:bg-primary group-hover:text-white`}
+                  >
+                    <span
+                      style={{ fontSize: '32px' }}
+                    >
+                      {cat.icon}
+                    </span>
+                  </div>
               <span className="text-sm font-medium text-slate-700 text-center">
                 {cat.name}
               </span>
@@ -1034,7 +979,7 @@ export default function HomeScreen({ isDesktop }) {
                   onClick={() => setShowPostForm(false)}
                   className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full"
                 >
-                  <span className="material-symbols-outlined">close</span>
+                  <FiX />
                 </button>
               </div>
               <div className="flex items-center gap-3 mb-4">
@@ -1083,23 +1028,19 @@ export default function HomeScreen({ isDesktop }) {
                       setPostImagePreview(null);
                     }}
                     className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">
-                      close
-                    </span>
-                  </button>
+                    >
+                      <FiX className="text-[18px]" />
+                    </button>
                 </div>
               )}
               <div className="flex gap-3 mt-4">
                 <button
                   onClick={() => postImageInputRef.current?.click()}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
-                >
-                  <span className="material-symbols-outlined text-primary">
-                    image
-                  </span>
-                  Photo
-                </button>
+                  >
+                    <FiImage className="text-primary" />
+                    Photo
+                  </button>
                 <input
                   type="file"
                   ref={postImageInputRef}
@@ -1134,12 +1075,7 @@ export default function HomeScreen({ isDesktop }) {
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-slate-900 text-xl font-bold">Popular Near You</h2>
           <button className="text-slate-400 hover:text-primary transition-colors">
-            <span
-              className="material-symbols-outlined"
-              style={{ fontSize: '24px' }}
-            >
-              filter_list
-            </span>
+            <FiFilter style={{ fontSize: '24px' }} />
           </button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -1170,12 +1106,7 @@ export default function HomeScreen({ isDesktop }) {
                   <div className="flex justify-between items-start">
                     <h3 className="font-bold text-slate-900">{provider.name}</h3>
                     <div className="flex items-center gap-1 bg-yellow-100 px-1.5 py-0.5 rounded text-xs font-bold text-yellow-700">
-                      <span
-                        className="material-symbols-outlined"
-                        style={{ fontSize: '14px' }}
-                      >
-                        star
-                      </span>
+                      <FiStar style={{ fontSize: '14px' }} />
                       {provider.rating}
                     </div>
                   </div>
@@ -1185,12 +1116,7 @@ export default function HomeScreen({ isDesktop }) {
                 </div>
                 <div className="flex items-end justify-between mt-3">
                   <div className="flex items-center gap-1 text-slate-400 text-xs">
-                    <span
-                      className="material-symbols-outlined"
-                      style={{ fontSize: '14px' }}
-                    >
-                      location_on
-                    </span>
+                    <FiMapPin style={{ fontSize: '14px' }} />
                     {provider.distance} km
                   </div>
                   <div className="flex items-center gap-3">

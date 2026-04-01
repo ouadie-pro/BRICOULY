@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { api } from '../services/api';
+import { 
+  FiTool, FiUser, FiMail, FiLock, FiPhone, FiEye, FiEyeOff, FiAlertCircle, FiPlus, FiAlertTriangle,
+  FiZap, FiDroplet, FiBox, FiTruck, FiWind, FiFeather, FiHome, FiShoppingBag
+} from 'react-icons/fi';
 
 export default function AuthScreen({ onAuth }) {
   const [searchParams] = useSearchParams();
@@ -20,17 +24,30 @@ export default function AuthScreen({ onAuth }) {
   const [newProfessionName, setNewProfessionName] = useState('');
   const navigate = useNavigate();
 
+  const iconMap = {
+    plumbing: FiDroplet,
+    bolt: FiZap,
+    format_paint: FiBox,
+    carpenter: FiTool,
+    cleaning_services: FiFeather,
+    local_shipping: FiTruck,
+    ac_unit: FiWind,
+    grass: FiFeather,
+    roofing: FiHome,
+    kitchen: FiShoppingBag,
+  };
+
   const defaultProfessions = [
-    { id: 1, name: 'Plumber', icon: 'plumbing', color: '#3b82f6' },
-    { id: 2, name: 'Electrician', icon: 'bolt', color: '#eab308' },
-    { id: 3, name: 'Painter', icon: 'format_paint', color: '#ec4899' },
-    { id: 4, name: 'Carpenter', icon: 'carpenter', color: '#f59e0b' },
-    { id: 5, name: 'Home Cleaner', icon: 'cleaning_services', color: '#8b5cf6' },
-    { id: 6, name: 'Mover', icon: 'local_shipping', color: '#22c55e' },
-    { id: 7, name: 'HVAC Technician', icon: 'ac_unit', color: '#06b6d4' },
-    { id: 8, name: 'Landscaper', icon: 'grass', color: '#84cc16' },
-    { id: 9, name: 'Roofer', icon: 'roofing', color: '#dc2626' },
-    { id: 10, name: 'Appliance Repair', icon: 'kitchen', color: '#6366f1' },
+    { id: 1, name: 'Plumber', icon: FiDroplet, color: '#3b82f6' },
+    { id: 2, name: 'Electrician', icon: FiZap, color: '#eab308' },
+    { id: 3, name: 'Painter', icon: FiBox, color: '#ec4899' },
+    { id: 4, name: 'Carpenter', icon: FiTool, color: '#f59e0b' },
+    { id: 5, name: 'Home Cleaner', icon: FiFeather, color: '#8b5cf6' },
+    { id: 6, name: 'Mover', icon: FiTruck, color: '#22c55e' },
+    { id: 7, name: 'HVAC Technician', icon: FiWind, color: '#06b6d4' },
+    { id: 8, name: 'Landscaper', icon: FiFeather, color: '#84cc16' },
+    { id: 9, name: 'Roofer', icon: FiHome, color: '#dc2626' },
+    { id: 10, name: 'Appliance Repair', icon: FiShoppingBag, color: '#6366f1' },
   ];
 
   useEffect(() => {
@@ -122,7 +139,7 @@ export default function AuthScreen({ onAuth }) {
         
         <div className="absolute top-8 left-8 flex items-center gap-3">
           <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/30">
-            <span className="material-symbols-outlined text-white text-3xl">handyman</span>
+            <FiTool className="text-white text-3xl" />
           </div>
           <h1 className="text-white text-3xl font-black tracking-tight">PRUCOLY</h1>
         </div>
@@ -164,7 +181,7 @@ export default function AuthScreen({ onAuth }) {
         <div className="w-full max-w-[440px]">
           <div className="lg:hidden flex items-center gap-3 mb-8 justify-center">
             <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-dark rounded-xl flex items-center justify-center shadow-lg shadow-primary/30">
-              <span className="material-symbols-outlined text-white text-2xl">handyman</span>
+              <FiTool className="text-white text-2xl" />
             </div>
             <h1 className="text-2xl font-black tracking-tight text-slate-900">PRUCOLY</h1>
           </div>
@@ -220,7 +237,7 @@ export default function AuthScreen({ onAuth }) {
                           : 'border-slate-200 hover:border-slate-300 bg-white'
                       }`}
                     >
-                      <span className="material-symbols-outlined text-2xl mb-2 block text-slate-600">person</span>
+                      <FiUser className="text-2xl mb-2 block text-slate-600 mx-auto" />
                       <span className="text-sm font-semibold text-slate-700">Client</span>
                       <p className="text-xs text-slate-500 mt-1">Find & book services</p>
                     </button>
@@ -233,7 +250,7 @@ export default function AuthScreen({ onAuth }) {
                           : 'border-slate-200 hover:border-slate-300 bg-white'
                       }`}
                     >
-                      <span className="material-symbols-outlined text-2xl mb-2 block text-slate-600">construction</span>
+                      <FiTool className="text-2xl mb-2 block text-slate-600 mx-auto" />
                       <span className="text-sm font-semibold text-slate-700">Provider</span>
                       <p className="text-xs text-slate-500 mt-1">Offer your services</p>
                     </button>
@@ -248,10 +265,10 @@ export default function AuthScreen({ onAuth }) {
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       className="input-field pl-10"
-                      placeholder="John Doe"
+                      placeholder="Enter your name..."
                       required
                     />
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary">person</span>
+    
                   </div>
                 </div>
 
@@ -276,12 +293,10 @@ export default function AuthScreen({ onAuth }) {
                               className="w-9 h-9 rounded-lg flex items-center justify-center"
                               style={{ backgroundColor: prof.color ? `${prof.color}20` : '#f1f5f9' }}
                             >
-                              <span 
-                                className="material-symbols-outlined text-lg"
+                              <prof.icon 
+                                className="text-lg"
                                 style={{ color: prof.color || '#64748b' }}
-                              >
-                                {prof.icon}
-                              </span>
+                              />
                             </div>
                             <span className="text-xs font-semibold text-slate-700">{prof.name}</span>
                           </button>
@@ -294,7 +309,7 @@ export default function AuthScreen({ onAuth }) {
                           onClick={() => setShowAddProfession(true)}
                           className="flex items-center justify-center gap-2 w-full p-3 rounded-xl border-2 border-dashed border-slate-300 text-slate-500 hover:border-primary hover:text-primary hover:bg-blue-50/30 transition-all text-sm font-medium mt-1"
                         >
-                          <span className="material-symbols-outlined text-lg">add</span>
+                          <FiPlus className="text-lg" />
                           Add New Specialization
                         </button>
                       ) : (
@@ -353,15 +368,15 @@ export default function AuthScreen({ onAuth }) {
             <div className="flex flex-col gap-1.5">
               <label className="text-slate-700 text-sm font-medium">Email Address</label>
               <div className="relative group">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="input-field pl-10"
-                  placeholder="name@company.com"
-                  required
-                />
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary">mail</span>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="input-field pl-10"
+                    placeholder="name@company.com"
+                    required
+                  />
+                  
               </div>
             </div>
 
@@ -373,22 +388,22 @@ export default function AuthScreen({ onAuth }) {
                 )}
               </div>
               <div className="relative group">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="input-field pl-10 pr-10"
-                  placeholder="Enter your password"
-                  required
-                />
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary">lock</span>
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
-                >
-                  <span className="material-symbols-outlined text-lg">{showPassword ? 'visibility' : 'visibility_off'}</span>
-                </button>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="input-field pl-10 pr-10"
+                    placeholder="Enter your password"
+                    required
+                  />
+                  
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                  >
+                    {showPassword ? <FiEyeOff className="text-lg" /> : <FiEye className="text-lg" />}
+                  </button>
               </div>
             </div>
 
@@ -401,16 +416,15 @@ export default function AuthScreen({ onAuth }) {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     className="input-field pl-10"
-                    placeholder="+1 (555) 000-0000"
+                    placeholder="+1 (212) 000-0000"
                   />
-                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary">phone</span>
                 </div>
               </div>
             )}
 
             {error && (
               <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl">
-                <span className="material-symbols-outlined text-red-500 text-lg">error</span>
+                <FiAlertCircle className="text-red-500 text-lg" />
                 <p className="text-red-600 text-sm">{error}</p>
               </div>
             )}

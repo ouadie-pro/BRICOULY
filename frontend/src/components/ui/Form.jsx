@@ -1,10 +1,11 @@
 import { useState, forwardRef } from 'react';
 import { LoadingSpinner } from './Loading';
+import { FiCheck, FiChevronDown, FiX, FiUpload } from 'react-icons/fi';
 
 export const Input = forwardRef(({ 
   label, 
   error, 
-  icon, 
+  icon: Icon, 
   className = '', 
   containerClassName = '',
   ...props 
@@ -13,14 +14,14 @@ export const Input = forwardRef(({
     <div className={`flex flex-col gap-1.5 ${containerClassName}`}>
       {label && <label className="text-sm font-medium text-slate-700">{label}</label>}
       <div className="relative">
-        {icon && (
+        {Icon && (
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-            <span className="material-symbols-outlined text-lg">{icon}</span>
+            <Icon className="text-lg" />
           </span>
         )}
         <input
           ref={ref}
-          className={`input-field ${icon ? 'pl-10' : ''} ${error ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20' : ''} ${className}`}
+          className={`input-field ${Icon ? 'pl-10' : ''} ${error ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20' : ''} ${className}`}
           {...props}
         />
       </div>
@@ -79,7 +80,7 @@ export const Select = forwardRef(({
           ))}
         </select>
         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-          <span className="material-symbols-outlined text-lg">expand_more</span>
+          <FiChevronDown className="text-lg" />
         </span>
       </div>
       {error && <p className="text-xs text-red-500">{error}</p>}
@@ -107,7 +108,7 @@ export function Checkbox({ label, checked, onChange, className = '' }) {
           }`}
         >
           {checked && (
-            <span className="material-symbols-outlined text-white text-lg">check</span>
+            <FiCheck className="text-white text-lg" />
           )}
         </div>
       </div>
@@ -181,18 +182,18 @@ export function FileUpload({
         ) : preview ? (
           <div className="relative inline-block">
             <img src={preview} alt="Preview" className="max-h-40 rounded-lg" />
-            <button
-              type="button"
-              onClick={onChange.bind(null, null)}
-              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center"
-            >
-              <span className="material-symbols-outlined text-lg">close</span>
-            </button>
+              <button
+                type="button"
+                onClick={onChange.bind(null, null)}
+                className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center"
+              >
+                <FiX className="text-lg" />
+              </button>
           </div>
         ) : (
           <label className="cursor-pointer">
             <input type="file" accept={accept} onChange={(e) => e.target.files[0] && onChange(e.target.files[0])} className="hidden" />
-            <span className="material-symbols-outlined text-4xl text-slate-400 mb-2">cloud_upload</span>
+            <FiUpload className="text-4xl text-slate-400 mb-2" />
             <p className="text-sm text-slate-600">Click to upload or drag and drop</p>
             <p className="text-xs text-slate-400 mt-1">PNG, JPG up to 10MB</p>
           </label>

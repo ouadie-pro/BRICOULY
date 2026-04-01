@@ -32,8 +32,10 @@ export function LoadingCard({ className = '' }) {
   );
 }
 
+import { FiInbox, FiAlertCircle } from 'react-icons/fi';
+
 export function EmptyState({ 
-  icon = 'inbox', 
+  icon = FiInbox, 
   title = 'No data found', 
   description = 'Nothing to display here yet.',
   action,
@@ -42,7 +44,7 @@ export function EmptyState({
   return (
     <div className={`flex flex-col items-center justify-center py-12 px-4 text-center ${className}`}>
       <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
-        <span className="material-symbols-outlined text-slate-400 text-3xl">{icon}</span>
+        <icon className="text-slate-400 text-3xl" />
       </div>
       <h3 className="text-lg font-semibold text-slate-900 mb-2">{title}</h3>
       <p className="text-slate-500 text-sm max-w-xs mb-4">{description}</p>
@@ -63,7 +65,7 @@ export function ErrorState({
   return (
     <div className={`flex flex-col items-center justify-center py-12 px-4 text-center ${className}`}>
       <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mb-4">
-        <span className="material-symbols-outlined text-red-500 text-3xl">error</span>
+        <FiAlertCircle className="text-red-500 text-3xl" />
       </div>
       <h3 className="text-lg font-semibold text-slate-900 mb-2">Oops!</h3>
       <p className="text-slate-500 text-sm max-w-xs mb-4">{message}</p>
