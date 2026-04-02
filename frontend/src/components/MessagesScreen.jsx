@@ -52,6 +52,19 @@ export default function MessagesScreen({ isDesktop }) {
           if (!providerData || providerData.error) {
             providerData = await api.getUser(providerId).catch(() => null);
           }
+          // Ensure provider has avatar from message data if available
+          if (messagesArray.length > 0) {
+            const firstReceivedMsg = messagesArray.find(m => 
+              String(m.senderId) !== String(currentUser.id)
+            );
+            if (firstReceivedMsg && firstReceivedMsg.senderAvatar) {
+              providerData = {
+                ...providerData,
+                avatar: providerData?.avatar || firstReceivedMsg.senderAvatar,
+                name: providerData?.name || firstReceivedMsg.senderName
+              };
+            }
+          }
           setProvider(providerData);
         } catch (error) {
           console.error('Error loading chat:', error);
@@ -60,7 +73,7 @@ export default function MessagesScreen({ isDesktop }) {
       };
       loadChat();
     }
-  }, [providerId]);
+  }, [providerId, currentUser.id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -184,6 +197,25 @@ export default function MessagesScreen({ isDesktop }) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const getSenderAvatar = (msg, isOwn) => {
+    if (isOwn) {
+      return currentUser?.avatar;
+    }
+    // Use message's senderAvatar first, then fall back to provider avatar
+    return msg.senderAvatar || provider?.avatar;
+  };
+
+  const getSenderName = (msg, isOwn) => {
+    if (isOwn) {
+      return currentUser?.name;
+    }
+    return msg.senderName || provider?.name;
+  };
+
+  const getAvatarFallback = (name) => {
+    return name?.charAt(0)?.toUpperCase() || '?';
+  };
+
   const renderMessageContent = (msg) => {
     const text = msg.content || msg.text || '';
     
@@ -291,25 +323,36 @@ export default function MessagesScreen({ isDesktop }) {
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
-          {messages.map((msg) => {
+          {messages.map((msg, index) => {
             const isOwn = String(msg.senderId) === String(currentUser.id) || String(msg.sender) === String(currentUser.id);
-            const avatarUrl = isOwn ? currentUser.avatar : (provider?.avatar);
+            const avatarUrl = getSenderAvatar(msg, isOwn);
+            const senderName = getSenderName(msg, isOwn);
+            // Show avatar only on last message of consecutive group
+            const nextMsg = messages[index + 1];
+            const isNextFromSameSender = nextMsg && (
+              String(nextMsg.senderId) === String(msg.senderId) || 
+              String(nextMsg.sender) === String(msg.sender)
+            );
+            const showAvatar = !isNextFromSameSender;
+            
             return (
             <div
               key={msg.id || msg._id}
               className={`flex items-end gap-2 ${isOwn ? 'flex-row-reverse' : ''}`}
             >
-              {avatarUrl ? (
+              {showAvatar && avatarUrl ? (
                 <div
-                  className="w-8 h-8 rounded-full bg-cover bg-center shrink-0"
+                  className="w-8 h-8 rounded-full bg-cover bg-center shrink-0 flex-shrink-0"
                   style={{ backgroundImage: `url("${avatarUrl}")` }}
                 />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-slate-300 shrink-0 flex items-center justify-center">
-                  <span className="text-xs font-bold text-slate-500">
-                    {isOwn ? (currentUser.name?.charAt(0) || '?') : (provider?.name?.charAt(0) || '?')}
+              ) : showAvatar ? (
+                <div className="w-8 h-8 rounded-full bg-primary shrink-0 flex items-center justify-center flex-shrink-0">
+                  <span className="text-xs font-bold text-white">
+                    {getAvatarFallback(senderName)}
                   </span>
                 </div>
+              ) : (
+                <div className="w-8 shrink-0" />
               )}
               <div className={`max-w-[80%] px-4 py-3 rounded-2xl text-[15px] ${
                 isOwn
@@ -375,12 +418,12 @@ export default function MessagesScreen({ isDesktop }) {
                 {isRecording ? <FiX /> : <FiMic style={{ fontSize: '20px' }} />}
               </button>
             </div>
-            <div className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center min-h-[44px] px-4 py-2 focus-within:ring-2 focus-within:ring-primary/50">
+            <div className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center min-h-[44px] px-4 py-2 border border-transparent focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all duration-200">
               <input
                 type="text"
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                className="w-full bg-transparent border-none p-0 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-0  text-[15px]"
+                className="w-full bg-transparent border-none p-0 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none text-[15px]"
                 placeholder="Type a message..."
               />
             </div>
@@ -398,9 +441,9 @@ export default function MessagesScreen({ isDesktop }) {
   }
 
   return (
-    <div className="flex gap-6 h-[calc(100vh-64px)]">
-      <div className="w-80 bg-white rounded-xl border border-slate-200 flex flex-col shrink-0">
-        <div className="p-4 border-b border-slate-200">
+    <div className="flex gap-6 h-[calc(100vh-64px)] overflow-hidden">
+      <div className="w-80 bg-white rounded-xl border border-slate-200 flex flex-col shrink-0 overflow-hidden">
+        <div className="p-4 border-b border-slate-200 flex-shrink-0">
           <h2 className="text-lg font-bold text-slate-900 mb-3">Messages</h2>
           <div className="relative">
             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" style={{ fontSize: '16px' }} />
@@ -413,7 +456,7 @@ export default function MessagesScreen({ isDesktop }) {
             />
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto min-h-0">
           {conversations.length === 0 ? (
             <div className="p-4 text-center text-slate-500">
               <FiMessageCircle style={{ fontSize: '40px' }} className="text-4xl mb-2" />
@@ -433,10 +476,18 @@ export default function MessagesScreen({ isDesktop }) {
                   String(providerId) === String(conv.userId) ? 'bg-blue-50' : ''
                 }`}
               >
-                <div
-                  className="w-12 h-12 rounded-full bg-cover bg-center"
-                  style={{ backgroundImage: `url("${conv.userAvatar}")` }}
-                />
+                {conv.userAvatar ? (
+                  <div
+                    className="w-12 h-12 rounded-full bg-cover bg-center"
+                    style={{ backgroundImage: `url("${conv.userAvatar}")` }}
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm font-bold text-white">
+                      {conv.userName?.charAt(0)?.toUpperCase() || '?'}
+                    </span>
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-center">
                     <h3 className="font-semibold text-slate-900 truncate">{conv.userName}</h3>
@@ -460,10 +511,10 @@ export default function MessagesScreen({ isDesktop }) {
         </div>
       </div>
 
-      <div className="flex-1 bg-white rounded-xl border border-slate-200 flex flex-col">
+      <div className="flex-1 bg-white rounded-xl border border-slate-200 flex flex-col overflow-hidden">
         {providerId ? (
           <>
-            <header className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+            <header className="flex items-center justify-between px-6 py-4 border-b border-slate-200 flex-shrink-0 bg-white z-10">
               <div className="flex items-center gap-3">
                 <div className="relative">
                   {provider?.avatar ? (
@@ -472,41 +523,52 @@ export default function MessagesScreen({ isDesktop }) {
                       style={{ backgroundImage: `url("${provider.avatar}")` }}
                     />
                   ) : (
-                    <div className="w-12 h-12 rounded-full bg-slate-300 border border-slate-200 flex items-center justify-center">
-                      <span className="text-sm font-bold text-slate-500">
-                        {provider?.name ? provider.name.charAt(0).toUpperCase() : '?'}
+                    <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center border border-slate-200">
+                      <span className="text-sm font-bold text-white">
+                        {provider?.name?.charAt(0)?.toUpperCase() || '?'}
                       </span>
                     </div>
                   )}
                   <div className="absolute bottom-0 right-0 size-3 bg-green-500 rounded-full border-2 border-white"></div>
                 </div>
                 <div className="flex flex-col">
-                  <h2 className="text-lg font-bold text-slate-900">{provider?.name}</h2>
-                  <p className="text-primary text-sm font-medium">{provider?.profession}</p>
+                  <h2 className="text-lg font-bold text-slate-900">{provider?.name || 'Unknown User'}</h2>
+                  <p className="text-primary text-sm font-medium">{provider?.profession || provider?.role || ''}</p>
                 </div>
               </div>
             </header>
 
-            <main className="flex-1 overflow-y-auto p-6 space-y-4">
-              {messages.map((msg) => {
+            <main className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0">
+              {messages.map((msg, index) => {
                 const isOwn = String(msg.senderId) === String(currentUser.id) || String(msg.sender) === String(currentUser.id);
-                const avatarUrl = isOwn ? currentUser.avatar : (provider?.avatar);
+                const avatarUrl = getSenderAvatar(msg, isOwn);
+                const senderName = getSenderName(msg, isOwn);
+                // Show avatar only on last message of consecutive group
+                const nextMsg = messages[index + 1];
+                const isNextFromSameSender = nextMsg && (
+                  String(nextMsg.senderId) === String(msg.senderId) || 
+                  String(nextMsg.sender) === String(msg.sender)
+                );
+                const showAvatar = !isNextFromSameSender;
+                
                 return (
                 <div
                   key={msg.id || msg._id}
                   className={`flex items-end gap-3 ${isOwn ? 'flex-row-reverse' : ''}`}
                 >
-                  {avatarUrl ? (
+                  {showAvatar && avatarUrl ? (
                     <div
-                      className="w-8 h-8 rounded-full bg-cover bg-center shrink-0"
+                      className="w-8 h-8 rounded-full bg-cover bg-center shrink-0 flex-shrink-0"
                       style={{ backgroundImage: `url("${avatarUrl}")` }}
                     />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-slate-300 shrink-0 flex items-center justify-center">
-                      <span className="text-xs font-bold text-slate-500">
-                        {isOwn ? (currentUser.name?.charAt(0) || '?') : (provider?.name?.charAt(0) || '?')}
+                  ) : showAvatar ? (
+                    <div className="w-8 h-8 rounded-full bg-primary shrink-0 flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-bold text-white">
+                        {getAvatarFallback(senderName)}
                       </span>
                     </div>
+                  ) : (
+                    <div className="w-8 shrink-0" />
                   )}
         
                   <div className={`flex flex-col gap-1 max-w-[60%] ${isOwn ? 'items-end' : 'items-start'}`}>
@@ -527,7 +589,7 @@ export default function MessagesScreen({ isDesktop }) {
               <div ref={messagesEndRef} />
             </main>
 
-            <footer className="px-6 py-4 border-t border-slate-200">
+            <footer className="px-6 py-4 border-t border-slate-200 flex-shrink-0 bg-white z-10">
               {mediaPreview && (
                 <div className="mb-2">
                   {renderMediaPreview()}
@@ -578,12 +640,12 @@ export default function MessagesScreen({ isDesktop }) {
                 {isRecording ? <FiX /> : <FiMic style={{ fontSize: '20px' }} />}
                   </button>
                 </div>
-                <div className="flex-1 bg-slate-100 rounded-2xl flex items-center px-4 py-3 focus-within:ring-2 focus-within:ring-primary/50">
+                <div className="flex-1 bg-slate-100 rounded-2xl flex items-center px-4 py-3 border border-transparent focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all duration-200">
                   <input
                     type="text"
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
-                    className="w-full bg-transparent border-none p-0 text-slate-900 placeholder-slate-400 focus:ring-0 text-[15px]"
+                    className="w-full bg-transparent border-none p-0 text-slate-900 placeholder-slate-400 focus:outline-none text-[15px]"
                     placeholder="Type a message..."
                   />
                 </div>

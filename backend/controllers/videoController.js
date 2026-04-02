@@ -113,3 +113,21 @@ exports.deleteVideo = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.incrementView = async (req, res) => {
+  try {
+    const video = await Video.findByIdAndUpdate(
+      req.params.id,
+      { $inc: { views: 1 } },
+      { new: true }
+    );
+    
+    if (!video) {
+      return res.status(404).json({ error: 'Video not found' });
+    }
+    
+    res.json({ success: true, views: video.views });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

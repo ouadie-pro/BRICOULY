@@ -3,14 +3,109 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { 
   FiArrowLeft, FiShare2, FiCheckCircle, FiStar, FiMessageCircle, FiCalendar, FiCheck, FiX,
-  FiMapPin, FiPhone, FiMail, FiUserPlus, FiUserMinus, FiUsers, FiAlertCircle, FiPlay
+  FiMapPin, FiPhone, FiMail, FiUserPlus, FiUserMinus, FiUsers, FiAlertCircle, FiPlay,
+  FiPlus, FiEdit2, FiTrash2, FiLoader, FiChevronLeft, FiChevronRight
 } from 'react-icons/fi';
+
+const formatCurrency = (amount) => `${amount} MAD`;
+
+const StarRating = ({ rating, count, size = 14 }) => {
+  const roundedRating = Math.round(rating || 0);
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <span 
+          key={star} 
+          style={{ 
+            color: star <= roundedRating ? '#f59e0b' : '#d1d5db',
+            fontSize: `${size}px`
+          }}
+        >
+          ★
+        </span>
+      ))}
+      {count !== undefined && count > 0 && (
+        <span className="text-xs text-slate-500 ml-1">({count})</span>
+      )}
+    </div>
+  );
+};
+
+const formatPhone = (phone) => {
+  if (!phone) return 'Non renseigné';
+  if (phone.startsWith('+')) return phone;
+  if (phone.startsWith('0')) return `+212 ${phone.slice(1)}`;
+  return phone;
+};
+
+const getResponseTimeDisplay = (responseTime) => {
+  if (responseTime) return responseTime;
+  return '< 1h';
+};
+
+const PortfolioLightbox = ({ items, currentIndex, onClose, onNext, onPrev }) => {
+  if (currentIndex === null) return null;
+  
+  return (
+    <div 
+      className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center"
+      onClick={onClose}
+    >
+      <button 
+        className="absolute top-4 right-4 p-2 text-white/80 hover:text-white transition-colors z-10"
+        onClick={onClose}
+      >
+        <FiX style={{ fontSize: '32px' }} />
+      </button>
+      
+      {currentIndex > 0 && (
+        <button 
+          className="absolute left-4 p-3 text-white/80 hover:text-white transition-colors z-10 bg-black/30 rounded-full"
+          onClick={(e) => { e.stopPropagation(); onPrev(); }}
+        >
+          <FiChevronLeft style={{ fontSize: '32px' }} />
+        </button>
+      )}
+      
+      {currentIndex < items.length - 1 && (
+        <button 
+          className="absolute right-4 p-3 text-white/80 hover:text-white transition-colors z-10 bg-black/30 rounded-full"
+          onClick={(e) => { e.stopPropagation(); onNext(); }}
+        >
+          <FiChevronRight style={{ fontSize: '32px' }} />
+        </button>
+      )}
+      
+      <div 
+        className="max-w-4xl max-h-[90vh] w-full mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <img 
+          src={items[currentIndex]?.imageUrl || items[currentIndex]?.image} 
+          alt={items[currentIndex]?.caption || items[currentIndex]?.title}
+          className="w-full h-full max-h-[85vh] object-contain rounded-lg"
+        />
+        {items[currentIndex]?.caption && (
+          <p className="text-white text-center mt-4">{items[currentIndex].caption}</p>
+        )}
+        <div className="flex justify-center items-center gap-4 mt-4 text-white">
+          <span className="text-sm opacity-70">
+            {currentIndex + 1} / {items.length}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function ProviderProfileScreen({ isDesktop }) {
   const { id } = useParams();
   const [provider, setProvider] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [reviews, setReviews] = useState([]);
+  const [services, setServices] = useState([]);
+  const [portfolio, setPortfolio] = useState([]);
   const [activeTab, setActiveTab] = useState('about');
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [selectedService, setSelectedService] = useState('');
@@ -18,18 +113,62 @@ export default function ProviderProfileScreen({ isDesktop }) {
   const [requestSent, setRequestSent] = useState(false);
   const [following, setFollowing] = useState(false);
   const [followRequestSent, setFollowRequestSent] = useState(false);
+  
+  // Service form state
+  const [showServiceForm, setShowServiceForm] = useState(false);
+  const [editingService, setEditingService] = useState(null);
+  const [serviceName, setServiceName] = useState('');
+  const [serviceDescription, setServiceDescription] = useState('');
+  const [servicePrice, setServicePrice] = useState('');
+  const [serviceCategory, setServiceCategory] = useState('other');
+  const [savingService, setSavingService] = useState(false);
+  
   const navigate = useNavigate();
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const [portfolioLightboxIndex, setPortfolioLightboxIndex] = useState(null);
+
+  const openPortfolioLightbox = (index) => {
+    setPortfolioLightboxIndex(index);
+  };
+
+  const closePortfolioLightbox = () => {
+    setPortfolioLightboxIndex(null);
+  };
+
+  const prevPortfolioImage = () => {
+    if (portfolioLightboxIndex > 0) {
+      setPortfolioLightboxIndex(portfolioLightboxIndex - 1);
+    }
+  };
+
+  const nextPortfolioImage = () => {
+    if (portfolioLightboxIndex < portfolio.length - 1) {
+      setPortfolioLightboxIndex(portfolioLightboxIndex + 1);
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (portfolioLightboxIndex === null) return;
+      if (e.key === 'Escape') closePortfolioLightbox();
+      if (e.key === 'ArrowRight') nextPortfolioImage();
+      if (e.key === 'ArrowLeft') prevPortfolioImage();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [portfolioLightboxIndex]);
 
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
       setError(null);
       try {
-        const [providerData, reviewsData, myFollowingIds] = await Promise.all([
+        const [providerData, reviewsData, myFollowingIds, servicesData, portfolioData] = await Promise.all([
           api.getProvider(id),
           api.getProviderReviews(id),
-          // Use getMyFollowing (no param) to get current user's following list
           api.getMyFollowing(),
+          api.getProviderServices(id),
+          api.getProviderPortfolio(id),
         ]);
 
         if (providerData && !providerData.error) {
@@ -42,20 +181,96 @@ export default function ProviderProfileScreen({ isDesktop }) {
         }
 
         setReviews(reviewsData || []);
+        setServices(servicesData || []);
+        setPortfolio(portfolioData || []);
 
-        // myFollowingIds is an array of ObjectId strings
         if (Array.isArray(myFollowingIds)) {
-          const isFollowing = myFollowingIds.some(
-            (fId) => String(fId) === String(id)
-          );
+          const isFollowing = myFollowingIds.some((fId) => String(fId) === String(id));
           setFollowing(isFollowing);
         }
       } catch (err) {
         setError('Failed to load provider');
+      } finally {
+        setLoading(false);
       }
     };
     fetchData();
   }, [id]);
+
+  // Service CRUD handlers
+  const handleAddService = async () => {
+    if (!serviceName.trim() || !servicePrice) return;
+    setSavingService(true);
+    try {
+      const result = await api.addService({
+        name: serviceName,
+        description: serviceDescription,
+        price: parseInt(servicePrice),
+        category: serviceCategory,
+      });
+      if (result.success) {
+        setServices([...services, result.service]);
+        setShowServiceForm(false);
+        resetServiceForm();
+      }
+    } catch (err) {
+      console.error('Error adding service:', err);
+    } finally {
+      setSavingService(false);
+    }
+  };
+
+  const handleUpdateService = async () => {
+    if (!editingService || !serviceName.trim() || !servicePrice) return;
+    setSavingService(true);
+    try {
+      const result = await api.updateService(editingService.id, {
+        name: serviceName,
+        description: serviceDescription,
+        price: parseInt(servicePrice),
+        category: serviceCategory,
+      });
+      if (result.success) {
+        setServices(services.map(s => s.id === editingService.id ? result.service : s));
+        setShowServiceForm(false);
+        setEditingService(null);
+        resetServiceForm();
+      }
+    } catch (err) {
+      console.error('Error updating service:', err);
+    } finally {
+      setSavingService(false);
+    }
+  };
+
+  const handleDeleteService = async (serviceId) => {
+    if (!window.confirm('Are you sure you want to delete this service?')) return;
+    try {
+      const result = await api.deleteService(serviceId);
+      if (result.success) {
+        setServices(services.filter(s => s.id !== serviceId));
+      }
+    } catch (err) {
+      console.error('Error deleting service:', err);
+    }
+  };
+
+  const openEditService = (service) => {
+    setEditingService(service);
+    setServiceName(service.name || '');
+    setServiceDescription(service.description || '');
+    setServicePrice(service.price?.toString() || '');
+    setServiceCategory(service.category || 'other');
+    setShowServiceForm(true);
+  };
+
+  const resetServiceForm = () => {
+    setServiceName('');
+    setServiceDescription('');
+    setServicePrice('');
+    setServiceCategory('other');
+    setEditingService(null);
+  };
 
   const handleRequestService = async (e) => {
     e.preventDefault();
@@ -100,15 +315,43 @@ export default function ProviderProfileScreen({ isDesktop }) {
     );
   }
 
-  if (!provider) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background-light dark:bg-background-dark">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <FiLoader className="animate-spin text-4xl text-primary" />
+      </div>
+    );
+  }
+
+  if (!provider) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background-light dark:bg-background-dark p-4">
+        <FiAlertCircle style={{ fontSize: '60px' }} className="text-6xl text-slate-300 mb-4" />
+        <p className="text-slate-500 text-lg">Provider not found</p>
+        <button onClick={() => navigate(-1)} className="mt-4 px-4 py-2 bg-primary text-white rounded-lg">
+          Go Back
+        </button>
       </div>
     );
   }
 
   const isOwnProfile = String(currentUser.id) === String(provider.id);
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    try {
+      await navigator.clipboard.writeText(url);
+      alert('Link copied to clipboard!');
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  const handleCall = () => {
+    if (provider.phone) {
+      window.location.href = `tel:${provider.phone}`;
+    }
+  };
 
   // Follow button label
   const followLabel = following ? 'Following' : followRequestSent ? 'Request Sent' : 'Follow';
@@ -129,7 +372,10 @@ export default function ProviderProfileScreen({ isDesktop }) {
             Provider Profile
           </h2>
           <div className="flex w-12 items-center justify-end">
-            <button className="flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full size-12 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+            <button 
+              onClick={handleShare}
+              className="flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full size-12 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            >
               <FiShare2 style={{ fontSize: '24px' }} />
             </button>
           </div>
@@ -203,17 +449,17 @@ export default function ProviderProfileScreen({ isDesktop }) {
           <div className="flex justify-around py-4 bg-card-light dark:bg-card-dark border-b border-gray-100 dark:border-gray-800">
             <div className="flex flex-col items-center">
               <p className="text-lg font-bold text-text-light dark:text-text-dark">{provider.jobsDone || 0}</p>
-              <p className="text-xs text-secondary-text-light dark:text-secondary-text-dark uppercase tracking-wide">Jobs Done</p>
+              <p className="text-xs text-secondary-text-light dark:text-secondary-text-dark uppercase tracking-wide">Travaux Effectués</p>
             </div>
             <div className="w-px bg-gray-200 dark:bg-gray-700"></div>
             <div className="flex flex-col items-center">
-              <p className="text-lg font-bold text-text-light dark:text-text-dark">{provider.rating || 0}</p>
-              <p className="text-xs text-secondary-text-light dark:text-secondary-text-dark uppercase tracking-wide">Rating</p>
+              <StarRating rating={provider.rating || 0} count={provider.reviewCount || 0} />
+              <p className="text-xs text-secondary-text-light dark:text-secondary-text-dark uppercase tracking-wide mt-1">Note</p>
             </div>
             <div className="w-px bg-gray-200 dark:bg-gray-700"></div>
             <div className="flex flex-col items-center">
-              <p className="text-lg font-bold text-text-light dark:text-text-dark">${provider.hourlyRate}</p>
-              <p className="text-xs text-secondary-text-light dark:text-secondary-text-dark uppercase tracking-wide">Per Hour</p>
+              <p className="text-lg font-bold text-text-light dark:text-text-dark">{formatCurrency(provider.hourlyRate || 0)}</p>
+              <p className="text-xs text-secondary-text-light dark:text-secondary-text-dark uppercase tracking-wide">Par Heure</p>
             </div>
           </div>
 
@@ -241,42 +487,83 @@ export default function ProviderProfileScreen({ isDesktop }) {
             {activeTab === 'about' && (
               <div className="bg-card-light dark:bg-card-dark p-5 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm">
                 <h3 className="text-text-light dark:text-text-dark text-lg font-bold mb-3">
-                  About {provider.name.split(' ')[0]}
+                  À propos de {provider.name?.split(' ')[0] || 'ce prestataire'}
                 </h3>
                 <p className="text-secondary-text-light dark:text-secondary-text-dark text-sm leading-relaxed">
-                  {provider.bio || 'No bio available.'}
+                  {provider.bio || 'Aucune description disponible.'}
+                </p>
+                <div className="flex flex-wrap gap-4 mt-3">
+                  <div className="flex items-center gap-2 text-secondary-text-light dark:text-secondary-text-dark text-sm">
+                    <FiMapPin style={{ fontSize: '16px' }} />
+                    {provider.location || 'Localisation non renseignée'}
+                  </div>
+                  {provider.phone && (
+                    <div className="flex items-center gap-2 text-secondary-text-light dark:text-secondary-text-dark text-sm">
+                      <FiPhone style={{ fontSize: '16px' }} />
+                      {provider.phone}
+                    </div>
+                  )}
+                </div>
+                <p className="text-secondary-text-light dark:text-secondary-text-dark text-sm mt-2">
+                  {provider.serviceArea || 'Rayon de service non renseigné'}
                 </p>
                 <div className="flex flex-wrap gap-2 mt-4">
-                  {provider.services?.map((service, idx) => (
+                  {services.map((service, idx) => (
                     <span
-                      key={idx}
+                      key={service.id || idx}
                       className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-text-light dark:text-text-dark text-xs font-medium rounded-full"
                     >
                       {service.name}
                     </span>
                   ))}
+                  {services.length === 0 && (
+                    <span className="text-slate-400 text-sm">Aucun service proposé</span>
+                  )}
                 </div>
               </div>
             )}
 
             {activeTab === 'portfolio' && (
-              <div className="grid grid-cols-2 gap-2">
-                {provider.portfolio?.map((item) => (
-                  <div key={item.id} className="aspect-square rounded-lg overflow-hidden bg-gray-200">
-                    <img src={item.imageUrl} alt={item.caption} className="w-full h-full object-cover" />
+              <>
+                {portfolio.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    {portfolio.map((item, index) => (
+                      <div 
+                        key={item.id || item._id || index} 
+                        className="aspect-square rounded-lg overflow-hidden bg-gray-200 cursor-pointer relative group"
+                        onClick={() => openPortfolioLightbox(index)}
+                      >
+                        <img 
+                          src={item.imageUrl || item.image} 
+                          alt={item.caption || item.title || 'Portfolio item'} 
+                          className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105" 
+                        />
+                        {item.caption && (
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <p className="text-white text-xs truncate">{item.caption}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                ))}
-                {(!provider.portfolio || provider.portfolio.length === 0) && (
-                  <p className="col-span-2 text-center text-slate-500 py-8">No portfolio items yet.</p>
+                ) : (
+                  <p className="text-center text-slate-500 py-8">Aucun élément dans le portfolio pour le moment.</p>
                 )}
-              </div>
+                <PortfolioLightbox 
+                  items={portfolio}
+                  currentIndex={portfolioLightboxIndex}
+                  onClose={closePortfolioLightbox}
+                  onNext={nextPortfolioImage}
+                  onPrev={prevPortfolioImage}
+                />
+              </>
             )}
 
             {activeTab === 'reviews' && (
               <div className="space-y-4">
-                {reviews.map((review) => (
+                {reviews.length > 0 ? reviews.map((review) => (
                   <div
-                    key={review.id}
+                    key={review.id || review._id}
                     className="bg-card-light dark:bg-card-dark p-4 rounded-xl border border-gray-100 dark:border-gray-800"
                   >
                     <div className="flex justify-between items-start mb-2">
@@ -286,27 +573,17 @@ export default function ProviderProfileScreen({ isDesktop }) {
                         </div>
                         <div>
                           <p className="text-sm font-bold text-text-light dark:text-text-dark">{review.clientName}</p>
-                          <div className="flex gap-0.5">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <FiStar
-                                key={star}
-                                className={star <= review.rating ? 'text-primary' : 'text-gray-300'}
-                                style={{ fontSize: '12px' }}
-                                fill={star <= review.rating ? 'currentColor' : 'none'}
-                              />
-                            ))}
-                          </div>
+                          <StarRating rating={review.rating || 0} size={12} />
                         </div>
                       </div>
                       <span className="text-xs text-secondary-text-light dark:text-secondary-text-dark">
-                        {review.createdAt?.split('T')[0]}
+                        {review.createdAt ? new Date(review.createdAt).toLocaleDateString() : ''}
                       </span>
                     </div>
                     <p className="text-sm text-secondary-text-light dark:text-secondary-text-dark">{review.comment}</p>
                   </div>
-                ))}
-                {reviews.length === 0 && (
-                  <p className="text-center text-slate-500 py-8">No reviews yet.</p>
+                )) : (
+                  <p className="text-center text-slate-500 py-8">Aucun avis pour le moment.</p>
                 )}
               </div>
             )}
@@ -367,11 +644,14 @@ export default function ProviderProfileScreen({ isDesktop }) {
                         onChange={(e) => setSelectedService(e.target.value)}
                         className="w-full p-3 border border-slate-200 rounded-xl"
                       >
-                        {provider.services?.map((service) => (
-                          <option key={service.id} value={service.name}>
-                            {service.name} - ${service.price}
+                        {services.map((service) => (
+                          <option key={service.id || service._id} value={service.name}>
+                            {service.name} - {formatCurrency(service.price || 0)}
                           </option>
                         ))}
+                        {services.length === 0 && (
+                          <option value="">Aucun service disponible</option>
+                        )}
                       </select>
                     </div>
                     <div className="mb-6">
@@ -472,17 +752,17 @@ export default function ProviderProfileScreen({ isDesktop }) {
           <div className="flex justify-around py-6 border-b border-slate-200">
             <div className="flex flex-col items-center">
               <p className="text-xl font-bold text-slate-900">{provider.jobsDone || 0}</p>
-              <p className="text-xs text-slate-500 uppercase tracking-wide">Jobs Done</p>
+              <p className="text-xs text-slate-500 uppercase tracking-wide">Travaux Effectués</p>
             </div>
             <div className="w-px bg-slate-200"></div>
             <div className="flex flex-col items-center">
-              <p className="text-xl font-bold text-slate-900">{provider.rating || 0}</p>
-              <p className="text-xs text-slate-500 uppercase tracking-wide">Rating</p>
+              <StarRating rating={provider.rating || 0} count={provider.reviewCount || 0} size={16} />
+              <p className="text-xs text-slate-500 uppercase tracking-wide mt-1">Note</p>
             </div>
             <div className="w-px bg-slate-200"></div>
             <div className="flex flex-col items-center">
-              <p className="text-xl font-bold text-slate-900">${provider.hourlyRate}</p>
-              <p className="text-xs text-slate-500 uppercase tracking-wide">Per Hour</p>
+              <p className="text-xl font-bold text-slate-900">{formatCurrency(provider.hourlyRate || 0)}</p>
+              <p className="text-xs text-slate-500 uppercase tracking-wide">Par Heure</p>
             </div>
           </div>
 
@@ -505,26 +785,62 @@ export default function ProviderProfileScreen({ isDesktop }) {
             {activeTab === 'about' && (
               <>
                 <div className="mb-6">
-                  <h3 className="text-lg font-bold text-slate-900 mb-3">About {provider.name.split(' ')[0]}</h3>
-                  <p className="text-slate-600 leading-relaxed">{provider.bio || 'No bio available.'}</p>
-                  <div className="flex items-center gap-2 mt-3 text-slate-500 text-sm">
-                    <FiMapPin style={{ fontSize: '18px' }} />
-                    {provider.location || 'NYC Area'} • {provider.serviceArea || 'Available'}
+                  <h3 className="text-lg font-bold text-slate-900 mb-3">À propos de {provider.name?.split(' ')[0] || 'ce prestataire'}</h3>
+                  <p className="text-slate-600 leading-relaxed">{provider.bio || 'Aucune description disponible.'}</p>
+                  <div className="flex flex-wrap gap-4 mt-3">
+                    <div className="flex items-center gap-2 text-slate-500 text-sm">
+                      <FiMapPin style={{ fontSize: '18px' }} />
+                      {provider.location || provider.city ? `${provider.location || provider.city}, Maroc` : 'Localisation non renseignée'}
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-500 text-sm">
+                      <FiPhone style={{ fontSize: '18px' }} />
+                      {formatPhone(provider.phone)}
+                    </div>
                   </div>
+                  {provider.serviceArea && (
+                    <p className="text-slate-400 text-sm mt-2">
+                      {provider.serviceArea.includes('km') ? `Rayon de service: ${provider.serviceArea}` : provider.serviceArea}
+                    </p>
+                  )}
                 </div>
                 <div className="rounded-xl border border-slate-200 overflow-hidden">
-                  <div className="p-4 border-b border-slate-200">
+                  <div className="p-4 border-b border-slate-200 flex justify-between items-center">
                     <h3 className="text-lg font-bold text-slate-900">Services Offered</h3>
+                    {isOwnProfile && (
+                      <button
+                        onClick={() => { resetServiceForm(); setShowServiceForm(true); }}
+                        className="flex items-center gap-1 px-3 py-1 bg-primary text-white text-sm rounded-lg hover:bg-blue-600"
+                      >
+                        <FiPlus /> Add
+                      </button>
+                    )}
                   </div>
                   <div className="divide-y divide-slate-200">
-                    {provider.services?.map((service, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-4">
-                        <span className="text-slate-700">{service.name}</span>
-                        <span className="text-primary font-semibold">${service.price}</span>
+                    {services.map((service) => (
+                      <div key={service.id || service._id} className="flex items-center justify-between p-4">
+                        <div>
+                          <span className="text-slate-700 font-medium">{service.name}</span>
+                          {service.description && (
+                            <p className="text-slate-500 text-sm">{service.description}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-primary font-semibold">{formatCurrency(service.price || 0)}</span>
+                          {isOwnProfile && (
+                            <div className="flex gap-1">
+                              <button onClick={() => openEditService(service)} className="p-1 text-slate-400 hover:text-primary">
+                                <FiEdit2 style={{ fontSize: '14px' }} />
+                              </button>
+                              <button onClick={() => handleDeleteService(service.id || service._id)} className="p-1 text-slate-400 hover:text-red-500">
+                                <FiTrash2 style={{ fontSize: '14px' }} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))}
-                    {(!provider.services || provider.services.length === 0) && (
-                      <p className="p-4 text-slate-500">No services listed.</p>
+                    {services.length === 0 && (
+                      <p className="p-4 text-slate-500 text-center">Aucun service proposé pour le moment.</p>
                     )}
                   </div>
                 </div>
@@ -533,17 +849,16 @@ export default function ProviderProfileScreen({ isDesktop }) {
 
             {activeTab === 'portfolio' && (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {provider.portfolio?.map((item) => (
-                  <div key={item.id} className="aspect-square rounded-xl overflow-hidden bg-gray-100">
+                {portfolio.length > 0 ? portfolio.map((item) => (
+                  <div key={item.id || item._id} className="aspect-square rounded-xl overflow-hidden bg-gray-100">
                     <img
                       src={item.imageUrl}
                       alt={item.caption}
                       className="w-full h-full object-cover hover:scale-105 transition-transform"
                     />
                   </div>
-                ))}
-                {(!provider.portfolio || provider.portfolio.length === 0) && (
-                  <p className="col-span-3 text-center text-slate-500 py-8">No portfolio items yet.</p>
+                )) : (
+                  <p className="col-span-3 text-center text-slate-500 py-8">Aucun élément dans le portfolio pour le moment.</p>
                 )}
               </div>
             )}
@@ -553,18 +868,14 @@ export default function ProviderProfileScreen({ isDesktop }) {
                 <div className="rounded-xl border border-slate-200 p-5">
                   <div className="flex gap-8 items-center">
                     <div className="flex flex-col items-center justify-center min-w-[80px]">
-                      <p className="text-5xl font-black text-slate-900">{provider.rating || 0}</p>
-                      <div className="flex gap-0.5 my-2">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <FiStar key={star} className="text-primary" style={{ fontSize: '16px' }} fill="currentColor" />
-                        ))}
-                      </div>
-                      <p className="text-xs text-slate-500">Based on {provider.reviewCount || 0} reviews</p>
+                      <p className="text-5xl font-black text-slate-900">{provider.rating ? provider.rating.toFixed(1) : '0.0'}</p>
+                      <StarRating rating={provider.rating || 0} size={16} />
+                      <p className="text-xs text-slate-500 mt-2">Basé sur {provider.reviewCount || 0} avis</p>
                     </div>
                   </div>
                 </div>
-                {reviews.map((review) => (
-                  <div key={review.id} className="border-t border-slate-200 pt-4">
+                {reviews.length > 0 ? reviews.map((review) => (
+                  <div key={review.id || review._id} className="border-t border-slate-200 pt-4">
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold">
@@ -572,24 +883,14 @@ export default function ProviderProfileScreen({ isDesktop }) {
                         </div>
                         <div>
                           <p className="font-semibold text-slate-900">{review.clientName}</p>
-                          <div className="flex gap-0.5">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <FiStar
-                                key={star}
-                                className={star <= review.rating ? 'text-primary' : 'text-slate-300'}
-                                style={{ fontSize: '14px' }}
-                                fill={star <= review.rating ? 'currentColor' : 'none'}
-                              />
-                            ))}
-                          </div>
+                          <StarRating rating={review.rating || 0} size={14} />
                         </div>
                       </div>
-                      <span className="text-xs text-slate-500">{review.createdAt?.split('T')[0]}</span>
+                      <span className="text-xs text-slate-500">{review.createdAt ? new Date(review.createdAt).toLocaleDateString() : ''}</span>
                     </div>
                     <p className="text-slate-600">{review.comment}</p>
                   </div>
-                ))}
-                {reviews.length === 0 && <p className="text-center text-slate-500 py-8">No reviews yet.</p>}
+                )) : <p className="text-center text-slate-500 py-8">Aucun avis pour le moment.</p>}
               </div>
             )}
           </div>
@@ -600,9 +901,9 @@ export default function ProviderProfileScreen({ isDesktop }) {
       <div className="w-80 shrink-0">
         <div className="bg-white rounded-2xl border border-slate-200 p-6 sticky top-24">
           <div className="mb-4">
-            <span className="text-sm text-slate-500">Starting at</span>
+            <span className="text-sm text-slate-500">À partir de</span>
             <p className="text-3xl font-bold text-slate-900">
-              ${provider.hourlyRate}
+              {formatCurrency(provider.hourlyRate || 0)}
               <span className="text-base font-normal text-slate-500">/hr</span>
             </p>
           </div>
@@ -629,10 +930,18 @@ export default function ProviderProfileScreen({ isDesktop }) {
           )}
 
           <div className="flex justify-center gap-4 mt-6 pt-6 border-t border-slate-200">
-            <button className="flex items-center justify-center w-12 h-12 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors text-slate-600">
+            <button 
+              onClick={handleCall}
+              className="flex items-center justify-center w-12 h-12 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors text-slate-600"
+              title={provider.phone ? `Appeler ${provider.phone}` : 'Numéro non disponible'}
+            >
               <FiPhone style={{ fontSize: '18px' }} />
             </button>
-            <button className="flex items-center justify-center w-12 h-12 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors text-slate-600">
+            <button 
+              onClick={handleShare}
+              className="flex items-center justify-center w-12 h-12 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors text-slate-600"
+              title="Partager ce profil"
+            >
               <FiShare2 />
             </button>
             {!isOwnProfile && (
@@ -674,17 +983,20 @@ export default function ProviderProfileScreen({ isDesktop }) {
                 </div>
                 <form onSubmit={handleRequestService}>
                   <div className="mb-4">
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Select Service</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Sélectionner un service</label>
                     <select
                       value={selectedService}
                       onChange={(e) => setSelectedService(e.target.value)}
                       className="w-full p-3 border border-slate-200 rounded-xl"
                     >
-                      {provider.services?.map((service) => (
-                        <option key={service.id} value={service.name}>
-                          {service.name} - ${service.price}
+                      {services.map((service) => (
+                        <option key={service.id || service._id} value={service.name}>
+                          {service.name} - {formatCurrency(service.price || 0)}
                         </option>
                       ))}
+                      {services.length === 0 && (
+                        <option value="">Aucun service disponible</option>
+                      )}
                     </select>
                   </div>
                   <div className="mb-6">
@@ -712,6 +1024,101 @@ export default function ProviderProfileScreen({ isDesktop }) {
                 </form>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Service Form Modal */}
+      {showServiceForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-surface-dark rounded-2xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                {editingService ? 'Edit Service' : 'Add Service'}
+              </h3>
+              <button 
+                onClick={() => { setShowServiceForm(false); resetServiceForm(); }} 
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full"
+              >
+                <FiX />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Service Name *
+                </label>
+                <input
+                  type="text"
+                  value={serviceName}
+                  onChange={(e) => setServiceName(e.target.value)}
+                  className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-transparent focus:outline-none focus:border-primary"
+                  placeholder="e.g., Home Cleaning"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={serviceDescription}
+                  onChange={(e) => setServiceDescription(e.target.value)}
+                  className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-transparent resize-none focus:outline-none focus:border-primary"
+                  placeholder="Describe what this service includes..."
+                  rows={3}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Price ($) *
+                </label>
+                <input
+                  type="number"
+                  value={servicePrice}
+                  onChange={(e) => setServicePrice(e.target.value)}
+                  className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-transparent focus:outline-none focus:border-primary"
+                  placeholder="e.g., 50"
+                  min="1"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Category
+                </label>
+                <select
+                  value={serviceCategory}
+                  onChange={(e) => setServiceCategory(e.target.value)}
+                  className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-transparent focus:outline-none focus:border-primary"
+                >
+                  <option value="cleaning">Cleaning</option>
+                  <option value="repairs">Repairs</option>
+                  <option value="electrical">Electrical</option>
+                  <option value="plumbing">Plumbing</option>
+                  <option value="painting">Painting</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => { setShowServiceForm(false); resetServiceForm(); }}
+                className="flex-1 py-3 text-slate-600 font-medium hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={editingService ? handleUpdateService : handleAddService}
+                disabled={savingService || !serviceName.trim() || !servicePrice}
+                className="flex-1 py-3 bg-primary text-white font-bold rounded-xl hover:bg-blue-600 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {savingService && <FiLoader className="animate-spin" />}
+                {editingService ? 'Update' : 'Add'} Service
+              </button>
+            </div>
           </div>
         </div>
       )}

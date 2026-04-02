@@ -4,10 +4,206 @@ import { api } from '../services/api';
 import { 
   FiHeart, FiMessageCircle, FiShare2, FiStar, FiMapPin, FiSearch, 
   FiMenu, FiBell, FiPlayCircle, FiImage, FiX, FiFilter, FiSettings,
-  FiHome, FiUser, FiChevronDown, FiTrash2
+  FiHome, FiUser, FiChevronDown, FiTrash2, FiChevronLeft, FiChevronRight
 } from 'react-icons/fi';
 import { GoTasklist } from 'react-icons/go';
 import { getCategoryIcon, categoryIcons, defaultCategories } from '../utils/categoryIcons.jsx';
+
+const ImageGrid = ({ images, compact = false, title = '' }) => {
+  const [lightboxIndex, setLightboxIndex] = useState(null);
+  const count = images.length;
+
+  const openLightbox = (index) => {
+    setLightboxIndex(index);
+  };
+
+  const closeLightbox = () => {
+    setLightboxIndex(null);
+  };
+
+  const goNext = () => {
+    setLightboxIndex((prev) => (prev + 1) % count);
+  };
+
+  const goPrev = () => {
+    setLightboxIndex((prev) => (prev - 1 + count) % count);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (lightboxIndex === null) return;
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'ArrowRight') goNext();
+      if (e.key === 'ArrowLeft') goPrev();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxIndex, count]);
+
+  if (count === 0) return null;
+
+  const renderSingle = () => (
+    <div 
+      className="cursor-pointer" 
+      onClick={() => openLightbox(0)}
+    >
+      <img 
+        src={images[0]} 
+        alt={title || 'Post image'}
+        className="w-full max-h-[400px] object-cover rounded-xl"
+        loading="lazy"
+      />
+    </div>
+  );
+
+  const renderTwo = () => (
+    <div className="grid grid-cols-2 gap-0.5 h-[300px]">
+      {images.map((img, idx) => (
+        <div 
+          key={idx} 
+          className="relative cursor-pointer overflow-hidden rounded-xl"
+          onClick={() => openLightbox(idx)}
+        >
+          <img 
+            src={img} 
+            alt={`Image ${idx + 1}`} 
+            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+            loading="lazy"
+          />
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderThree = () => (
+    <div className="grid grid-rows-2 gap-0.5 h-[400px]">
+      <div 
+        className="cursor-pointer overflow-hidden rounded-xl"
+        onClick={() => openLightbox(0)}
+      >
+        <img 
+          src={images[0]} 
+          alt="Image 1" 
+          className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+          loading="lazy"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-0.5">
+        {[1, 2].map((idx) => (
+          <div 
+            key={idx} 
+            className="relative cursor-pointer overflow-hidden rounded-xl"
+            onClick={() => openLightbox(idx)}
+          >
+            <img 
+              src={images[idx]} 
+              alt={`Image ${idx + 1}`} 
+              className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+              loading="lazy"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderFourPlus = () => {
+    const visible = images.slice(0, 4);
+    const remaining = images.length - 4;
+    
+    return (
+      <div className="grid grid-cols-2 gap-0.5 h-[400px]">
+        {visible.map((img, idx) => (
+          <div 
+            key={idx} 
+            className="relative cursor-pointer overflow-hidden rounded-xl"
+            onClick={() => openLightbox(idx)}
+          >
+            <img 
+              src={img} 
+              alt={`Image ${idx + 1}`} 
+              className={`w-full h-full object-cover hover:scale-105 transition-transform duration-300 ${
+                idx === 3 && remaining > 0 ? 'opacity-40' : ''
+              }`}
+              loading="lazy"
+            />
+            {idx === 3 && remaining > 0 && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                <span className="text-white font-bold text-4xl">+{remaining}</span>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <>
+      <div className={`mb-4 ${compact ? 'rounded-lg' : 'rounded-xl'} overflow-hidden`}>
+        {count === 1 && renderSingle()}
+        {count === 2 && renderTwo()}
+        {count === 3 && renderThree()}
+        {count >= 4 && renderFourPlus()}
+      </div>
+
+      {lightboxIndex !== null && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center"
+          onClick={closeLightbox}
+        >
+          <button 
+            className="absolute top-4 right-4 p-2 text-white/80 hover:text-white transition-colors z-10"
+            onClick={closeLightbox}
+          >
+            <FiX style={{ fontSize: '32px' }} />
+          </button>
+          
+          <button 
+            className="absolute left-4 p-3 text-white/80 hover:text-white transition-colors z-10 bg-black/30 rounded-full"
+            onClick={(e) => { e.stopPropagation(); goPrev(); }}
+          >
+            <FiChevronLeft style={{ fontSize: '32px' }} />
+          </button>
+          
+          <div 
+            className="max-w-4xl max-h-[90vh] w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img 
+              src={images[lightboxIndex]} 
+              alt={`Image ${lightboxIndex + 1}`}
+              className="w-full h-full max-h-[85vh] object-contain rounded-lg"
+            />
+            <div className="flex justify-center items-center gap-4 mt-4 text-white">
+              <span className="text-sm opacity-70">
+                {lightboxIndex + 1} / {count}
+              </span>
+              <div className="flex gap-1">
+                {images.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setLightboxIndex(idx)}
+                    className={`w-2 h-2 rounded-full transition-colors ${
+                      idx === lightboxIndex ? 'bg-white' : 'bg-white/40'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+          
+          <button 
+            className="absolute right-4 p-3 text-white/80 hover:text-white transition-colors z-10 bg-black/30 rounded-full"
+            onClick={(e) => { e.stopPropagation(); goNext(); }}
+          >
+            <FiChevronRight style={{ fontSize: '32px' }} />
+          </button>
+        </div>
+      )}
+    </>
+  );
+};
 
 const banner = {
   badge: 'New Offer',
@@ -30,6 +226,8 @@ export default function HomeScreen({ isDesktop }) {
   const [postImages, setPostImages] = useState([]);
   const [postImagePreviews, setPostImagePreviews] = useState([]);
   const [isPosting, setIsPosting] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
+  const [locationError, setLocationError] = useState(false);
   const postImageInputRef = useRef(null);
 
   const handlePostImageSelect = (e) => {
@@ -209,6 +407,68 @@ export default function HomeScreen({ isDesktop }) {
       clearInterval(interval);
     };
   }, []);
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+          setLocationError(false);
+        },
+        (error) => {
+          console.log('Geolocation error:', error.message);
+          setLocationError(true);
+        }
+      );
+    } else {
+      setLocationError(true);
+    }
+  }, []);
+
+  const calculateDistance = (lat1, lng1, lat2, lng2) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  const getSortedProviders = () => {
+    let sorted = [...providers];
+    if (userLocation && !locationError) {
+      sorted = sorted.map(p => {
+        if (p.location?.lat && p.location?.lng) {
+          const distance = calculateDistance(
+            userLocation.lat, userLocation.lng,
+            p.location.lat, p.location.lng
+          );
+          return { ...p, calculatedDistance: Math.round(distance * 10) / 10 };
+        }
+        return { ...p, calculatedDistance: p.distance || 0 };
+      });
+      sorted.sort((a, b) => (a.calculatedDistance || 0) - (b.calculatedDistance || 0));
+    } else {
+      sorted.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    }
+    return sorted;
+  };
+
+  const formatCurrency = (amount) => {
+    return `${amount} MAD`;
+  };
+
+  const formatDistance = (distance) => {
+    if (userLocation && !locationError) {
+      return `${distance} km`;
+    }
+    return `${Math.round(distance * 10) / 10} km`;
+  };
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -475,61 +735,8 @@ export default function HomeScreen({ isDesktop }) {
 
         {/* Multi-Image Display - Facebook Style */}
         {item.images && item.images.length > 0 && (
-          <div className={`mb-4 ${compact ? 'rounded-lg' : 'rounded-xl'} overflow-hidden`}>
-            {item.images.length === 1 && (
-              <div className="relative group">
-                <img 
-                  src={item.images[0]} 
-                  alt={item.title || 'Post image'}
-                  className="w-full h-64 object-cover"
-                  loading="lazy"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            )}
-            {item.images.length === 2 && (
-              <div className="grid grid-cols-2 gap-0.5">
-                {item.images.map((img, idx) => (
-                  <div key={idx} className="relative aspect-square">
-                    <img src={img} alt={`Image ${idx + 1}`} className="w-full h-full object-cover" loading="lazy" />
-                  </div>
-                ))}
-              </div>
-            )}
-            {item.images.length === 3 && (
-              <div className="grid grid-cols-2 grid-rows-2 gap-0.5">
-                <div className="row-span-2 relative">
-                  <img src={item.images[0]} alt="Image 1" className="w-full h-full object-cover" loading="lazy" />
-                </div>
-                <div className="relative">
-                  <img src={item.images[1]} alt="Image 2" className="w-full h-full object-cover" loading="lazy" />
-                </div>
-                <div className="relative">
-                  <img src={item.images[2]} alt="Image 3" className="w-full h-full object-cover" loading="lazy" />
-                </div>
-              </div>
-            )}
-            {item.images.length >= 4 && (
-              <div className="grid grid-cols-2 grid-rows-2 gap-0.5">
-                <div className="row-span-2 relative">
-                  <img src={item.images[0]} alt="Image 1" className="w-full h-full object-cover" loading="lazy" />
-                </div>
-                <div className="relative">
-                  <img src={item.images[1]} alt="Image 2" className="w-full h-full object-cover" loading="lazy" />
-                </div>
-                <div className="relative">
-                  <img src={item.images[2]} alt="Image 3" className="w-full h-full object-cover" loading="lazy" />
-                </div>
-                <div className="relative bg-slate-800 flex items-center justify-center">
-                  <img src={item.images[3]} alt="Image 4" className="w-full h-full object-cover opacity-60" loading="lazy" />
-                  {item.images.length > 4 && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                      <span className="text-white font-bold text-xl">+{item.images.length - 4}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+          <>
+            <ImageGrid images={item.images} compact={compact} title={item.title} />
             {type === 'article' && (
               <div className="absolute top-3 left-3">
                 <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-white/95 backdrop-blur-sm text-purple-700 shadow-lg">
@@ -537,7 +744,7 @@ export default function HomeScreen({ isDesktop }) {
                 </span>
               </div>
             )}
-          </div>
+          </>
         )}
 
         {/* Actions */}
@@ -908,8 +1115,13 @@ export default function HomeScreen({ isDesktop }) {
                 <FiFilter style={{ fontSize: '24px' }} />
               </button>
             </div>
+            {locationError && (
+              <div className="mb-4 px-4 py-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-amber-700 dark:text-amber-400 text-sm">
+                Location unavailable. Showing top-rated providers.
+              </div>
+            )}
             <div className="flex flex-col gap-4">
-              {providers.slice(0, 3).map((provider) => (
+              {getSortedProviders().slice(0, 3).map((provider) => (
                 <Link
                   key={provider._id || provider.id}
                   to={`/provider/${provider._id || provider.id}`}
@@ -951,11 +1163,13 @@ export default function HomeScreen({ isDesktop }) {
                     <div className="flex items-end justify-between mt-2">
                         <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500 text-xs">
                           <FiMapPin style={{ fontSize: '14px' }} />
-                          {provider.distance} km
+                          {provider.calculatedDistance !== undefined 
+                            ? `${provider.calculatedDistance} km`
+                            : `${Math.round((provider.distance || 0) * 10) / 10} km`}
                         </div>
                       <div className="flex items-center gap-3">
                         <span className="font-bold text-primary">
-                          ${provider.hourlyRate}
+                          {formatCurrency(provider.hourlyRate || 0)}
                           <span className="text-xs font-normal text-slate-400 dark:text-slate-500">
                             /hr
                           </span>
@@ -1213,11 +1427,16 @@ export default function HomeScreen({ isDesktop }) {
             <FiFilter style={{ fontSize: '24px' }} />
           </button>
         </div>
+        {locationError && (
+          <div className="mb-4 px-4 py-2 bg-amber-50 rounded-lg text-amber-700 text-sm">
+            Location unavailable. Showing top-rated providers.
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {providers.slice(0, 6).map((provider) => (
+          {getSortedProviders().slice(0, 6).map((provider) => (
             <Link
-              key={provider.id}
-              to={`/provider/${provider.id}`}
+              key={provider.id || provider._id}
+              to={`/provider/${provider.id || provider._id}`}
               className="flex gap-4 p-5 rounded-2xl bg-white shadow-sm border border-slate-200 hover:shadow-md hover:border-primary/30 transition-all"
             >
               <div
@@ -1252,11 +1471,13 @@ export default function HomeScreen({ isDesktop }) {
                 <div className="flex items-end justify-between mt-3">
                   <div className="flex items-center gap-1 text-slate-400 text-xs">
                     <FiMapPin style={{ fontSize: '14px' }} />
-                    {provider.distance} km
+                    {provider.calculatedDistance !== undefined 
+                      ? `${provider.calculatedDistance} km`
+                      : `${Math.round((provider.distance || 0) * 10) / 10} km`}
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-bold text-primary">
-                      ${provider.hourlyRate}
+                      {formatCurrency(provider.hourlyRate || 0)}
                       <span className="text-xs font-normal text-slate-400">
                         /hr
                       </span>

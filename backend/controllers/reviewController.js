@@ -2,6 +2,26 @@ const User = require('../models/User');
 const Provider = require('../models/Provider');
 const Review = require('../models/Review');
 
+const updateProviderStats = async (providerId) => {
+  try {
+    const reviews = await Review.find({ provider: providerId });
+    const reviewCount = reviews.length;
+    let rating = 0;
+    
+    if (reviews.length > 0) {
+      const sum = reviews.reduce((acc, r) => acc + r.rating, 0);
+      rating = Math.round((sum / reviews.length) * 10) / 10;
+    }
+    
+    await Provider.findByIdAndUpdate(providerId, {
+      rating,
+      reviewCount,
+    });
+  } catch (error) {
+    console.error('Error updating provider stats:', error);
+  }
+};
+
 exports.getReviews = async (req, res) => {
   try {
     console.log('[getReviews] Request received', { params: req.params, headers: req.headers });
@@ -61,6 +81,8 @@ exports.createReview = async (req, res) => {
       rating: parseInt(rating),
       comment: comment || '',
     });
+    
+    await updateProviderStats(provider._id);
     
     res.json({ success: true, review });
   } catch (error) {

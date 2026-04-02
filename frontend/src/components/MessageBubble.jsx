@@ -5,6 +5,10 @@ export default function MessageBubble({ message, isOwn, showAvatar }) {
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  const getAvatarFallback = (name) => {
+    return name?.charAt(0)?.toUpperCase() || '?';
+  };
+
   const getMessageContent = () => {
     switch (message.type) {
       case 'image':
@@ -54,15 +58,30 @@ export default function MessageBubble({ message, isOwn, showAvatar }) {
   return (
     <div className={`flex items-end gap-2 mb-4 ${isOwn ? 'flex-row-reverse' : ''}`}>
       {!isOwn && (
-        <div className="shrink-0">
+        <div className="shrink-0 flex-shrink-0">
           {showAvatar ? (
-            <img
-              src={message.senderAvatar || '/default-avatar.png'}
-              alt="Avatar"
-              className="w-8 h-8 rounded-full object-cover"
-            />
+            message.senderAvatar ? (
+              <img
+                src={message.senderAvatar}
+                alt={message.senderName || 'User'}
+                className="w-8 h-8 rounded-full object-cover"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling && (e.target.nextSibling.style.display = 'flex');
+                }}
+              />
+            ) : null
           ) : (
             <div className="w-8" />
+          )}
+          {showAvatar && !message.senderAvatar && (
+            <div 
+              className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"
+            >
+              <span className="text-xs font-bold text-white">
+                {getAvatarFallback(message.senderName)}
+              </span>
+            </div>
           )}
         </div>
       )}

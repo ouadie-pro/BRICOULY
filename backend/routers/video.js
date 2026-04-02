@@ -5,12 +5,14 @@ const {
   getVideos, 
   createVideo, 
   likeVideo, 
-  deleteVideo 
+  deleteVideo,
+  incrementView 
 } = require('../controllers/videoController');
 
 router.get('/', getVideos);
 router.post('/', uploadVideo.single('video'), createVideo);
 router.post('/:id/like', likeVideo);
+router.post('/:id/view', incrementView);
 router.delete('/:id', deleteVideo);
 
 module.exports = router;

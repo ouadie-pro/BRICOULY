@@ -1,4 +1,14 @@
 const Booking = require('../models/Booking');
+const Provider = require('../models/Provider');
+
+const updateProviderJobsDone = async (providerId) => {
+  try {
+    const completedBookings = await Booking.countDocuments({ provider: providerId, status: 'completed' });
+    await Provider.findByIdAndUpdate(providerId, { jobsDone: completedBookings });
+  } catch (error) {
+    console.error('Error updating provider jobsDone:', error);
+  }
+};
 
 exports.getBookings = async (req, res) => {
   try {
@@ -10,7 +20,6 @@ exports.getBookings = async (req, res) => {
     let query = {};
     
     if (role === 'provider') {
-      const Provider = require('../models/Provider');
       const provider = await Provider.findOne({ user: userId });
       if (provider) {
         query.provider = provider._id;
@@ -87,25 +96,12 @@ exports.updateBookingStatus = async (req, res) => {
       });
     }
 
-    // FIXED: #9 - Increment jobsDone and recalculate successRate on completion
-    if (status === 'completed') {
+    const previousStatus = booking.status;
+    
+    if (status === 'completed' && previousStatus !== 'completed') {
       booking.completedAt = new Date();
-      
-      // Find and update the provider's jobsDone and successRate
       if (booking.provider) {
-        const Provider = require('../models/Provider');
-        const totalBookings = await Booking.countDocuments({ provider: booking.provider });
-        const completedBookings = await Booking.countDocuments({ 
-          provider: booking.provider, 
-          status: 'completed' 
-        });
-        
-        const successRate = totalBookings > 0 ? Math.round((completedBookings / totalBookings) * 100) : 95;
-        
-        await Provider.findByIdAndUpdate(booking.provider, {
-          $inc: { jobsDone: 1 },
-          successRate: successRate,
-        });
+        await updateProviderJobsDone(booking.provider);
       }
     }
 

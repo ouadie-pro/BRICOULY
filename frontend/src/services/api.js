@@ -318,6 +318,12 @@ export const api = {
     });
   },
 
+  incrementVideoView: async (videoId) => {
+    return safeFetch(`${API_BASE}/videos/${videoId}/view`, {
+      method: 'POST',
+    });
+  },
+
   deleteVideo: async (videoId) => {
     return safeFetch(`${API_BASE}/videos/${videoId}`, {
       method: 'DELETE',

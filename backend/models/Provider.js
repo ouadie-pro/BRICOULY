@@ -56,7 +56,7 @@ const providerSchema = new mongoose.Schema({
   },
   location: {
     type: String,
-    default: 'New York, NY',
+    default: 'Maroc',
   },
   services: [{
     type: String,
