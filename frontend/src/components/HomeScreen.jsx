@@ -38,6 +38,7 @@ export default function HomeScreen({ isDesktop }) {
     feedId: `post-${p.id}`,
     type: 'post',
     id: p.id,
+    authorId: p.authorId,
     authorName: p.authorName,
     authorAvatar: p.authorAvatar,
     authorRole: p.authorRole,
@@ -56,9 +57,10 @@ export default function HomeScreen({ isDesktop }) {
     feedId: `article-${a.id || a._id}`,
     type: 'article',
     id: a.id || a._id,
-    authorName: a.authorName || a.author?.name || 'Unknown',
-    authorAvatar: a.authorAvatar || a.author?.avatar || null,
-    authorRole: a.authorRole || a.author?.role || null,
+    authorId: a.authorId || a.userId || a.author?._id || null,
+    authorName: a.authorName || a.userName || a.author?.name || 'Unknown',
+    authorAvatar: a.authorAvatar || a.userAvatar || a.author?.avatar || null,
+    authorRole: a.authorRole || a.userRole || a.author?.role || null,
     authorProfession: a.authorProfession || a.author?.profession || null,
     title: a.title || null,
     content: a.content,
@@ -307,16 +309,27 @@ export default function HomeScreen({ isDesktop }) {
     }
   };
 
-  const handleDeletePost = async (feedId) => {
-    if (!window.confirm('Are you sure you want to delete this post?')) return;
+  const handleDeletePost = async (feedId, type) => {
+    const confirmMsg = type === 'article' 
+      ? 'Are you sure you want to delete this article?' 
+      : 'Are you sure you want to delete this post?';
+    if (!window.confirm(confirmMsg)) return;
     try {
-      const postId = feedId.replace('post-', '');
-      const result = await api.deletePost?.(postId);
-      if (result?.success || result?.message === 'Post deleted') {
-        setFeed((prev) => prev.filter((f) => f.feedId !== feedId));
+      if (type === 'article') {
+        const articleId = feedId.replace('article-', '');
+        const result = await api.deleteArticle?.(articleId);
+        if (result?.success) {
+          setFeed((prev) => prev.filter((f) => f.feedId !== feedId));
+        }
+      } else {
+        const postId = feedId.replace('post-', '');
+        const result = await api.deletePost?.(postId);
+        if (result?.success || result?.message === 'Post deleted') {
+          setFeed((prev) => prev.filter((f) => f.feedId !== feedId));
+        }
       }
     } catch (err) {
-      console.error('Error deleting post:', err);
+      console.error('Error deleting item:', err);
     }
   };
 
@@ -393,7 +406,7 @@ export default function HomeScreen({ isDesktop }) {
           {/* Badge: article vs post */}
           <div className="flex items-center gap-1.5 shrink-0">
             {type === 'article' && (
-              <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+              <span className="hidden px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
                 Article
               </span>
             )}
@@ -404,9 +417,18 @@ export default function HomeScreen({ isDesktop }) {
             )}
             {type === 'post' && isOwnPost && (
               <button
-                onClick={() => handleDeletePost(feedId)}
+                onClick={() => handleDeletePost(feedId, type)}
                 className="p-1.5 hover:bg-red-50 rounded-full transition-colors text-slate-400 hover:text-red-500"
                 title="Delete post"
+              >
+                <FiTrash2 style={{ fontSize: '16px' }} />
+              </button>
+            )}
+            {type === 'article' && isOwnPost && (
+              <button
+                onClick={() => handleDeletePost(feedId, type)}
+                className="p-1.5 hover:bg-red-50 rounded-full transition-colors text-slate-400 hover:text-red-500"
+                title="Delete article"
               >
                 <FiTrash2 style={{ fontSize: '16px' }} />
               </button>
@@ -434,14 +456,24 @@ export default function HomeScreen({ isDesktop }) {
           {item.content}
         </p>
 
-        {/* Image */}
+        {/* Article Image - Professional Design */}
         {item.image && (
-          <div
-            className={`w-full rounded-xl overflow-hidden bg-slate-100 mb-3 ${
-              compact ? 'h-40' : 'h-56'
-            }`}
-            style={{ backgroundImage: `url("${item.image}")`, backgroundSize: 'cover', backgroundPosition: 'center' }}
-          />
+          <div className={`relative overflow-hidden rounded-xl mb-4 group ${compact ? 'h-40' : 'h-64'}`}>
+            <img 
+              src={item.image} 
+              alt={item.title || 'Article image'}
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              loading="lazy"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            {type === 'article' && (
+              <div className="absolute top-3 left-3">
+                <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-white/95 backdrop-blur-sm text-purple-700 shadow-lg">
+                  Article
+                </span>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Actions */}
