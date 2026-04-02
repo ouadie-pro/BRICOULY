@@ -26,8 +26,8 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
   const [showArticleForm, setShowArticleForm] = useState(false);
   const [articleTitle, setArticleTitle] = useState('');
   const [articleContent, setArticleContent] = useState('');
-  const [articleImage, setArticleImage] = useState(null);
-  const [articleImagePreview, setArticleImagePreview] = useState(null);
+  const [articleImages, setArticleImages] = useState([]);
+  const [articleImagePreviews, setArticleImagePreviews] = useState([]);
   const [isSubmittingArticle, setIsSubmittingArticle] = useState(false);
   const [activeTab, setActiveTab] = useState('info');
   const [portfolio, setPortfolio] = useState([]);
@@ -157,25 +157,32 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
   };
 
   const handleArticleImageSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setArticleImage(file);
-      setArticleImagePreview(URL.createObjectURL(file));
+    const files = Array.from(e.target.files);
+    if (files.length > 0) {
+      const newImages = [...articleImages, ...files].slice(0, 10);
+      setArticleImages(newImages);
+      const newPreviews = newImages.map(file => URL.createObjectURL(file));
+      setArticleImagePreviews(newPreviews);
     }
+  };
+
+  const removeArticleImage = (index) => {
+    setArticleImages(prev => prev.filter((_, i) => i !== index));
+    setArticleImagePreviews(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmitArticle = async () => {
     if (!articleTitle.trim() || !articleContent.trim()) return;
     setIsSubmittingArticle(true);
     try {
-      const result = await api.createArticle({ title: articleTitle, content: articleContent, image: articleImage });
+      const result = await api.createArticle({ title: articleTitle, content: articleContent, images: articleImages });
       if (result.success) {
         setArticles([result.article, ...articles]);
         setShowArticleForm(false);
         setArticleTitle('');
         setArticleContent('');
-        setArticleImage(null);
-        setArticleImagePreview(null);
+        setArticleImages([]);
+        setArticleImagePreviews([]);
       }
     } catch (err) {
       console.error('Error creating article:', err);
@@ -187,7 +194,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
   const handleLikeArticle = async (articleId) => {
     const res = await api.likeArticle(articleId);
     if (res.success) {
-      setArticles(articles.map((a) => (a.id === articleId ? { ...a, likes: res.likes } : a)));
+      setArticles(articles.map((a) => (a.id === articleId ? { ...a, likesCount: res.likesCount, isLiked: res.isLiked } : a)));
     }
   };
 
@@ -768,16 +775,31 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                         onClick={() => articleImageInputRef.current?.click()}
                         className="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center cursor-pointer hover:border-primary transition-colors mb-4"
                       >
-                        {articleImagePreview ? (
-                          <img
-                            src={articleImagePreview}
-                            alt="Preview"
-                            className="w-full max-h-48 object-contain rounded"
-                          />
+                        {articleImagePreviews.length > 0 ? (
+                          <div className="grid grid-cols-3 gap-2">
+                            {articleImagePreviews.map((preview, idx) => (
+                              <div key={idx} className="relative aspect-square">
+                                <img
+                                  src={preview}
+                                  alt={`Preview ${idx + 1}`}
+                                  className="w-full h-full object-cover rounded"
+                                />
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeArticleImage(idx);
+                                  }}
+                                  className="absolute top-1 right-1 bg-black/50 text-white p-1 rounded-full"
+                                >
+                                  <FiX className="text-[14px]" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
                         ) : (
                           <>
                             <FiImage className="text-4xl text-slate-400" />
-                            <p className="text-slate-500 mt-2">Add cover image (optional)</p>
+                            <p className="text-slate-500 mt-2">Add images (optional)</p>
                           </>
                         )}
                       </div>
@@ -786,6 +808,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                         ref={articleImageInputRef}
                         onChange={handleArticleImageSelect}
                         accept="image/*"
+                        multiple
                         className="hidden"
                       />
                       <input
@@ -808,8 +831,8 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                             setShowArticleForm(false);
                             setArticleTitle('');
                             setArticleContent('');
-                            setArticleImage(null);
-                            setArticleImagePreview(null);
+                            setArticleImages([]);
+                            setArticleImagePreviews([]);
                           }}
                           className="flex-1 py-3 rounded-lg border border-slate-200 font-medium"
                         >
@@ -842,28 +865,34 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {articles.map((article) => (
-                      <div key={article.id} className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
-                        {article.imageUrl && (
-                          <div
-                            className="w-full h-48 rounded-lg bg-cover bg-center mb-4"
-                            style={{ backgroundImage: `url("${window.location.origin}${article.imageUrl}")` }}
-                          />
-                        )}
-                        <h4 className="font-bold text-slate-900 text-lg mb-2">{article.title}</h4>
-                        <p className="text-slate-600 text-sm mb-3 line-clamp-3">{article.content}</p>
-                        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                          <span className="text-xs text-slate-400">{formatDate(article.createdAt)}</span>
-                          <button
-                            onClick={() => handleLikeArticle(article.id)}
-                            className="flex items-center gap-1 text-slate-500 hover:text-red-500 text-sm transition-colors"
-                          >
-                            <FiHeart className="text-[18px]" />
-                            {article.likes}
-                          </button>
+                    {articles.map((article) => {
+                      const articleImages = article.images && article.images.length > 0 
+                        ? article.images 
+                        : article.imageUrl ? [article.imageUrl] : [];
+                      return (
+                        <div key={article.id} className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
+                          {articleImages.length > 0 && (
+                            <img
+                              src={articleImages[0].startsWith('http') ? articleImages[0] : `${window.location.origin}${articleImages[0]}`}
+                              alt={article.title}
+                              className="w-full h-48 object-cover rounded-lg mb-4"
+                            />
+                          )}
+                          <h4 className="font-bold text-slate-900 text-lg mb-2">{article.title}</h4>
+                          <p className="text-slate-600 text-sm mb-3 line-clamp-3">{article.content}</p>
+                          <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                            <span className="text-xs text-slate-400">{formatDate(article.createdAt)}</span>
+                            <button
+                              onClick={() => handleLikeArticle(article.id)}
+                              className="flex items-center gap-1 text-slate-500 hover:text-red-500 text-sm transition-colors"
+                            >
+                              <FiHeart className="text-[18px]" />
+                              {article.likesCount || article.likes || 0}
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

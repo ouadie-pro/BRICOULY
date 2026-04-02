@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
-const upload = require('../middleware/upload');
+const { upload } = require('../middleware/upload');
 const { 
   getConversations, 
   getMessages, 

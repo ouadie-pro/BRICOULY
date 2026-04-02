@@ -6,14 +6,22 @@ const Comment = require('../models/Comment');
 exports.getPosts = async (req, res) => {
   try {
     const userId = req.headers['x-user-id'];
-    const posts = await Post.find().populate('author', 'name avatar role').sort({ createdAt: -1 });
+    const posts = await Post.find()
+      .populate('author', 'name avatar role')
+      .sort({ createdAt: -1 });
+    
     const postsWithAuthor = await Promise.all(posts.map(async p => {
       let authorProfession = null;
       if (p.author.role === 'provider') {
         const provider = await Provider.findOne({ user: p.author._id });
         authorProfession = provider?.profession || null;
       }
-      const liked = userId ? p.likedBy.some(id => id.toString() === userId) : false;
+      
+      const isLiked = userId ? p.likes.some(id => id.toString() === userId) : false;
+      const images = p.images?.map(img => 
+        img.startsWith('http') ? img : `${req.protocol}://${req.get('host')}${img}`
+      ) || [];
+      
       return {
         id: p._id.toString(),
         authorId: p.author._id.toString(),
@@ -22,10 +30,10 @@ exports.getPosts = async (req, res) => {
         authorRole: p.author.role,
         authorProfession,
         content: p.content,
-        image: p.image,
-        likes: p.likes,
-        liked,
-        commentsCount: p.commentsCount,
+        images,
+        likesCount: p.likes?.length || 0,
+        isLiked,
+        commentsCount: p.commentsCount || 0,
         type: p.type,
         createdAt: p.createdAt,
       };
@@ -45,14 +53,19 @@ exports.createPost = async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     
-    const { content, image } = req.body;
+    const { content, type } = req.body;
+    
+    let images = [];
+    if (req.files && req.files.length > 0) {
+      images = req.files.map(file => `/uploads/${file.filename}`);
+    }
     
     const post = await Post.create({
       author: userId,
       content,
-      image: image || null,
-      type: 'post',
-      likedBy: [],
+      images,
+      type: type || 'post',
+      likes: [],
       commentsCount: 0,
     });
     
@@ -64,20 +77,24 @@ exports.createPost = async (req, res) => {
       authorProfession = provider?.profession || null;
     }
     
+    const imageUrls = populatedPost.images?.map(img => 
+      img.startsWith('http') ? img : `${req.protocol}://${req.get('host')}${img}`
+    ) || [];
+    
     res.json({ 
       success: true, 
       post: {
-        id: populatedPost._id,
-        authorId: populatedPost.author._id,
+        id: populatedPost._id.toString(),
+        authorId: populatedPost.author._id.toString(),
         authorName: populatedPost.author.name,
         authorAvatar: populatedPost.author.avatar,
         authorRole: populatedPost.author.role,
         authorProfession,
         content: populatedPost.content,
-        image: populatedPost.image,
-        likes: populatedPost.likes,
-        liked: false,
-        commentsCount: populatedPost.commentsCount,
+        images: imageUrls,
+        likesCount: 0,
+        isLiked: false,
+        commentsCount: 0,
         type: populatedPost.type,
         createdAt: populatedPost.createdAt,
       }
@@ -98,19 +115,21 @@ exports.likePost = async (req, res) => {
     }
     
     const userIdObj = new mongoose.Types.ObjectId(userId);
-    const alreadyLiked = post.likedBy.some(id => id.toString() === userId);
+    const alreadyLiked = post.likes.some(id => id.toString() === userId);
     
     if (alreadyLiked) {
-      post.likedBy = post.likedBy.filter(id => id.toString() !== userId);
-      post.likes = Math.max(0, post.likes - 1);
+      post.likes = post.likes.filter(id => id.toString() !== userId);
     } else {
-      post.likedBy.push(userIdObj);
-      post.likes += 1;
+      post.likes.push(userIdObj);
     }
     
     await post.save();
     
-    res.json({ success: true, likes: post.likes, liked: !alreadyLiked });
+    res.json({ 
+      success: true, 
+      likesCount: post.likes.length, 
+      isLiked: !alreadyLiked 
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -172,9 +191,9 @@ exports.createComment = async (req, res) => {
     res.json({
       success: true,
       comment: {
-        id: populatedComment._id,
-        postId: populatedComment.post,
-        authorId: populatedComment.author._id,
+        id: populatedComment._id.toString(),
+        postId: populatedComment.post.toString(),
+        authorId: populatedComment.author._id.toString(),
         authorName: populatedComment.author.name,
         authorAvatar: populatedComment.author.avatar,
         content: populatedComment.content,

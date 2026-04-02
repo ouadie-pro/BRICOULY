@@ -27,53 +27,108 @@ export default function HomeScreen({ isDesktop }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showPostForm, setShowPostForm] = useState(false);
   const [postContent, setPostContent] = useState('');
-  const [postImage, setPostImage] = useState(null);
-  const [postImagePreview, setPostImagePreview] = useState(null);
+  const [postImages, setPostImages] = useState([]);
+  const [postImagePreviews, setPostImagePreviews] = useState([]);
   const [isPosting, setIsPosting] = useState(false);
   const postImageInputRef = useRef(null);
-  const navigate = useNavigate();
+
+  const handlePostImageSelect = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length > 0) {
+      const newImages = [...postImages, ...files].slice(0, 10);
+      setPostImages(newImages);
+      const newPreviews = newImages.map(file => URL.createObjectURL(file));
+      setPostImagePreviews(newPreviews);
+    }
+  };
+
+  const removePostImage = (index) => {
+    setPostImages(prev => prev.filter((_, i) => i !== index));
+    setPostImagePreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleCreatePost = async () => {
+    if (!postContent.trim() && postImages.length === 0) return;
+    if (postContent.trim().length < 10 && postImages.length === 0) {
+      alert('Post must have at least 10 characters or an image');
+      return;
+    }
+    setIsPosting(true);
+    try {
+      const result = await api.createPost({ content: postContent, images: postImages });
+      if (result.success) {
+        setFeed((prev) => [normalizePost(result.post), ...prev]);
+        setShowPostForm(false);
+        setPostContent('');
+        setPostImages([]);
+        setPostImagePreviews([]);
+      }
+    } catch (err) {
+      console.error('Error creating post:', err);
+    } finally {
+      setIsPosting(false);
+    }
+  };
 
   // Normalize a post into unified feed item shape
-  const normalizePost = (p) => ({
-    feedId: `post-${p.id}`,
-    type: 'post',
-    id: p.id,
-    authorId: p.authorId,
-    authorName: p.authorName,
-    authorAvatar: p.authorAvatar,
-    authorRole: p.authorRole,
-    authorProfession: p.authorProfession,
-    title: null,
-    content: p.content,
-    image: p.image || null,
-    likes: p.likes || 0,
-    liked: p.liked || false,
-    commentsCount: p.commentsCount || 0,
-    createdAt: p.createdAt,
-  });
+  const normalizePost = (p) => {
+    let images = [];
+    if (p.images && Array.isArray(p.images)) {
+      images = p.images.map(img => 
+        img.startsWith('http') ? img : `${window.location.origin}${img}`
+      );
+    } else if (p.image) {
+      const img = p.image.startsWith('http') ? p.image : `${window.location.origin}${p.image}`;
+      images = [img];
+    }
+    return {
+      feedId: `post-${p.id}`,
+      type: 'post',
+      id: p.id,
+      authorId: p.authorId,
+      authorName: p.authorName,
+      authorAvatar: p.authorAvatar,
+      authorRole: p.authorRole,
+      authorProfession: p.authorProfession,
+      title: null,
+      content: p.content,
+      images,
+      likesCount: p.likesCount || p.likes || 0,
+      isLiked: p.isLiked || p.liked || false,
+      commentsCount: p.commentsCount || 0,
+      createdAt: p.createdAt,
+    };
+  };
 
   // Normalize an article into unified feed item shape
-  const normalizeArticle = (a) => ({
-    feedId: `article-${a.id || a._id}`,
-    type: 'article',
-    id: a.id || a._id,
-    authorId: a.authorId || a.userId || a.author?._id || null,
-    authorName: a.authorName || a.userName || a.author?.name || 'Unknown',
-    authorAvatar: a.authorAvatar || a.userAvatar || a.author?.avatar || null,
-    authorRole: a.authorRole || a.userRole || a.author?.role || null,
-    authorProfession: a.authorProfession || a.author?.profession || null,
-    title: a.title || null,
-    content: a.content,
-    image: a.imageUrl
-      ? a.imageUrl.startsWith('http')
-        ? a.imageUrl
-        : `${window.location.origin}${a.imageUrl}`
-      : null,
-    likes: a.likes || 0,
-    liked: a.liked || false,
-    commentsCount: a.commentsCount || 0,
-    createdAt: a.createdAt,
-  });
+  const normalizeArticle = (a) => {
+    let images = [];
+    if (a.images && Array.isArray(a.images)) {
+      images = a.images.map(img => 
+        img.startsWith('http') ? img : `${window.location.origin}${img}`
+      );
+    } else if (a.imageUrl) {
+      const img = a.imageUrl.startsWith('http') ? a.imageUrl : `${window.location.origin}${a.imageUrl}`;
+      images = [img];
+    }
+    return {
+      feedId: `article-${a.id || a._id}`,
+      type: 'article',
+      id: a.id || a._id,
+      authorId: a.authorId || a.userId || a.author?._id || null,
+      authorName: a.authorName || a.userName || a.author?.name || 'Unknown',
+      authorAvatar: a.authorAvatar || a.userAvatar || a.author?.avatar || null,
+      authorRole: a.authorRole || a.userRole || a.author?.role || null,
+      authorProfession: a.authorProfession || a.author?.profession || null,
+      title: a.title || null,
+      content: a.content,
+      images,
+      likesCount: a.likesCount || 0,
+      isLiked: a.isLiked || false,
+      commentsCount: a.commentsCount || 0,
+      createdAt: a.createdAt,
+    };
+  };
 
   const buildFeed = (posts, articles) => {
     const normalized = [
@@ -164,10 +219,10 @@ export default function HomeScreen({ isDesktop }) {
 
   const handleLikeItem = async (item) => {
     const { feedId, type, id } = item;
-    const isLiked = likedItems.has(feedId);
-    const newLikes = isLiked
-      ? Math.max(0, (item.likes || 0) - 1)
-      : (item.likes || 0) + 1;
+    const isLiked = item.isLiked || likedItems.has(feedId);
+    const newLikesCount = isLiked
+      ? Math.max(0, (item.likesCount || 0) - 1)
+      : (item.likesCount || 0) + 1;
 
     // Optimistic update
     setLikedItems((prev) => {
@@ -179,7 +234,7 @@ export default function HomeScreen({ isDesktop }) {
     setFeed((prev) =>
       prev.map((f) =>
         f.feedId === feedId
-          ? { ...f, likes: newLikes, liked: !isLiked }
+          ? { ...f, likesCount: newLikesCount, isLiked: !isLiked }
           : f
       )
     );
@@ -193,13 +248,13 @@ export default function HomeScreen({ isDesktop }) {
       setFeed((prev) =>
         prev.map((f) =>
           f.feedId === feedId
-            ? { ...f, likes: res.likes, liked: res.liked ?? !isLiked }
+            ? { ...f, likesCount: res.likesCount, isLiked: res.isLiked ?? !isLiked }
             : f
         )
       );
       setLikedItems((prev) => {
         const next = new Set(prev);
-        if (res.liked ?? !isLiked) next.add(feedId);
+        if (res.isLiked ?? !isLiked) next.add(feedId);
         else next.delete(feedId);
         return next;
       });
@@ -214,7 +269,7 @@ export default function HomeScreen({ isDesktop }) {
       setFeed((prev) =>
         prev.map((f) =>
           f.feedId === feedId
-            ? { ...f, likes: item.likes, liked: isLiked }
+            ? { ...f, likesCount: item.likesCount, isLiked }
             : f
         )
       );
@@ -271,44 +326,6 @@ export default function HomeScreen({ isDesktop }) {
     }
   };
 
-  const handlePostImageSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setPostImage(file);
-      setPostImagePreview(URL.createObjectURL(file));
-    }
-  };
-
-  const handleCreatePost = async () => {
-    if (!postContent.trim() && !postImage) return;
-    if (postContent.trim().length < 10) {
-      alert('Post must be at least 10 characters long');
-      return;
-    }
-    setIsPosting(true);
-    try {
-      let imageUrl = null;
-      if (postImage) {
-        const uploadRes = await api.uploadMedia(postImage);
-        if (uploadRes.success) {
-          imageUrl = uploadRes.filePath;
-        }
-      }
-      const result = await api.createPost({ content: postContent, image: imageUrl });
-      if (result.success) {
-        setFeed((prev) => [normalizePost(result.post), ...prev]);
-        setShowPostForm(false);
-        setPostContent('');
-        setPostImage(null);
-        setPostImagePreview(null);
-      }
-    } catch (err) {
-      console.error('Error creating post:', err);
-    } finally {
-      setIsPosting(false);
-    }
-  };
-
   const handleDeletePost = async (feedId, type) => {
     const confirmMsg = type === 'article' 
       ? 'Are you sure you want to delete this article?' 
@@ -349,7 +366,7 @@ export default function HomeScreen({ isDesktop }) {
   // Shared FeedCard component used by both mobile and desktop
   const FeedCard = ({ item, compact = false }) => {
     const { feedId, type, id, authorName, authorId } = item;
-    const isLiked = likedItems.has(feedId);
+    const isLiked = item.isLiked || likedItems.has(feedId);
     const isExpanded = expandedItems.has(feedId);
     const comments = itemComments[feedId] || [];
     const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -456,16 +473,63 @@ export default function HomeScreen({ isDesktop }) {
           {item.content}
         </p>
 
-        {/* Article Image - Professional Design */}
-        {item.image && (
-          <div className={`relative overflow-hidden rounded-xl mb-4 group ${compact ? 'h-40' : 'h-64'}`}>
-            <img 
-              src={item.image} 
-              alt={item.title || 'Article image'}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-              loading="lazy"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        {/* Multi-Image Display - Facebook Style */}
+        {item.images && item.images.length > 0 && (
+          <div className={`mb-4 ${compact ? 'rounded-lg' : 'rounded-xl'} overflow-hidden`}>
+            {item.images.length === 1 && (
+              <div className="relative group">
+                <img 
+                  src={item.images[0]} 
+                  alt={item.title || 'Post image'}
+                  className="w-full h-64 object-cover"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+            )}
+            {item.images.length === 2 && (
+              <div className="grid grid-cols-2 gap-0.5">
+                {item.images.map((img, idx) => (
+                  <div key={idx} className="relative aspect-square">
+                    <img src={img} alt={`Image ${idx + 1}`} className="w-full h-full object-cover" loading="lazy" />
+                  </div>
+                ))}
+              </div>
+            )}
+            {item.images.length === 3 && (
+              <div className="grid grid-cols-2 grid-rows-2 gap-0.5">
+                <div className="row-span-2 relative">
+                  <img src={item.images[0]} alt="Image 1" className="w-full h-full object-cover" loading="lazy" />
+                </div>
+                <div className="relative">
+                  <img src={item.images[1]} alt="Image 2" className="w-full h-full object-cover" loading="lazy" />
+                </div>
+                <div className="relative">
+                  <img src={item.images[2]} alt="Image 3" className="w-full h-full object-cover" loading="lazy" />
+                </div>
+              </div>
+            )}
+            {item.images.length >= 4 && (
+              <div className="grid grid-cols-2 grid-rows-2 gap-0.5">
+                <div className="row-span-2 relative">
+                  <img src={item.images[0]} alt="Image 1" className="w-full h-full object-cover" loading="lazy" />
+                </div>
+                <div className="relative">
+                  <img src={item.images[1]} alt="Image 2" className="w-full h-full object-cover" loading="lazy" />
+                </div>
+                <div className="relative">
+                  <img src={item.images[2]} alt="Image 3" className="w-full h-full object-cover" loading="lazy" />
+                </div>
+                <div className="relative bg-slate-800 flex items-center justify-center">
+                  <img src={item.images[3]} alt="Image 4" className="w-full h-full object-cover opacity-60" loading="lazy" />
+                  {item.images.length > 4 && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                      <span className="text-white font-bold text-xl">+{item.images.length - 4}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             {type === 'article' && (
               <div className="absolute top-3 left-3">
                 <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-white/95 backdrop-blur-sm text-purple-700 shadow-lg">
@@ -496,7 +560,7 @@ export default function HomeScreen({ isDesktop }) {
                 fill: isLiked ? 'currentColor' : 'none'
               }} 
             />
-            <span className="text-sm font-medium">{item.likes}</span>
+            <span className="text-sm font-medium">{item.likesCount || 0}</span>
           </button>
           <button
             onClick={() => handleToggleComments(item)}
@@ -779,22 +843,23 @@ export default function HomeScreen({ isDesktop }) {
                     className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent resize-none focus:outline-none focus:border-primary"
                     rows={4}
                   />
-                  {postImagePreview && (
-                    <div className="relative mt-4">
-                      <img
-                        src={postImagePreview}
-                        alt="Preview"
-                        className="w-full max-h-48 object-contain rounded-lg"
-                      />
-                      <button
-                        onClick={() => {
-                          setPostImage(null);
-                          setPostImagePreview(null);
-                        }}
-                        className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full"
-                      >
-                        <FiX className="text-[18px]" />
-                      </button>
+                  {postImagePreviews.length > 0 && (
+                    <div className="mt-4 grid grid-cols-3 gap-2">
+                      {postImagePreviews.map((preview, idx) => (
+                        <div key={idx} className="relative aspect-square">
+                          <img
+                            src={preview}
+                            alt={`Preview ${idx + 1}`}
+                            className="w-full h-full object-cover rounded-lg"
+                          />
+                          <button
+                            onClick={() => removePostImage(idx)}
+                            className="absolute top-1 right-1 bg-black/50 text-white p-1 rounded-full"
+                          >
+                            <FiX className="text-[14px]" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   )}
                   <div className="flex gap-3 mt-4">
@@ -803,19 +868,20 @@ export default function HomeScreen({ isDesktop }) {
                       className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
                     >
                       <FiImage className="text-primary" />
-                      Photo
+                      Photo {postImages.length > 0 && `(${postImages.length})`}
                     </button>
                     <input
                       type="file"
                       ref={postImageInputRef}
                       onChange={handlePostImageSelect}
                       accept="image/*"
+                      multiple
                       className="hidden"
                     />
                     <div className="flex-1"></div>
                     <button
                       onClick={handleCreatePost}
-                      disabled={(!postContent.trim() && !postImage) || isPosting}
+                      disabled={(!postContent.trim() && postImages.length === 0) || isPosting}
                       className="px-6 py-2 rounded-lg bg-primary text-white font-medium disabled:opacity-50"
                     >
                       {isPosting ? 'Posting...' : 'Post'}
@@ -1082,22 +1148,23 @@ export default function HomeScreen({ isDesktop }) {
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent resize-none focus:outline-none focus:border-primary"
                 rows={4}
               />
-              {postImagePreview && (
-                <div className="relative mt-4">
-                  <img
-                    src={postImagePreview}
-                    alt="Preview"
-                    className="w-full max-h-48 object-contain rounded-lg"
-                  />
-                  <button
-                    onClick={() => {
-                      setPostImage(null);
-                      setPostImagePreview(null);
-                    }}
-                    className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full"
-                    >
-                      <FiX className="text-[18px]" />
-                    </button>
+              {postImagePreviews.length > 0 && (
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  {postImagePreviews.map((preview, idx) => (
+                    <div key={idx} className="relative aspect-square">
+                      <img
+                        src={preview}
+                        alt={`Preview ${idx + 1}`}
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                      <button
+                        onClick={() => removePostImage(idx)}
+                        className="absolute top-1 right-1 bg-black/50 text-white p-1 rounded-full"
+                      >
+                        <FiX className="text-[14px]" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
               <div className="flex gap-3 mt-4">
@@ -1105,20 +1172,21 @@ export default function HomeScreen({ isDesktop }) {
                   onClick={() => postImageInputRef.current?.click()}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
                   >
-                    <FiImage className="text-primary" />
-                    Photo
-                  </button>
+                  <FiImage className="text-primary" />
+                  Photo {postImages.length > 0 && `(${postImages.length})`}
+                </button>
                 <input
                   type="file"
                   ref={postImageInputRef}
                   onChange={handlePostImageSelect}
                   accept="image/*"
+                  multiple
                   className="hidden"
                 />
                 <div className="flex-1"></div>
                 <button
                   onClick={handleCreatePost}
-                  disabled={(!postContent.trim() && !postImage) || isPosting}
+                  disabled={(!postContent.trim() && postImages.length === 0) || isPosting}
                   className="px-6 py-2 rounded-lg bg-primary text-white font-medium disabled:opacity-50"
                 >
                   {isPosting ? 'Posting...' : 'Post'}

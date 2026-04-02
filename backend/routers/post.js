@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { uploadMultiple } = require('../middleware/upload');
 const { 
   getPosts, 
   createPost, 
@@ -10,7 +11,7 @@ const {
 } = require('../controllers/postController');
 
 router.get('/', getPosts);
-router.post('/', createPost);
+router.post('/', uploadMultiple, createPost);
 router.delete('/:id', deletePost);
 router.post('/:id/like', likePost);
 router.get('/:id/comments', getComments);

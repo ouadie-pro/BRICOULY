@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const upload = require('../middleware/upload');
+const { uploadVideo } = require('../middleware/upload');
 const { 
   getVideos, 
   createVideo, 
@@ -9,7 +9,7 @@ const {
 } = require('../controllers/videoController');
 
 router.get('/', getVideos);
-router.post('/', upload.single('video'), createVideo);
+router.post('/', uploadVideo.single('video'), createVideo);
 router.post('/:id/like', likeVideo);
 router.delete('/:id', deleteVideo);
 

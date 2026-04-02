@@ -236,13 +236,16 @@ export const api = {
   },
 
   createPost: async (postData) => {
+    const formData = new FormData();
+    if (postData.content) formData.append('content', postData.content);
+    if (postData.type) formData.append('type', postData.type);
+    if (postData.images && postData.images.length > 0) {
+      postData.images.forEach(image => formData.append('images', image));
+    }
     return safeFetch(`${API_BASE}/posts`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': getUserId(),
-      },
-      body: JSON.stringify(postData),
+      headers: { 'x-user-id': getUserId() },
+      body: formData,
     });
   },
 
@@ -335,7 +338,10 @@ export const api = {
     const formData = new FormData();
     if (articleData.title) formData.append('title', articleData.title);
     if (articleData.content) formData.append('content', articleData.content);
-    if (articleData.image) formData.append('image', articleData.image);
+    if (articleData.type) formData.append('type', articleData.type);
+    if (articleData.images && articleData.images.length > 0) {
+      articleData.images.forEach(image => formData.append('images', image));
+    }
     return safeFetch(`${API_BASE}/articles`, {
       method: 'POST',
       headers: { 'x-user-id': getUserId() },

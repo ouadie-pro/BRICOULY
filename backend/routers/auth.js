@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const upload = require('../middleware/upload');
+const { upload } = require('../middleware/upload');
 const { signup, login, getMe, updateProfile, uploadAvatar } = require('../controllers/authController');
 const { authLimiter } = require('../middleware/rateLimiter'); // FIXED: #11
 

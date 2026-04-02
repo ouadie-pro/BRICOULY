@@ -16,16 +16,38 @@ const storage = multer.diskStorage({
   },
 });
 
-const fileFilter = (req, file, cb) => {
-  // Allow all file types for now
-  // The frontend already has type restrictions in the file input accept attribute
-  return cb(null, true);
+const imageFilter = (req, file, cb) => {
+  const allowedTypes = /jpeg|jpg|png|gif|webp/;
+  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = allowedTypes.test(file.mimetype);
+  if (extname && mimetype) {
+    return cb(null, true);
+  }
+  cb(new Error('Only image files are allowed'));
+};
+
+const videoFilter = (req, file, cb) => {
+  const allowedTypes = /mp4|webm|mov|avi/;
+  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = /video\//.test(file.mimetype);
+  if (extname || mimetype) {
+    return cb(null, true);
+  }
+  cb(new Error('Only video files are allowed'));
 };
 
 const upload = multer({
   storage,
-  limits: { fileSize: 100 * 1024 * 1024 },
-  fileFilter,
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: imageFilter,
 });
 
-module.exports = upload;
+const uploadVideo = multer({
+  storage,
+  limits: { fileSize: 100 * 1024 * 1024 },
+  fileFilter: videoFilter,
+});
+
+const uploadMultiple = upload.array('images', 10);
+
+module.exports = { upload, uploadVideo, uploadMultiple };
