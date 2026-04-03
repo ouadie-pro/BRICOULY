@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
-const { upload } = require('../middleware/upload');
+const { uploadMedia } = require('../middleware/upload');
 const { 
   getConversations, 
   getMessages, 
@@ -13,11 +13,11 @@ const {
 router.get('/conversations', getConversations);
 
 const handleUpload = [
-  upload.single('file'),
+  uploadMedia.single('file'),
   (err, req, res, next) => {
     if (err instanceof multer.MulterError) {
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(413).json({ success: false, error: 'File too large', message: 'Maximum file size is 50MB' });
+        return res.status(413).json({ success: false, error: 'File too large', message: 'Maximum file size is 100MB' });
       }
       return res.status(400).json({ success: false, error: err.message });
     }

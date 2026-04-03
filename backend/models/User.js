@@ -16,8 +16,7 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: [true, 'Password is required'],
-    minlength: 6,
+    default: null,
   },
   avatar: {
     type: String,
@@ -29,12 +28,29 @@ const userSchema = new mongoose.Schema({
   },
   location: {
     type: String,
-    default: 'Downtown, NY',
+    default: 'Maroc',
   },
   role: {
     type: String,
     enum: ['user', 'provider', 'admin'],
     default: 'user',
+  },
+  googleId: {
+    type: String,
+    default: null,
+  },
+  facebookId: {
+    type: String,
+    default: null,
+  },
+  isVerified: {
+    type: Boolean,
+    default: false,
+  },
+  authProvider: {
+    type: String,
+    enum: ['local', 'google', 'facebook'],
+    default: 'local',
   },
   createdAt: {
     type: Date,
@@ -43,7 +59,7 @@ const userSchema = new mongoose.Schema({
 });
 
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
+  if (!this.isModified('password') || !this.password) return next();
   try {
     const salt = await bcrypt.genSalt(12);
     this.password = await bcrypt.hash(this.password, salt);
