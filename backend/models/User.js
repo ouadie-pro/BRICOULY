@@ -56,6 +56,26 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  profileViews: {
+    type: Number,
+    default: 0,
+  },
+  hourlyRate: {
+    type: Number,
+    default: 0,
+  },
+  profession: {
+    type: String,
+    default: '',
+  },
+  bio: {
+    type: String,
+    default: '',
+  },
+  city: {
+    type: String,
+    default: '',
+  },
 });
 
 userSchema.pre('save', async function (next) {
