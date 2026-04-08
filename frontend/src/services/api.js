@@ -3,36 +3,33 @@ const API_BASE = '/api';
 async function safeFetch(url, options = {}) {
   try {
     const res = await fetch(url, options);
-    const text = await res.text();
+    let data;
     
-    if (!text || text.trim() === '') {
-      if (res.ok) {
-        return [];
-      }
+    try {
+      const text = await res.text();
+      data = text ? JSON.parse(text) : {};
+    } catch (e) {
+      console.error('JSON parse error at:', url);
       return { 
         success: false, 
-        error: res.status >= 500 ? 'Server error. Please try again later.' : 'Server returned empty response',
+        error: res.status >= 500 ? 'Server error. Please try again later.' : 'Invalid server response',
         status: res.status
       };
     }
     
-    try {
-      const data = JSON.parse(text);
-      if (!res.ok) {
-        return { 
-          ...data,
-          success: false, 
-          status: res.status,
-          error: data.error || `Request failed with status ${res.status}`
-        };
-      }
-      return data;
-    } catch (e) {
-      console.error('JSON parse error at:', url, text.substring(0, 200));
-      return { success: false, error: 'Invalid server response' };
+    if (!res.ok) {
+      console.error('API Error:', res.status, data);
+      return { 
+        ...data,
+        success: false, 
+        status: res.status,
+        error: data?.error || `Request failed (${res.status})`
+      };
     }
+    
+    return data;
   } catch (err) {
-    console.error('Network error connecting to:', url, err.message);
+    console.error('Network error:', url, err);
     return { success: false, error: 'Cannot connect to server. Is backend running?' };
   }
 }
@@ -435,7 +432,7 @@ export const api = {
   },
 
   getMyFollowing: async () => {
-    return safeFetch(`${API_BASE}/following`, {
+    return safeFetch(`${API_BASE}/follow/following`, {
       headers: { 'x-user-id': getUserId() },
     });
   },

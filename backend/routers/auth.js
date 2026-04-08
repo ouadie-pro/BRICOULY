@@ -3,7 +3,6 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const { upload } = require('../middleware/upload');
 const { signup, login, getMe, updateProfile, uploadAvatar, incrementProfileView } = require('../controllers/authController');
-const { authLimiter } = require('../middleware/rateLimiter');
 const User = require('../models/User');
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -114,8 +113,8 @@ if (passport && FacebookStrategy && process.env.FACEBOOK_APP_ID && process.env.F
   console.log('Facebook OAuth configured');
 }
 
-router.post('/signup', authLimiter, signup);
-router.post('/login', authLimiter, login);
+router.post('/signup', signup);
+router.post('/login', login);
 router.get('/me', getMe);
 router.put('/profile', updateProfile);
 router.post('/avatar', upload.single('file'), uploadAvatar);

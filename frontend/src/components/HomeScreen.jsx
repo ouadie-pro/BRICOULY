@@ -418,18 +418,12 @@ export default function HomeScreen({ isDesktop }) {
           });
           setLocationError(false);
         },
-        (error) => {
-          if (error.code === error.PERMISSION_DENIED) {
-            console.log('Geolocation permission denied. This may be due to running on HTTP (localhost). For production, ensure site is served over HTTPS.');
-          } else {
-            console.log('Geolocation error:', error.message);
-          }
+        () => {
           setLocationError(true);
         },
         { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
       );
     } else {
-      console.log('Geolocation is not supported by this browser');
       setLocationError(true);
     }
   }, []);

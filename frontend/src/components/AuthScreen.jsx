@@ -98,6 +98,7 @@ export default function AuthScreen({ onAuth }) {
           setError(res.error || 'Login failed');
         }
       } else {
+        console.log('[Auth] Signing up with:', { name, email, role });
         const res = await api.signup({ 
           name, 
           email, 
@@ -109,16 +110,22 @@ export default function AuthScreen({ onAuth }) {
           bio: role === 'provider' ? bio : '',
           hourlyRate: role === 'provider' ? parseFloat(hourlyRate) || 0 : undefined,
         });
+        console.log('[Auth] Signup response:', res);
+        
         if (res.success) {
           localStorage.setItem('user', JSON.stringify(res.user));
+          if (res.token) {
+            localStorage.setItem('token', res.token);
+          }
           if (onAuth) onAuth(res.user);
           navigate('/home');
         } else {
-          setError(res.error || 'Signup failed');
+          setError(res.error || 'Signup failed. Please try again.');
         }
       }
-    } catch (_err) {
-      setError('Something went wrong. Please try again.');
+    } catch (err) {
+      console.error('[Auth] Signup error:', err);
+      setError('Something went wrong. Please check if the server is running.');
     }
   };
 

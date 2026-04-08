@@ -64,6 +64,26 @@ app.post('/api/test', (req, res) => {
   res.json({ success: true, message: 'Server is working!', received: req.body });
 });
 
+app.get('/api/test-db', async (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    const state = mongoose.connection.readyState;
+    const states = {
+      0: 'disconnected',
+      1: 'connected',
+      2: 'connecting',
+      3: 'disconnecting'
+    };
+    res.json({
+      success: true,
+      dbState: states[state] || 'unknown',
+      mongoUri: process.env.MONGODB_URI ? 'set' : 'NOT SET'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 if (!fs.existsSync(path.join(__dirname, 'uploads'))) {
   fs.mkdirSync(path.join(__dirname, 'uploads'));
 }
@@ -180,7 +200,7 @@ connectDB()
     console.log('MongoDB Connected successfully');
     await seedCategories();
     server.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+      console.log(`Server running on http://localhost:${PORT}`);
     });
   })
   .catch(err => {
@@ -188,8 +208,10 @@ connectDB()
     console.error('Full error:', err);
     if (!process.env.MONGODB_URI) {
       console.error('Please set MONGODB_URI in your .env file');
+      console.error('Example: MONGODB_URI=mongodb://localhost:27017/yourdb');
     } else {
       console.error('Make sure MongoDB is running on your system');
+      console.error('Run: mongod (to start MongoDB)');
     }
     process.exit(1);
   });

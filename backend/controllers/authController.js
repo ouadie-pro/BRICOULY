@@ -1,39 +1,54 @@
 const User = require('../models/User');
 const Provider = require('../models/Provider');
 const Category = require('../models/Category');
-const { generateToken } = require('../middleware/authMiddleware');
+const jwt = require('jsonwebtoken');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+
+const generateToken = (userId, role) => {
+  return jwt.sign({ id: userId, role }, JWT_SECRET, { expiresIn: '7d' });
+};
 
 exports.signup = async (req, res) => {
   try {
-    console.log('[signup] Request received', { body: req.body });
     const { name, email, password, role, phone, professionId, bio } = req.body;
-    console.log('[signup] role:', role);
     
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      console.log('[signup] Email already exists:', email);
-      return res.status(400).json({ success: false, error: 'Email already exists' });
+    if (!name || !email || !password) {
+      return res.status(400).json({ success: false, error: 'Name, email, and password are required' });
     }
     
-    let category = null;
-    if (professionId) {
-      category = await Category.findById(professionId);
+    if (password.length < 6) {
+      return res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
+    }
+    
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      return res.status(400).json({ success: false, error: 'Email already exists' });
     }
     
     const user = await User.create({
       name,
-      email,
+      email: email.toLowerCase(),
       password,
-      role: role || 'user',
+      role: role === 'provider' ? 'provider' : 'user',
       avatar: '',
       phone: phone || '',
-      location: '',
+      location: 'Maroc',
     });
     
     if (role === 'provider') {
+      let categoryName = 'General Services';
+      if (professionId) {
+        const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(professionId);
+        if (isValidObjectId) {
+          const category = await Category.findById(professionId);
+          if (category) categoryName = category.name;
+        }
+      }
+      
       await Provider.create({
         user: user._id,
-        profession: category?.name || '',
+        profession: categoryName,
         bio: bio || '',
         hourlyRate: 50,
         rating: 0,
@@ -42,8 +57,7 @@ exports.signup = async (req, res) => {
         experience: '1 Year Exp.',
         verified: false,
         serviceArea: '10km radius',
-        location: 'New York, NY',
-        category: category?._id,
+        location: 'Maroc',
       });
     }
     
@@ -53,8 +67,15 @@ exports.signup = async (req, res) => {
     
     res.json({ success: true, user: responseUser, token });
   } catch (error) {
-    console.error('[signup] Error:', error.message, error.stack);
-    res.status(500).json({ success: false, error: error.message });
+    console.error('[signup] Error:', error.message);
+    if (error.code === 11000) {
+      return res.status(400).json({ success: false, error: 'Email already exists' });
+    }
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(e => e.message).join(', ');
+      return res.status(400).json({ success: false, error: messages });
+    }
+    res.status(500).json({ success: false, error: 'Signup failed: ' + error.message });
   }
 };
 
