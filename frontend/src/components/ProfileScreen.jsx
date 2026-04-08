@@ -14,7 +14,10 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('');
+  const [city, setCity] = useState('');
   const [bio, setBio] = useState('');
+  const [hourlyRate, setHourlyRate] = useState('');
+  const [profession, setProfession] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedAvatar, setUploadedAvatar] = useState(null);
   const [articles, setArticles] = useState([]);
@@ -67,7 +70,10 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
           setName(userData.name || '');
           setPhone(userData.phone || '');
           setLocation(userData.location || userData.address || '');
+          setCity(userData.city || '');
           setBio(userData.bio || '');
+          setHourlyRate(userData.hourlyRate || '');
+          setProfession(userData.profession || '');
         }
 
         const [userArticles, userFollowers, userFollowing, userReviews] = await Promise.all([
@@ -141,8 +147,12 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
 
   const handleSave = async () => {
     try {
-      const updates = { name, phone, location };
-      if (currentUser.role === 'provider') updates.bio = bio;
+      const updates = { name, phone, location, city };
+      if (currentUser.role === 'provider') {
+        updates.bio = bio;
+        updates.hourlyRate = hourlyRate;
+        updates.profession = profession;
+      }
       const result = await api.updateProfile(updates);
       if (result.success) {
         const updatedUser = { ...user, ...updates };

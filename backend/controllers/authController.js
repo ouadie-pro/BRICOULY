@@ -135,7 +135,14 @@ exports.updateProfile = async (req, res) => {
     
     const user = await User.findByIdAndUpdate(
       userId,
-      { name: updates.name, phone: updates.phone, location: updates.location, avatar: updates.avatar },
+      { 
+        name: updates.name, 
+        phone: updates.phone, 
+        location: updates.location, 
+        avatar: updates.avatar,
+        bio: updates.bio,
+        city: updates.city,
+      },
       { new: true }
     );
     
@@ -143,18 +150,39 @@ exports.updateProfile = async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    // FIXED: #10 - Guard provider profile updates by role
-    if ((updates.bio || updates.profession) && user.role === 'provider') {
-      await Provider.findOneAndUpdate(
-        { user: user._id },
-        { bio: updates.bio, profession: updates.profession }
-      );
-    } else if (updates.bio || updates.profession) {
-      return res.status(403).json({ error: 'Only providers can update provider-specific fields (bio, profession)' });
+    // Update provider-specific fields
+    if (user.role === 'provider') {
+      const providerUpdate = {};
+      if (updates.bio !== undefined) providerUpdate.bio = updates.bio;
+      if (updates.profession !== undefined) providerUpdate.profession = updates.profession;
+      if (updates.hourlyRate !== undefined) providerUpdate.hourlyRate = parseFloat(updates.hourlyRate);
+      if (updates.serviceArea !== undefined) providerUpdate.serviceArea = updates.serviceArea;
+      if (updates.city !== undefined) providerUpdate.city = updates.city;
+      
+      if (Object.keys(providerUpdate).length > 0) {
+        await Provider.findOneAndUpdate(
+          { user: user._id },
+          providerUpdate
+        );
+      }
     }
     
+    const provider = await Provider.findOne({ user: user._id });
+    
     const { password: _, ...userWithoutPassword } = user.toObject();
-    res.json({ success: true, user: { ...userWithoutPassword, id: user._id.toString() } });
+    res.json({ 
+      success: true, 
+      user: { 
+        ...userWithoutPassword, 
+        id: user._id.toString(),
+        profession: provider?.profession || '',
+        bio: provider?.bio || user.bio || '',
+        hourlyRate: provider?.hourlyRate || 0,
+        city: provider?.city || user.city || '',
+        rating: provider?.rating || 0,
+        verified: provider?.verified || false,
+      } 
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -180,6 +208,25 @@ exports.uploadAvatar = async (req, res) => {
     }
     
     res.json({ success: true, filePath: avatarUrl });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.incrementProfileView = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findByIdAndUpdate(
+      id,
+      { $inc: { profileViews: 1 } },
+      { new: true }
+    );
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json({ success: true, profileViews: user.profileViews });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

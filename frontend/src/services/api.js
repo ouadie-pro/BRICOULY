@@ -385,6 +385,12 @@ export const api = {
     });
   },
 
+  getCompletedBookings: async () => {
+    return safeFetch(`${API_BASE}/bookings?status=completed`, {
+      headers: { 'x-user-id': getUserId() },
+    });
+  },
+
   // Follow
   followUser: async (targetUserId) => {
     return safeFetch(`${API_BASE}/follow/${targetUserId}`, {
@@ -533,6 +539,12 @@ export const api = {
   getWeeklyActivity: async (providerId) => {
     return safeFetch(`${API_BASE}/providers/${providerId}/activity`, {
       headers: { 'x-user-id': getUserId() },
+    });
+  },
+
+  incrementProfileView: async (userId) => {
+    return safeFetch(`${API_BASE}/auth/users/${userId}/view`, {
+      method: 'PATCH',
     });
   },
 };

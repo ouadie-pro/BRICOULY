@@ -54,6 +54,10 @@ const providerSchema = new mongoose.Schema({
     type: String,
     default: '10km radius',
   },
+  city: {
+    type: String,
+    default: '',
+  },
   location: {
     type: String,
     default: 'Maroc',

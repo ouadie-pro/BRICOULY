@@ -6,6 +6,31 @@ import {
   FiArrowLeft, FiVolume2, FiSearch
 } from 'react-icons/fi';
 
+const formatRelativeTime = (dateStr) => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffHours < 1) return 'À l\'instant';
+  if (diffHours < 24) return `Il y a ${diffHours}h`;
+  if (diffDays === 1) return 'Hier';
+  if (diffDays < 7) return `Il y a ${diffDays}j`;
+  return date.toLocaleDateString('fr-FR');
+};
+
+const getMessagePreview = (msg) => {
+  const text = msg.content || msg.text || '';
+  
+  if (msg.type === 'image') return '[Photo]';
+  if (msg.type === 'video') return '[Vidéo]';
+  if (msg.type === 'voice') return '[Audio]';
+  
+  return text || '[Média]';
+};
+
 export default function MessagesScreen({ isDesktop }) {
   const { providerId } = useParams();
   const [conversations, setConversations] = useState([]);
@@ -491,13 +516,12 @@ export default function MessagesScreen({ isDesktop }) {
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-center">
                     <h3 className="font-semibold text-slate-900 truncate">{conv.userName}</h3>
-                    <span className="text-xs text-slate-400">{conv.lastMessageTime?.split('T')[0]}</span>
+                    <span className="text-xs text-slate-400">
+                      {formatRelativeTime(conv.lastMessageTime || conv.updatedAt)}
+                    </span>
                   </div>
                   <p className="text-sm text-slate-500 truncate">
-                    {conv.lastMessageType === 'image' ? '📷 Photo' :
-                     conv.lastMessageType === 'video' ? '🎥 Video' :
-                     conv.lastMessageType === 'voice' ? '🎤 Voice' :
-                     conv.lastMessage || conv.lastMessageContent || ''}
+                    {getMessagePreview(conv)}
                   </p>
                 </div>
                 {conv.unreadCount > 0 && (
@@ -580,7 +604,7 @@ export default function MessagesScreen({ isDesktop }) {
                       {renderMessageContent(msg)}
                     </div>
                     <span className="text-[11px] text-slate-400 px-1">
-                      {msg.time || msg.createdAt}
+                      {formatRelativeTime(msg.createdAt || msg.time)}
                     </span>
                   </div>
                 </div>

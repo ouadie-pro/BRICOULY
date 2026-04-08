@@ -623,10 +623,12 @@ export default function HomeScreen({ isDesktop }) {
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffHours < 1) return 'Just now';
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+    if (diffHours < 1) return 'À l\'instant';
+    if (diffHours < 24) return `Il y a ${diffHours}h`;
+    if (diffDays === 1) return 'Hier';
+    if (diffDays < 7) return `Il y a ${diffDays}j`;
+    if (diffDays < 30) return `Il y a ${Math.floor(diffDays / 7)} sem.`;
+    return date.toLocaleDateString('fr-FR');
   };
 
   // Shared FeedCard component used by both mobile and desktop
@@ -693,7 +695,7 @@ export default function HomeScreen({ isDesktop }) {
                 Article
               </span>
             )}
-            {item.authorRole === 'provider' && (
+            {item.authorRole === 'provider' && item.isVerified && (
               <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
                 Verified Pro
               </span>

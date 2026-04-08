@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../services/api';
+import RatingModal from './RatingModal';
 import { 
   FiArrowLeft, FiShare2, FiCheckCircle, FiStar, FiMessageCircle, FiCalendar, FiCheck, FiX,
   FiMapPin, FiPhone, FiMail, FiUserPlus, FiUserMinus, FiUsers, FiAlertCircle, FiPlay,
@@ -8,6 +9,28 @@ import {
 } from 'react-icons/fi';
 
 const formatCurrency = (amount) => `${amount} MAD`;
+
+const formatRelativeTime = (dateStr) => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffHours < 1) return 'À l\'instant';
+  if (diffHours < 24) return `Il y a ${diffHours} heure${diffHours > 1 ? 's' : ''}`;
+  if (diffDays === 1) return 'Hier';
+  if (diffDays < 7) return `Il y a ${diffDays} jour${diffDays > 1 ? 's' : ''}`;
+  if (diffDays < 30) return `Il y a ${Math.floor(diffDays / 7)} semaine${Math.floor(diffDays / 7) > 1 ? 's' : ''}`;
+  return date.toLocaleDateString('fr-FR');
+};
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+};
 
 const StarRating = ({ rating, count, size = 14 }) => {
   const roundedRating = Math.round(rating || 0);
@@ -113,6 +136,9 @@ export default function ProviderProfileScreen({ isDesktop }) {
   const [requestSent, setRequestSent] = useState(false);
   const [following, setFollowing] = useState(false);
   const [followRequestSent, setFollowRequestSent] = useState(false);
+  const [completedBookings, setCompletedBookings] = useState([]);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState(null);
   
   // Service form state
   const [showServiceForm, setShowServiceForm] = useState(false);
@@ -163,13 +189,33 @@ export default function ProviderProfileScreen({ isDesktop }) {
       setLoading(true);
       setError(null);
       try {
-        const [providerData, reviewsData, myFollowingIds, servicesData, portfolioData] = await Promise.all([
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const [providerData, reviewsData, myFollowingIds, servicesData, portfolioData, bookingsData] = await Promise.all([
           api.getProvider(id),
           api.getProviderReviews(id),
           api.getMyFollowing(),
           api.getProviderServices(id),
           api.getProviderPortfolio(id),
+          currentUser.role === 'user' ? api.getCompletedBookings() : Promise.resolve([]),
         ]);
+
+        // Increment profile view (don't await, fire and forget)
+        if (!isOwnProfile) {
+          api.incrementProfileView(id).catch(() => {});
+        }
+
+        // Filter completed bookings for this provider
+        if (bookingsData?.bookings) {
+          const providerBookings = bookingsData.bookings.filter(
+            b => b.provider?.user?._id === id || b.provider?.user === id
+          );
+          setCompletedBookings(providerBookings);
+        } else if (Array.isArray(bookingsData)) {
+          const providerBookings = bookingsData.filter(
+            b => b.provider?.user?._id === id || b.provider?.user === id
+          );
+          setCompletedBookings(providerBookings);
+        }
 
         if (providerData && !providerData.error) {
           setProvider(providerData);
@@ -300,6 +346,32 @@ export default function ProviderProfileScreen({ isDesktop }) {
       } else {
         setFollowing(res.following);
       }
+    }
+  };
+
+  const handleOpenRatingModal = (booking) => {
+    setSelectedBooking(booking);
+    setShowRatingModal(true);
+  };
+
+  const handleReviewSubmitted = (result) => {
+    // Remove the booking from the list of completed bookings
+    if (selectedBooking) {
+      setCompletedBookings(prev => prev.filter(b => 
+        (b._id || b.id) !== (selectedBooking._id || selectedBooking.id)
+      ));
+    }
+    // Refresh reviews
+    api.getProviderReviews(id).then(reviewsData => {
+      setReviews(reviewsData || []);
+    });
+    // Update provider rating in local state
+    if (result.newRating !== undefined) {
+      setProvider(prev => ({
+        ...prev,
+        rating: result.newRating,
+        reviewCount: result.reviewCount
+      }));
     }
   };
 
@@ -561,6 +633,39 @@ export default function ProviderProfileScreen({ isDesktop }) {
 
             {activeTab === 'reviews' && (
               <div className="space-y-4">
+                {/* Leave a review button for completed bookings */}
+                {!isOwnProfile && currentUser.role === 'user' && completedBookings.length > 0 && (
+                  <div className="bg-gradient-to-r from-primary/10 to-blue-50 dark:from-primary/5 dark:to-blue-900/20 p-4 rounded-xl border border-primary/20">
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
+                      Vous avez complété un service avec {provider.name}. Partagez votre expérience !
+                    </p>
+                    <button
+                      onClick={() => handleOpenRatingModal(completedBookings[0])}
+                      className="w-full py-3 bg-primary text-white font-bold rounded-xl hover:bg-blue-600 transition-colors"
+                    >
+                      Laisser un avis
+                    </button>
+                  </div>
+                )}
+
+                {/* Rating Summary */}
+                {reviews.length > 0 && (
+                  <div className="bg-card-light dark:bg-card-dark p-4 rounded-xl border border-gray-100 dark:border-gray-800">
+                    <div className="flex items-center gap-4">
+                      <div className="text-center min-w-[60px]">
+                        <p className="text-4xl font-black text-slate-900 dark:text-white">
+                          {provider.rating?.toFixed(1) || '0.0'}
+                        </p>
+                        <StarRating rating={provider.rating || 0} size={14} />
+                        <p className="text-xs text-slate-500 mt-1">
+                          {provider.reviewCount || 0} avis
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Reviews List */}
                 {reviews.length > 0 ? reviews.map((review) => (
                   <div
                     key={review.id || review._id}
@@ -568,22 +673,35 @@ export default function ProviderProfileScreen({ isDesktop }) {
                   >
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold">
-                          {review.clientName?.charAt(0)}
-                        </div>
+                        {review.userAvatar ? (
+                          <div
+                            className="w-8 h-8 rounded-full bg-cover bg-center"
+                            style={{ backgroundImage: `url("${review.userAvatar}")` }}
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold">
+                            {review.userName?.charAt(0) || '?'}
+                          </div>
+                        )}
                         <div>
-                          <p className="text-sm font-bold text-text-light dark:text-text-dark">{review.clientName}</p>
+                          <p className="text-sm font-bold text-text-light dark:text-text-dark">{review.userName || review.clientName}</p>
                           <StarRating rating={review.rating || 0} size={12} />
                         </div>
                       </div>
                       <span className="text-xs text-secondary-text-light dark:text-secondary-text-dark">
-                        {review.createdAt ? new Date(review.createdAt).toLocaleDateString() : ''}
+                        {formatRelativeTime(review.createdAt)}
                       </span>
                     </div>
-                    <p className="text-sm text-secondary-text-light dark:text-secondary-text-dark">{review.comment}</p>
+                    {review.comment && (
+                      <p className="text-sm text-secondary-text-light dark:text-secondary-text-dark">{review.comment}</p>
+                    )}
                   </div>
                 )) : (
-                  <p className="text-center text-slate-500 py-8">Aucun avis pour le moment.</p>
+                  <div className="text-center py-8">
+                    <span className="text-5xl">⭐</span>
+                    <p className="text-slate-500 mt-2">Aucun avis pour le moment</p>
+                    <small className="text-slate-400">Soyez le premier à noter ce professionnel</small>
+                  </div>
                 )}
               </div>
             )}
@@ -865,32 +983,65 @@ export default function ProviderProfileScreen({ isDesktop }) {
 
             {activeTab === 'reviews' && (
               <div className="space-y-4">
-                <div className="rounded-xl border border-slate-200 p-5">
-                  <div className="flex gap-8 items-center">
-                    <div className="flex flex-col items-center justify-center min-w-[80px]">
-                      <p className="text-5xl font-black text-slate-900">{provider.rating ? provider.rating.toFixed(1) : '0.0'}</p>
-                      <StarRating rating={provider.rating || 0} size={16} />
-                      <p className="text-xs text-slate-500 mt-2">Basé sur {provider.reviewCount || 0} avis</p>
+                {/* Leave a review button for completed bookings */}
+                {!isOwnProfile && currentUser.role === 'user' && completedBookings.length > 0 && (
+                  <div className="bg-gradient-to-r from-primary/10 to-blue-50 dark:from-primary/5 dark:to-blue-900/20 p-5 rounded-xl border border-primary/20">
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
+                      Vous avez complété un service avec {provider.name}. Partagez votre expérience !
+                    </p>
+                    <button
+                      onClick={() => handleOpenRatingModal(completedBookings[0])}
+                      className="w-full py-3 bg-primary text-white font-bold rounded-xl hover:bg-blue-600 transition-colors"
+                    >
+                      Laisser un avis
+                    </button>
+                  </div>
+                )}
+
+                {/* Rating Summary */}
+                {reviews.length > 0 && (
+                  <div className="rounded-xl border border-slate-200 p-5">
+                    <div className="flex gap-8 items-center">
+                      <div className="flex flex-col items-center justify-center min-w-[80px]">
+                        <p className="text-5xl font-black text-slate-900">{provider.rating ? provider.rating.toFixed(1) : '0.0'}</p>
+                        <StarRating rating={provider.rating || 0} size={16} />
+                        <p className="text-xs text-slate-500 mt-2">Basé sur {provider.reviewCount || 0} avis</p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
+
+                {/* Reviews List */}
                 {reviews.length > 0 ? reviews.map((review) => (
                   <div key={review.id || review._id} className="border-t border-slate-200 pt-4">
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold">
-                          {review.clientName?.charAt(0)}
-                        </div>
+                        {review.userAvatar ? (
+                          <div
+                            className="w-10 h-10 rounded-full bg-cover bg-center"
+                            style={{ backgroundImage: `url("${review.userAvatar}")` }}
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold">
+                            {review.userName?.charAt(0) || review.clientName?.charAt(0) || '?'}
+                          </div>
+                        )}
                         <div>
-                          <p className="font-semibold text-slate-900">{review.clientName}</p>
+                          <p className="font-semibold text-slate-900">{review.userName || review.clientName}</p>
                           <StarRating rating={review.rating || 0} size={14} />
                         </div>
                       </div>
-                      <span className="text-xs text-slate-500">{review.createdAt ? new Date(review.createdAt).toLocaleDateString() : ''}</span>
+                      <span className="text-xs text-slate-500">{formatRelativeTime(review.createdAt)}</span>
                     </div>
-                    <p className="text-slate-600">{review.comment}</p>
+                    {review.comment && <p className="text-slate-600">{review.comment}</p>}
                   </div>
-                )) : <p className="text-center text-slate-500 py-8">Aucun avis pour le moment.</p>}
+                )) : (
+                  <div className="text-center py-8">
+                    <span className="text-5xl">⭐</span>
+                    <p className="text-slate-500 mt-2">Aucun avis pour le moment</p>
+                    <small className="text-slate-400">Soyez le premier à noter ce professionnel</small>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1122,6 +1273,18 @@ export default function ProviderProfileScreen({ isDesktop }) {
           </div>
         </div>
       )}
+
+      {/* Rating Modal */}
+      <RatingModal
+        isOpen={showRatingModal}
+        onClose={() => {
+          setShowRatingModal(false);
+          setSelectedBooking(null);
+        }}
+        provider={provider}
+        booking={selectedBooking}
+        onReviewSubmitted={handleReviewSubmitted}
+      />
     </div>
   );
 }
