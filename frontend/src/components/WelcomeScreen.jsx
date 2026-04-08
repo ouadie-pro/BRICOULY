@@ -1,25 +1,44 @@
 import { Link } from 'react-router-dom';
+import { FiSearch, FiShield, FiDollarSign, FiHeadphones, FiStar, FiTool, FiMapPin, FiCheckCircle } from 'react-icons/fi';
 
 const features = [
   {
-    icon: 'search',
+    icon: FiSearch,
     title: 'Find Professionals',
     desc: 'Search from hundreds of verified service providers in your area.',
   },
   {
-    icon: 'verified_user',
+    icon: FiShield,
     title: 'Vetted Experts',
     desc: 'All providers are background-checked and verified.',
   },
   {
-    icon: 'payments',
+    icon: FiDollarSign,
     title: 'Transparent Pricing',
     desc: 'Get upfront quotes with no hidden fees.',
   },
   {
-    icon: 'support_agent',
+    icon: FiHeadphones,
     title: '24/7 Support',
     desc: 'Round-the-clock assistance for all your needs.',
+  },
+];
+
+const howItWorks = [
+  {
+    step: '1',
+    title: 'Search',
+    desc: 'Find the right professional for your needs',
+  },
+  {
+    step: '2',
+    title: 'Book',
+    desc: 'Schedule a service at your convenience',
+  },
+  {
+    step: '3',
+    title: 'Done',
+    desc: 'Relax while experts get the job done',
   },
 ];
 
@@ -35,7 +54,7 @@ export default function WelcomeScreen() {
         
         <div className="absolute top-8 left-8 flex items-center gap-3">
           <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/30">
-            <span className="material-symbols-outlined text-white text-3xl">handyman</span>
+            <FiTool className="text-white text-3xl" />
           </div>
           <h1 className="text-white text-3xl font-black tracking-tight">PRUCOLY</h1>
         </div>
@@ -67,10 +86,10 @@ export default function WelcomeScreen() {
               <div>
                 <div className="flex items-center gap-1">
                   {[1, 2, 3, 4, 5].map((i) => (
-                    <span key={i} className="material-symbols-outlined text-yellow-400 text-lg">star</span>
+                    <FiStar key={i} className="text-yellow-400 text-lg" />
                   ))}
                 </div>
-                <p className="text-white/70 text-sm">Trusted by 10,000+ customers</p>
+                <p className="text-white/70 text-sm">Trusted by 500+ customers</p>
               </div>
             </div>
           </div>
@@ -81,7 +100,7 @@ export default function WelcomeScreen() {
         <div className="lg:hidden mb-8">
           <div className="flex items-center gap-3 mb-4 justify-center">
             <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-dark rounded-xl flex items-center justify-center shadow-lg shadow-primary/30">
-              <span className="material-symbols-outlined text-white text-2xl">handyman</span>
+              <FiTool className="text-white text-2xl" />
             </div>
             <h1 className="text-2xl font-black tracking-tight text-slate-900">PRUCOLY</h1>
           </div>
@@ -128,7 +147,7 @@ export default function WelcomeScreen() {
             {features.map((feature, idx) => (
               <div key={idx} className="flex items-start gap-3 p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-white/50">
                 <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-primary">{feature.icon}</span>
+                  <feature.icon className="text-primary" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-slate-900 text-sm">{feature.title}</h3>
@@ -136,6 +155,21 @@ export default function WelcomeScreen() {
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="hidden lg:block mb-8">
+            <h3 className="text-lg font-bold text-slate-900 mb-4">How it works</h3>
+            <div className="grid grid-cols-3 gap-4">
+              {howItWorks.map((item, idx) => (
+                <div key={idx} className="text-center">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-2">
+                    <span className="text-xl font-bold text-primary">{item.step}</span>
+                  </div>
+                  <h4 className="font-semibold text-slate-900 text-sm">{item.title}</h4>
+                  <p className="text-xs text-slate-500 mt-1">{item.desc}</p>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="relative my-6 flex items-center">

@@ -192,9 +192,12 @@ exports.respondFollowRequest = async (req, res) => {
 
 exports.getFollowRequests = async (req, res) => {
   try {
+    console.log('[getFollowRequests] Request received', { headers: req.headers });
     const userId = req.headers['x-user-id'];
+    console.log('[getFollowRequests] userId:', userId);
     
     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      console.log('[getFollowRequests] Invalid userId');
       return res.status(400).json({ success: false, error: 'Invalid userId' });
     }
     
@@ -202,6 +205,7 @@ exports.getFollowRequests = async (req, res) => {
       toUser: new mongoose.Types.ObjectId(userId), 
       status: 'pending' 
     }).populate('fromUser', 'name avatar').lean();
+    console.log('[getFollowRequests] Found requests:', pendingRequests.length);
     
     const requestsData = pendingRequests.map(r => ({
       id: r._id.toString(),
@@ -216,7 +220,7 @@ exports.getFollowRequests = async (req, res) => {
     
     res.json(requestsData);
   } catch (error) {
-    console.error('Error in /api/follow/requests:', error);
+    console.error('[getFollowRequests] Error:', error.message, error.stack);
     res.status(500).json({ error: error.message });
   }
 };

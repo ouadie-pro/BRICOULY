@@ -1,7 +1,12 @@
+import { FiPlay, FiCheck } from 'react-icons/fi';
 export default function MessageBubble({ message, isOwn, showAvatar }) {
   const formatTime = (date) => {
     const d = new Date(date);
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const getAvatarFallback = (name) => {
+    return name?.charAt(0)?.toUpperCase() || '?';
   };
 
   const getMessageContent = () => {
@@ -31,7 +36,7 @@ export default function MessageBubble({ message, isOwn, showAvatar }) {
         return (
           <div className="flex items-center gap-2 min-w-[200px]">
             <button className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined text-white text-sm">play_arrow</span>
+              <FiPlay style={{ fontSize: '14px' }} className="text-white text-sm" />
             </button>
             <div className="flex-1 h-8 bg-white/10 rounded-full overflow-hidden">
               <div className="h-full w-1/3 bg-white/30 rounded-full" />
@@ -53,15 +58,30 @@ export default function MessageBubble({ message, isOwn, showAvatar }) {
   return (
     <div className={`flex items-end gap-2 mb-4 ${isOwn ? 'flex-row-reverse' : ''}`}>
       {!isOwn && (
-        <div className="shrink-0">
+        <div className="shrink-0 flex-shrink-0">
           {showAvatar ? (
-            <img
-              src={message.senderAvatar || '/default-avatar.png'}
-              alt="Avatar"
-              className="w-8 h-8 rounded-full object-cover"
-            />
+            message.senderAvatar ? (
+              <img
+                src={message.senderAvatar}
+                alt={message.senderName || 'User'}
+                className="w-8 h-8 rounded-full object-cover"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling && (e.target.nextSibling.style.display = 'flex');
+                }}
+              />
+            ) : null
           ) : (
             <div className="w-8" />
+          )}
+          {showAvatar && !message.senderAvatar && (
+            <div 
+              className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"
+            >
+              <span className="text-xs font-bold text-white">
+                {getAvatarFallback(message.senderName)}
+              </span>
+            </div>
           )}
         </div>
       )}
@@ -82,7 +102,7 @@ export default function MessageBubble({ message, isOwn, showAvatar }) {
             {formatTime(message.createdAt)}
           </span>
           {isOwn && message.read && (
-            <span className="material-symbols-outlined text-[12px] text-primary">done_all</span>
+            <FiCheck style={{ fontSize: '12px' }} className="text-primary" />
           )}
         </div>
       </div>

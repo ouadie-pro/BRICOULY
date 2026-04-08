@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { api } from '../services/api';
+import { FiImage, FiVideo, FiMic, FiSend, FiPhone, FiPlus, FiX, FiLoader } from 'react-icons/fi';
 
 export default function ChatInput({ receiverId, onMessageSent }) {
   const [message, setMessage] = useState('');
@@ -156,7 +157,7 @@ export default function ChatInput({ receiverId, onMessageSent }) {
             onClick={() => imageInputRef.current?.click()}
             className="flex flex-col items-center p-3 hover:bg-slate-100 rounded-lg transition-colors"
           >
-            <span className="material-symbols-outlined text-green-500 text-2xl">image</span>
+            <FiImage className="text-green-500 text-2xl" />
             <span className="text-xs text-slate-600 mt-1">Photo</span>
           </button>
           
@@ -171,7 +172,7 @@ export default function ChatInput({ receiverId, onMessageSent }) {
             onClick={() => videoInputRef.current?.click()}
             className="flex flex-col items-center p-3 hover:bg-slate-100 rounded-lg transition-colors"
           >
-            <span className="material-symbols-outlined text-purple-500 text-2xl">videocam</span>
+            <FiVideo className="text-purple-500 text-2xl" />
             <span className="text-xs text-slate-600 mt-1">Video</span>
           </button>
           
@@ -179,7 +180,7 @@ export default function ChatInput({ receiverId, onMessageSent }) {
             onClick={startRecording}
             className="flex flex-col items-center p-3 hover:bg-slate-100 rounded-lg transition-colors"
           >
-            <span className="material-symbols-outlined text-red-500 text-2xl">mic</span>
+            <FiMic className="text-red-500 text-2xl" />
             <span className="text-xs text-slate-600 mt-1">Voice</span>
           </button>
         </div>
@@ -192,7 +193,7 @@ export default function ChatInput({ receiverId, onMessageSent }) {
             onClick={() => setShowMediaPicker(!showMediaPicker)}
             className="flex items-center justify-center w-10 h-10 rounded-full text-slate-500 hover:bg-slate-100 transition-colors"
           >
-            <span className="material-symbols-outlined text-[22px]">add_circle</span>
+            <FiPlus style={{ fontSize: '22px' }} />
           </button>
           
           <button
@@ -204,16 +205,14 @@ export default function ChatInput({ receiverId, onMessageSent }) {
                 : 'text-slate-500 hover:bg-slate-100'
             }`}
           >
-            <span className="material-symbols-outlined text-[22px]">
-              {isRecording ? 'stop' : 'mic'}
-            </span>
+            {isRecording ? <FiX style={{ fontSize: '22px' }} /> : <FiMic style={{ fontSize: '22px' }} />}
           </button>
           
           <button
             type="button"
             className="flex items-center justify-center w-10 h-10 rounded-full text-slate-500 hover:bg-slate-100 transition-colors"
           >
-            <span className="material-symbols-outlined text-[22px]">call</span>
+            <FiPhone style={{ fontSize: '22px' }} />
           </button>
         </div>
         
@@ -237,9 +236,9 @@ export default function ChatInput({ receiverId, onMessageSent }) {
           }`}
         >
           {isSending ? (
-            <span className="material-symbols-outlined text-[18px] animate-spin">sync</span>
+            <FiLoader style={{ fontSize: '18px' }} className="animate-spin" />
           ) : (
-            <span className="material-symbols-outlined text-[20px]">send</span>
+            <FiSend style={{ fontSize: '20px' }} />
           )}
         </button>
       </form>

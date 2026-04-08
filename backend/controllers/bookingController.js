@@ -1,19 +1,31 @@
 const Booking = require('../models/Booking');
+const Provider = require('../models/Provider');
+
+const updateProviderJobsDone = async (providerId) => {
+  try {
+    const completedBookings = await Booking.countDocuments({ provider: providerId, status: 'completed' });
+    await Provider.findByIdAndUpdate(providerId, { jobsDone: completedBookings });
+  } catch (error) {
+    console.error('Error updating provider jobsDone:', error);
+  }
+};
 
 exports.getBookings = async (req, res) => {
   try {
+    console.log('[getBookings] Request received', { headers: req.headers });
+    const userId = req.headers['x-user-id'];
+    console.log('[getBookings] userId:', userId);
     const { status, role } = req.query;
     
     let query = {};
     
     if (role === 'provider') {
-      const Provider = require('../models/Provider');
-      const provider = await Provider.findOne({ user: req.user.id });
+      const provider = await Provider.findOne({ user: userId });
       if (provider) {
         query.provider = provider._id;
       }
     } else {
-      query.user = req.user.id;
+      query.user = userId;
     }
 
     if (status) {
@@ -34,6 +46,7 @@ exports.getBookings = async (req, res) => {
       bookings,
     });
   } catch (error) {
+    console.error('[getBookings] Error:', error.message, error.stack);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -43,9 +56,10 @@ exports.getBookings = async (req, res) => {
 
 exports.createBooking = async (req, res) => {
   try {
+    const userId = req.headers['x-user-id']; // FIXED: #1 - Use x-user-id header
     const bookingData = {
       ...req.body,
-      user: req.user.id,
+      user: userId,
     };
 
     const booking = await Booking.create(bookingData);
@@ -62,6 +76,7 @@ exports.createBooking = async (req, res) => {
       booking: populatedBooking,
     });
   } catch (error) {
+    console.error('[getBookings] Error:', error.message, error.stack);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -81,8 +96,13 @@ exports.updateBookingStatus = async (req, res) => {
       });
     }
 
-    if (status === 'completed') {
+    const previousStatus = booking.status;
+    
+    if (status === 'completed' && previousStatus !== 'completed') {
       booking.completedAt = new Date();
+      if (booking.provider) {
+        await updateProviderJobsDone(booking.provider);
+      }
     }
 
     booking.status = status;
@@ -93,6 +113,7 @@ exports.updateBookingStatus = async (req, res) => {
       booking,
     });
   } catch (error) {
+    console.error('[getBookings] Error:', error.message, error.stack);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -102,6 +123,7 @@ exports.updateBookingStatus = async (req, res) => {
 
 exports.cancelBooking = async (req, res) => {
   try {
+    const userId = req.headers['x-user-id']; // FIXED: #1 - Use x-user-id header
     const booking = await Booking.findById(req.params.id);
 
     if (!booking) {
@@ -111,7 +133,7 @@ exports.cancelBooking = async (req, res) => {
       });
     }
 
-    if (booking.user.toString() !== req.user.id) {
+    if (booking.user.toString() !== userId) {
       return res.status(403).json({
         success: false,
         error: 'Not authorized to cancel this booking',
@@ -126,6 +148,7 @@ exports.cancelBooking = async (req, res) => {
       booking,
     });
   } catch (error) {
+    console.error('[getBookings] Error:', error.message, error.stack);
     res.status(500).json({
       success: false,
       error: error.message,

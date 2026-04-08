@@ -3,27 +3,33 @@ const API_BASE = '/api';
 async function safeFetch(url, options = {}) {
   try {
     const res = await fetch(url, options);
-    const text = await res.text();
+    let data;
     
-    if (!text || text.trim() === '') {
-      if (res.ok) {
-        return [];
-      }
+    try {
+      const text = await res.text();
+      data = text ? JSON.parse(text) : {};
+    } catch (e) {
+      console.error('JSON parse error at:', url);
       return { 
         success: false, 
-        error: res.status >= 500 ? 'Server error. Please try again later.' : 'Server returned empty response',
+        error: res.status >= 500 ? 'Server error. Please try again later.' : 'Invalid server response',
         status: res.status
       };
     }
     
-    try {
-      return JSON.parse(text);
-    } catch (e) {
-      console.error('JSON parse error at:', url, text.substring(0, 200));
-      return { success: false, error: 'Invalid server response' };
+    if (!res.ok) {
+      console.error('API Error:', res.status, data);
+      return { 
+        ...data,
+        success: false, 
+        status: res.status,
+        error: data?.error || `Request failed (${res.status})`
+      };
     }
+    
+    return data;
   } catch (err) {
-    console.error('Network error connecting to:', url, err.message);
+    console.error('Network error:', url, err);
     return { success: false, error: 'Cannot connect to server. Is backend running?' };
   }
 }
@@ -32,28 +38,20 @@ async function safeFetch(url, options = {}) {
 export const getUserId = () => {
   try {
     const userStr = localStorage.getItem('user');
-    console.log('localStorage userStr:', userStr);
     
     if (!userStr) {
-      console.warn('No user in localStorage');
       return null;
     }
     
     const user = JSON.parse(userStr);
-    console.log('Parsed user:', user);
-    console.log('user.id:', user?.id, 'user._id:', user?._id);
-    
     const userId = user?.id || user?._id;
 
     if (!userId) {
-      console.warn('No userId found in localStorage user object');
       return null;
     }
 
-    console.log('Returning userId:', userId, 'length:', userId.length);
     return userId;
   } catch (e) {
-    console.warn('Error parsing user from localStorage:', e);
     return null;
   }
 };
@@ -131,6 +129,7 @@ export const api = {
 
   // Provider Services
   getProviderServices: async (providerId) => {
+    if (!providerId) return [];
     return safeFetch(`${API_BASE}/providers/${providerId}/services`);
   },
 
@@ -234,13 +233,16 @@ export const api = {
   },
 
   createPost: async (postData) => {
+    const formData = new FormData();
+    if (postData.content) formData.append('content', postData.content);
+    if (postData.type) formData.append('type', postData.type);
+    if (postData.images && postData.images.length > 0) {
+      postData.images.forEach(image => formData.append('images', image));
+    }
     return safeFetch(`${API_BASE}/posts`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': getUserId(),
-      },
-      body: JSON.stringify(postData),
+      headers: { 'x-user-id': getUserId() },
+      body: formData,
     });
   },
 
@@ -251,12 +253,35 @@ export const api = {
     });
   },
 
+  deletePost: async (postId) => {
+    return safeFetch(`${API_BASE}/posts/${postId}`, {
+      method: 'DELETE',
+      headers: { 'x-user-id': getUserId() },
+    });
+  },
+
   getComments: async (postId) => {
     return safeFetch(`${API_BASE}/posts/${postId}/comments`);
   },
 
   addComment: async (postId, content) => {
     return safeFetch(`${API_BASE}/posts/${postId}/comments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-id': getUserId(),
+      },
+      body: JSON.stringify({ content }),
+    });
+  },
+
+  // Article Comments
+  getArticleComments: async (articleId) => {
+    return safeFetch(`${API_BASE}/articles/${articleId}/comments`);
+  },
+
+  addArticleComment: async (articleId, content) => {
+    return safeFetch(`${API_BASE}/articles/${articleId}/comments`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -290,6 +315,12 @@ export const api = {
     });
   },
 
+  incrementVideoView: async (videoId) => {
+    return safeFetch(`${API_BASE}/videos/${videoId}/view`, {
+      method: 'POST',
+    });
+  },
+
   deleteVideo: async (videoId) => {
     return safeFetch(`${API_BASE}/videos/${videoId}`, {
       method: 'DELETE',
@@ -310,7 +341,10 @@ export const api = {
     const formData = new FormData();
     if (articleData.title) formData.append('title', articleData.title);
     if (articleData.content) formData.append('content', articleData.content);
-    if (articleData.image) formData.append('image', articleData.image);
+    if (articleData.type) formData.append('type', articleData.type);
+    if (articleData.images && articleData.images.length > 0) {
+      articleData.images.forEach(image => formData.append('images', image));
+    }
     return safeFetch(`${API_BASE}/articles`, {
       method: 'POST',
       headers: { 'x-user-id': getUserId() },
@@ -322,21 +356,6 @@ export const api = {
     return safeFetch(`${API_BASE}/articles/${articleId}/like`, {
       method: 'POST',
       headers: { 'x-user-id': getUserId() },
-    });
-  },
-
-  getArticleComments: async (articleId) => {
-    return safeFetch(`${API_BASE}/articles/${articleId}/comments`);
-  },
-
-  addArticleComment: async (articleId, content) => {
-    return safeFetch(`${API_BASE}/articles/${articleId}/comments`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': getUserId(),
-      },
-      body: JSON.stringify({ content }),
     });
   },
 
@@ -360,6 +379,12 @@ export const api = {
         'x-user-id': getUserId(),
       },
       body: JSON.stringify(reviewData),
+    });
+  },
+
+  getCompletedBookings: async () => {
+    return safeFetch(`${API_BASE}/bookings?status=completed`, {
+      headers: { 'x-user-id': getUserId() },
     });
   },
 
@@ -407,7 +432,7 @@ export const api = {
   },
 
   getMyFollowing: async () => {
-    return safeFetch(`${API_BASE}/following`, {
+    return safeFetch(`${API_BASE}/follow/following`, {
       headers: { 'x-user-id': getUserId() },
     });
   },
@@ -499,5 +524,24 @@ export const api = {
 
   getFollowing: async (userId) => {
     return safeFetch(`${API_BASE}/follow/${userId}/following`);
+  },
+
+  // Provider Dashboard Stats
+  getProviderStats: async (providerId) => {
+    return safeFetch(`${API_BASE}/providers/${providerId}/stats`, {
+      headers: { 'x-user-id': getUserId() },
+    });
+  },
+
+  getWeeklyActivity: async (providerId) => {
+    return safeFetch(`${API_BASE}/providers/${providerId}/activity`, {
+      headers: { 'x-user-id': getUserId() },
+    });
+  },
+
+  incrementProfileView: async (userId) => {
+    return safeFetch(`${API_BASE}/auth/users/${userId}/view`, {
+      method: 'PATCH',
+    });
   },
 };

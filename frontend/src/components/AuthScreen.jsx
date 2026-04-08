@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { api } from '../services/api';
+import { 
+  FiTool, FiUser, FiMail, FiLock, FiPhone, FiEye, FiEyeOff, FiAlertCircle, FiPlus, FiAlertTriangle,
+  FiZap, FiDroplet, FiBox, FiTruck, FiWind, FiFeather, FiHome, FiShoppingBag, FiCheckCircle
+} from 'react-icons/fi';
+import { getCategoryIcon } from '../utils/categoryIcons.jsx';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function AuthScreen({ onAuth }) {
   const [searchParams] = useSearchParams();
@@ -8,29 +15,40 @@ export default function AuthScreen({ onAuth }) {
   const [mode, setMode] = useState(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [role, setRole] = useState('client');
-  const [professionId, setProfessionId] = useState('');
+  const [role, setRole] = useState('user'); // FIXED: #3 - Use 'user' instead of 'client'
+  const [selectedProfessions, setSelectedProfessions] = useState([]);
+  const [hourlyRate, setHourlyRate] = useState('');
   const [professions, setProfessions] = useState(null);
   const [bio, setBio] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [showAddProfession, setShowAddProfession] = useState(false);
   const [newProfessionName, setNewProfessionName] = useState('');
   const navigate = useNavigate();
 
+  const toggleProfession = (profId) => {
+    setSelectedProfessions(prev => 
+      prev.includes(profId) 
+        ? prev.filter(id => id !== profId)
+        : [...prev, profId]
+    );
+  };
+
   const defaultProfessions = [
-    { id: 1, name: 'Plumber', icon: 'plumbing', color: '#3b82f6' },
-    { id: 2, name: 'Electrician', icon: 'bolt', color: '#eab308' },
-    { id: 3, name: 'Painter', icon: 'format_paint', color: '#ec4899' },
-    { id: 4, name: 'Carpenter', icon: 'carpenter', color: '#f59e0b' },
-    { id: 5, name: 'Home Cleaner', icon: 'cleaning_services', color: '#8b5cf6' },
-    { id: 6, name: 'Mover', icon: 'local_shipping', color: '#22c55e' },
-    { id: 7, name: 'HVAC Technician', icon: 'ac_unit', color: '#06b6d4' },
-    { id: 8, name: 'Landscaper', icon: 'grass', color: '#84cc16' },
-    { id: 9, name: 'Roofer', icon: 'roofing', color: '#dc2626' },
-    { id: 10, name: 'Appliance Repair', icon: 'kitchen', color: '#6366f1' },
+    { id: 1, name: 'Plumber', icon: FiDroplet, color: '#3b82f6' },
+    { id: 2, name: 'Electrician', icon: FiZap, color: '#eab308' },
+    { id: 3, name: 'Painter', icon: FiBox, color: '#ec4899' },
+    { id: 4, name: 'Carpenter', icon: FiTool, color: '#f59e0b' },
+    { id: 5, name: 'Home Cleaner', icon: FiFeather, color: '#8b5cf6' },
+    { id: 6, name: 'Mover', icon: FiTruck, color: '#22c55e' },
+    { id: 7, name: 'HVAC Technician', icon: FiWind, color: '#06b6d4' },
+    { id: 8, name: 'Landscaper', icon: FiFeather, color: '#84cc16' },
+    { id: 9, name: 'Roofer', icon: FiHome, color: '#dc2626' },
+    { id: 10, name: 'Appliance Repair', icon: FiShoppingBag, color: '#6366f1' },
   ];
 
   useEffect(() => {
@@ -54,8 +72,18 @@ export default function AuthScreen({ onAuth }) {
     e.preventDefault();
     setError('');
     
-    if (mode === 'signup' && role === 'provider' && !professionId) {
-      setError('Please select your specialization');
+    if (mode === 'signup' && role === 'provider' && selectedProfessions.length === 0) {
+      setError('Please select at least one specialization');
+      return;
+    }
+    
+    if (mode === 'signup' && password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+    
+    if (mode === 'signup' && password.length < 6) {
+      setError('Password must be at least 6 characters');
       return;
     }
     
@@ -70,25 +98,34 @@ export default function AuthScreen({ onAuth }) {
           setError(res.error || 'Login failed');
         }
       } else {
+        console.log('[Auth] Signing up with:', { name, email, role });
         const res = await api.signup({ 
           name, 
           email, 
           password, 
           role,
           phone,
-          professionId: role === 'provider' ? professionId : null,
+          professionId: role === 'provider' ? selectedProfessions[0] : null,
+          professionIds: role === 'provider' ? selectedProfessions : [],
           bio: role === 'provider' ? bio : '',
+          hourlyRate: role === 'provider' ? parseFloat(hourlyRate) || 0 : undefined,
         });
+        console.log('[Auth] Signup response:', res);
+        
         if (res.success) {
           localStorage.setItem('user', JSON.stringify(res.user));
+          if (res.token) {
+            localStorage.setItem('token', res.token);
+          }
           if (onAuth) onAuth(res.user);
           navigate('/home');
         } else {
-          setError(res.error || 'Signup failed');
+          setError(res.error || 'Signup failed. Please try again.');
         }
       }
     } catch (err) {
-      setError('Something went wrong. Please try again.');
+      console.error('[Auth] Signup error:', err);
+      setError('Something went wrong. Please check if the server is running.');
     }
   };
 
@@ -99,16 +136,25 @@ export default function AuthScreen({ onAuth }) {
     try {
       const res = await api.addProfession({ name: newProfessionName.trim() });
       if (res.success) {
-        setProfessions([...(professions || []), res.profession]);
-        setProfessionId(res.profession._id || res.profession.id);
+        const newProf = res.profession;
+        setProfessions([...(professions || []), newProf]);
+        setSelectedProfessions(prev => [...prev, newProf._id || newProf.id]);
         setNewProfessionName('');
         setShowAddProfession(false);
       } else {
         setError(res.error || 'Failed to add specialization');
       }
-    } catch (err) {
+    } catch (_err) {
       setError('Failed to add specialization');
     }
+  };
+
+  const handleGoogleLogin = () => {
+    window.location.href = `${API_URL}/api/auth/google`;
+  };
+
+  const handleFacebookLogin = () => {
+    window.location.href = `${API_URL}/api/auth/facebook`;
   };
 
   return (
@@ -122,7 +168,7 @@ export default function AuthScreen({ onAuth }) {
         
         <div className="absolute top-8 left-8 flex items-center gap-3">
           <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/30">
-            <span className="material-symbols-outlined text-white text-3xl">handyman</span>
+            <FiTool className="text-white text-3xl" />
           </div>
           <h1 className="text-white text-3xl font-black tracking-tight">PRUCOLY</h1>
         </div>
@@ -131,7 +177,7 @@ export default function AuthScreen({ onAuth }) {
           <div className="space-y-6">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full border border-white/20 w-fit">
               <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-              <span className="text-white/90 text-sm font-medium">Trusted by 10,000+ customers</span>
+              <span className="text-white/90 text-sm font-medium">Serving Morocco</span>
             </div>
             <h2 className="text-white text-4xl font-bold leading-tight max-w-lg">
               Connect with skilled professionals for your home
@@ -148,13 +194,40 @@ export default function AuthScreen({ onAuth }) {
             </div>
             <div className="w-px h-12 bg-white/20"></div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-white">4.9</div>
-              <div className="text-white/60 text-sm">Avg Rating</div>
+              <div className="text-3xl font-bold text-white">250+</div>
+              <div className="text-white/60 text-sm">Happy Customers</div>
             </div>
             <div className="w-px h-12 bg-white/20"></div>
             <div className="text-center">
               <div className="text-3xl font-bold text-white">24h</div>
               <div className="text-white/60 text-sm">Response Time</div>
+            </div>
+          </div>
+          
+          <div className="mt-12 pt-8 border-t border-white/20">
+            <h3 className="text-white text-lg font-semibold mb-6">How it works</h3>
+            <div className="grid grid-cols-3 gap-6">
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center mx-auto mb-3">
+                  <span className="text-white text-xl font-bold">1</span>
+                </div>
+                <p className="text-white/90 text-sm font-medium">Search</p>
+                <p className="text-white/50 text-xs mt-1">Find the right pro</p>
+              </div>
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center mx-auto mb-3">
+                  <span className="text-white text-xl font-bold">2</span>
+                </div>
+                <p className="text-white/90 text-sm font-medium">Book</p>
+                <p className="text-white/50 text-xs mt-1">Schedule service</p>
+              </div>
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center mx-auto mb-3">
+                  <span className="text-white text-xl font-bold">3</span>
+                </div>
+                <p className="text-white/90 text-sm font-medium">Done</p>
+                <p className="text-white/50 text-xs mt-1">Get it done!</p>
+              </div>
             </div>
           </div>
         </div>
@@ -164,7 +237,7 @@ export default function AuthScreen({ onAuth }) {
         <div className="w-full max-w-[440px]">
           <div className="lg:hidden flex items-center gap-3 mb-8 justify-center">
             <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-dark rounded-xl flex items-center justify-center shadow-lg shadow-primary/30">
-              <span className="material-symbols-outlined text-white text-2xl">handyman</span>
+              <FiTool className="text-white text-2xl" />
             </div>
             <h1 className="text-2xl font-black tracking-tight text-slate-900">PRUCOLY</h1>
           </div>
@@ -187,8 +260,8 @@ export default function AuthScreen({ onAuth }) {
                 checked={mode === 'login'}
                 onChange={() => {
                   setMode('login');
-                  setRole('client');
-                  setProfessionId('');
+                  setRole('user'); // FIXED: #3 - Use 'user' instead of 'client'
+                  setSelectedProfessions([]);
                 }}
                 className="invisible w-0 absolute"
               />
@@ -213,14 +286,14 @@ export default function AuthScreen({ onAuth }) {
                   <div className="flex gap-3">
                     <button
                       type="button"
-                      onClick={() => setRole('client')}
+                      onClick={() => setRole('user')} // FIXED: #3 - Use 'user' instead of 'client'
                       className={`flex-1 p-4 rounded-xl border-2 transition-all ${
-                        role === 'client' 
+                        role === 'user' 
                           ? 'border-primary bg-blue-50/50' 
                           : 'border-slate-200 hover:border-slate-300 bg-white'
                       }`}
                     >
-                      <span className="material-symbols-outlined text-2xl mb-2 block text-slate-600">person</span>
+                      <FiUser className="text-2xl mb-2 block text-slate-600 mx-auto" />
                       <span className="text-sm font-semibold text-slate-700">Client</span>
                       <p className="text-xs text-slate-500 mt-1">Find & book services</p>
                     </button>
@@ -233,7 +306,7 @@ export default function AuthScreen({ onAuth }) {
                           : 'border-slate-200 hover:border-slate-300 bg-white'
                       }`}
                     >
-                      <span className="material-symbols-outlined text-2xl mb-2 block text-slate-600">construction</span>
+                      <FiTool className="text-2xl mb-2 block text-slate-600 mx-auto" />
                       <span className="text-sm font-semibold text-slate-700">Provider</span>
                       <p className="text-xs text-slate-500 mt-1">Offer your services</p>
                     </button>
@@ -248,26 +321,26 @@ export default function AuthScreen({ onAuth }) {
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       className="input-field pl-10"
-                      placeholder="John Doe"
+                      placeholder="Enter your name..."
                       required
                     />
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary">person</span>
+    
                   </div>
                 </div>
 
                 {role === 'provider' && (
                   <>
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-slate-700 text-sm font-medium">Select Your Specialization</label>
-                      <p className="text-xs text-slate-500 mb-2">Choose the service you specialize in</p>
+                      <label className="text-slate-700 text-sm font-medium">Select Your Specialization(s)</label>
+                      <p className="text-xs text-slate-500 mb-2">Choose one or more services you offer</p>
                       <div className="grid grid-cols-2 gap-2.5">
                         {professions.map((prof) => (
                           <button
                             key={prof._id}
                             type="button"
-                            onClick={() => setProfessionId(prof._id)}
+                            onClick={() => toggleProfession(prof._id)}
                             className={`flex items-center gap-2.5 p-2.5 rounded-xl border-2 transition-all ${
-                              professionId === prof._id
+                              selectedProfessions.includes(prof._id)
                                 ? 'border-primary bg-blue-50/50'
                                 : 'border-slate-200 hover:border-slate-300 bg-white'
                             }`}
@@ -276,14 +349,12 @@ export default function AuthScreen({ onAuth }) {
                               className="w-9 h-9 rounded-lg flex items-center justify-center"
                               style={{ backgroundColor: prof.color ? `${prof.color}20` : '#f1f5f9' }}
                             >
-                              <span 
-                                className="material-symbols-outlined text-lg"
-                                style={{ color: prof.color || '#64748b' }}
-                              >
-                                {prof.icon}
-                              </span>
+                              {getCategoryIcon(prof.icon, 20)}
                             </div>
                             <span className="text-xs font-semibold text-slate-700">{prof.name}</span>
+                            {selectedProfessions.includes(prof._id) && (
+                              <FiCheckCircle className="ml-auto text-primary" style={{ fontSize: '16px' }} />
+                            )}
                           </button>
                         ))}
                       </div>
@@ -294,7 +365,7 @@ export default function AuthScreen({ onAuth }) {
                           onClick={() => setShowAddProfession(true)}
                           className="flex items-center justify-center gap-2 w-full p-3 rounded-xl border-2 border-dashed border-slate-300 text-slate-500 hover:border-primary hover:text-primary hover:bg-blue-50/30 transition-all text-sm font-medium mt-1"
                         >
-                          <span className="material-symbols-outlined text-lg">add</span>
+                          <FiPlus className="text-lg" />
                           Add New Specialization
                         </button>
                       ) : (
@@ -331,9 +402,24 @@ export default function AuthScreen({ onAuth }) {
                         </form>
                       )}
                       
-                      {mode === 'signup' && role === 'provider' && !professionId && (
-                        <p className="text-xs text-red-500 mt-1">Please select your specialization</p>
+                      {mode === 'signup' && role === 'provider' && selectedProfessions.length === 0 && (
+                        <p className="text-xs text-red-500 mt-1">Please select at least one specialization</p>
                       )}
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-slate-700 text-sm font-medium">Hourly Rate (MAD)</label>
+                      <div className="relative group">
+                        <input
+                          type="number"
+                          value={hourlyRate}
+                          onChange={(e) => setHourlyRate(e.target.value)}
+                          className="input-field pl-10"
+                          placeholder="e.g., 150"
+                          min="0"
+                        />
+                      </div>
+                      <p className="text-xs text-slate-400">Set your rate in Moroccan Dirhams per hour</p>
                     </div>
 
                     <div className="flex flex-col gap-1.5">
@@ -353,15 +439,15 @@ export default function AuthScreen({ onAuth }) {
             <div className="flex flex-col gap-1.5">
               <label className="text-slate-700 text-sm font-medium">Email Address</label>
               <div className="relative group">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="input-field pl-10"
-                  placeholder="name@company.com"
-                  required
-                />
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary">mail</span>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="input-field pl-10"
+                    placeholder="name@company.com"
+                    required
+                  />
+                  
               </div>
             </div>
 
@@ -373,44 +459,66 @@ export default function AuthScreen({ onAuth }) {
                 )}
               </div>
               <div className="relative group">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="input-field pl-10 pr-10"
-                  placeholder="Enter your password"
-                  required
-                />
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary">lock</span>
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
-                >
-                  <span className="material-symbols-outlined text-lg">{showPassword ? 'visibility' : 'visibility_off'}</span>
-                </button>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="input-field pl-10 pr-10"
+                    placeholder="Enter your password"
+                    required
+                  />
+                  
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                  >
+                    {showPassword ? <FiEyeOff className="text-lg" /> : <FiEye className="text-lg" />}
+                  </button>
               </div>
             </div>
 
             {mode === 'signup' && (
-              <div className="flex flex-col gap-1.5">
-                <label className="text-slate-700 text-sm font-medium">Phone Number <span className="text-slate-400 font-normal">(optional)</span></label>
-                <div className="relative group">
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="input-field pl-10"
-                    placeholder="+1 (555) 000-0000"
-                  />
-                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary">phone</span>
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-slate-700 text-sm font-medium">Phone Number <span className="text-slate-400 font-normal">(optional)</span></label>
+                  <div className="relative group">
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="input-field pl-10"
+                      placeholder="+212 6XX XXX XXX"
+                    />
+                  </div>
                 </div>
-              </div>
+                
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-slate-700 text-sm font-medium">Confirm Password</label>
+                  <div className="relative group">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="input-field pl-10 pr-10"
+                      placeholder="Confirm your password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                    >
+                      {showConfirmPassword ? <FiEyeOff className="text-lg" /> : <FiEye className="text-lg" />}
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
 
             {error && (
               <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl">
-                <span className="material-symbols-outlined text-red-500 text-lg">error</span>
+                <FiAlertCircle className="text-red-500 text-lg" />
                 <p className="text-red-600 text-sm">{error}</p>
               </div>
             )}
@@ -433,7 +541,11 @@ export default function AuthScreen({ onAuth }) {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <button className="flex items-center justify-center gap-2.5 h-11 rounded-xl border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all bg-white">
+            <button 
+              type="button"
+              onClick={handleGoogleLogin}
+              className="flex items-center justify-center gap-2.5 h-11 rounded-xl border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all bg-white"
+            >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                 <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -442,7 +554,11 @@ export default function AuthScreen({ onAuth }) {
               </svg>
               <span className="text-sm font-medium text-slate-700">Google</span>
             </button>
-            <button className="flex items-center justify-center gap-2.5 h-11 rounded-xl border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all bg-white">
+            <button 
+              type="button"
+              onClick={handleFacebookLogin}
+              className="flex items-center justify-center gap-2.5 h-11 rounded-xl border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all bg-white"
+            >
               <svg className="w-5 h-5" fill="#1877F2" viewBox="0 0 24 24">
                 <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
               </svg>

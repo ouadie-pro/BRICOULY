@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const upload = require('../middleware/upload');
+const { uploadMultiple } = require('../middleware/upload');
 const { 
   getArticles, 
   getUserArticles, 
@@ -13,7 +13,7 @@ const {
 
 router.get('/', getArticles);
 router.get('/users/:id/articles', getUserArticles);
-router.post('/', upload.single('image'), createArticle);
+router.post('/', uploadMultiple, createArticle);
 router.post('/:id/like', likeArticle);
 router.delete('/:id', deleteArticle);
 router.get('/:id/comments', getArticleComments);

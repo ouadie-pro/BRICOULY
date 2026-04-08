@@ -31,3 +31,7 @@ const serviceRequestSchema = new mongoose.Schema({
 });
 
 module.exports = mongoose.model('ServiceRequest', serviceRequestSchema);
+
+// FIXED: #18 - Add database indexes
+serviceRequestSchema.index({ client: 1, createdAt: -1 });
+serviceRequestSchema.index({ provider: 1, createdAt: -1 });

@@ -1,6 +1,13 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
+import { 
+  FiHome, FiSearch, FiPlayCircle, FiFileText, FiMessageCircle, FiUser, 
+  FiBell, FiBellOff, FiUserPlus, FiUsers, FiCheckCircle, FiMenu, FiX,
+  FiChevronRight, FiLogOut, FiMapPin, FiChevronDown, FiTool, FiHeart,
+  FiStar
+} from 'react-icons/fi';
+import { GoTasklist } from 'react-icons/go';
 
 export default function Layout({ children, user, onLogout }) {
   const navigate = useNavigate();
@@ -45,18 +52,14 @@ export default function Layout({ children, user, onLogout }) {
     if (isMarkingRead) return;
     
     setIsMarkingRead(true);
-    console.log('Marking all notifications as read...');
     
     try {
       const res = await api.markNotificationsRead();
-      console.log('Mark read response:', res);
       
       if (res.success || res.error === 'No notifications to update') {
         setNotifications(prev => prev.map(n => ({ ...n, read: true })));
         setUnreadCount(0);
         setShowNotifications(false);
-      } else {
-        console.error('Failed to mark notifications as read:', res.error);
       }
     } catch (err) {
       console.error('Error marking notifications as read:', err);
@@ -66,29 +69,18 @@ export default function Layout({ children, user, onLogout }) {
   };
 
   const handleFollowResponse = async (requestId, action) => {
-    if (!requestId) {
-      console.error('No request ID provided');
-      alert('Error: request ID is missing');
-      return;
-    }
-    
-    console.log('Handling follow response:', { requestId, action, type: typeof requestId });
+    if (!requestId) return;
     
     try {
       const res = await api.respondToFollowRequest(String(requestId), action);
-      console.log('Response from server:', res);
       
       if (res.success) {
         setFollowRequests(prev => prev.filter((r) => String(r.id) !== String(requestId)));
         const notifData = await api.getNotifications();
         setNotifications(Array.isArray(notifData) ? notifData : []);
-        alert(`Follow request ${action}ed successfully!`);
-      } else {
-        alert('Failed: ' + (res.error || 'Unknown error'));
       }
     } catch (err) {
       console.error('Error responding to follow request:', err);
-      alert('Error: ' + err.message);
     }
   };
 
@@ -140,31 +132,31 @@ export default function Layout({ children, user, onLogout }) {
 
   const getNotificationIcon = (type) => {
     switch (type) {
-      case 'message': return 'chat_bubble';
-      case 'request': return 'assignment';
-      case 'request_update': return 'check_circle';
-      case 'follow_request': return 'person_add';
-      case 'follow_accepted': return 'people';
-      default: return 'notifications';
+      case 'message': return FiMessageCircle;
+      case 'request': return GoTasklist;
+      case 'request_update': return FiCheckCircle;
+      case 'follow_request': return FiUserPlus;
+      case 'follow_accepted': return FiUsers;
+      default: return FiBell;
     }
   };
 
   const clientNavItems = [
-    { path: '/home', icon: 'home', label: 'Home' },
-    { path: '/search', icon: 'search', label: 'Search' },
-    { path: '/videos', icon: 'play_circle', label: 'Videos' },
-    { path: '/requests', icon: 'assignment', label: 'My Requests' },
-    { path: '/messages', icon: 'chat_bubble', label: 'Messages' },
-    { path: '/profile', icon: 'person', label: 'Profile' },
+    { path: '/home', icon: FiHome, label: 'Home' },
+    { path: '/search', icon: FiSearch, label: 'Search' },
+    { path: '/videos', icon: FiPlayCircle, label: 'Videos' },
+    { path: '/requests', icon: GoTasklist, label: 'My Requests' },
+    { path: '/messages', icon: FiMessageCircle, label: 'Messages' },
+    { path: '/profile', icon: FiUser, label: 'Profile' },
   ];
 
   const providerNavItems = [
-    { path: '/home', icon: 'home', label: 'Home' },
-    { path: '/search', icon: 'search', label: 'Find Work' },
-    { path: '/videos', icon: 'play_circle', label: 'Videos' },
-    { path: '/dashboard', icon: 'dashboard', label: 'Dashboard' },
-    { path: '/messages', icon: 'chat_bubble', label: 'Messages' },
-    { path: '/profile', icon: 'person', label: 'Profile' },
+    { path: '/home', icon: FiHome, label: 'Home' },
+    { path: '/search', icon: FiSearch, label: 'Find Work' },
+    { path: '/videos', icon: FiPlayCircle, label: 'Videos' },
+    { path: '/dashboard', icon: GoTasklist, label: 'Dashboard' },
+    { path: '/messages', icon: FiMessageCircle, label: 'Messages' },
+    { path: '/profile', icon: FiUser, label: 'Profile' },
   ];
 
   const navItems = user?.role === 'provider' ? providerNavItems : clientNavItems;
@@ -172,9 +164,7 @@ export default function Layout({ children, user, onLogout }) {
   return (
     <div className="desktop-layout">
       <button className="mobile-menu-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>
-        <span className="material-symbols-outlined text-slate-700">
-          {sidebarOpen ? 'close' : 'menu'}
-        </span>
+        {sidebarOpen ? <FiX className="text-slate-700" /> : <FiMenu className="text-slate-700" />}
       </button>
 
       <div className={`overlay ${sidebarOpen ? 'show' : ''}`} onClick={() => setSidebarOpen(false)} />
@@ -182,7 +172,7 @@ export default function Layout({ children, user, onLogout }) {
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-logo">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary-dark text-white shadow-md shadow-primary/20">
-            <span className="material-symbols-outlined text-2xl">handyman</span>
+            <FiTool className="text-2xl" />
           </div>
           <span className="text-xl font-black tracking-tight text-slate-900">PRUCOLY</span>
         </div>
@@ -195,9 +185,7 @@ export default function Layout({ children, user, onLogout }) {
               className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}
               onClick={() => setSidebarOpen(false)}
             >
-              <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>
-                {item.icon}
-              </span>
+              <item.icon style={{ fontSize: '22px' }} />
               <span>{item.label}</span>
               {item.label === 'Messages' && unreadCount > 0 && (
                 <span className="ml-auto bg-white/20 text-white text-xs px-2 py-0.5 rounded-full font-medium">
@@ -230,13 +218,13 @@ export default function Layout({ children, user, onLogout }) {
                 {user?.role === 'provider' ? user?.profession || 'Provider' : 'Client'}
               </p>
             </div>
-            <span className="material-symbols-outlined text-slate-400">chevron_right</span>
+            <FiChevronRight className="text-slate-400" />
           </div>
           <button
             onClick={onLogout}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all text-sm font-medium"
           >
-            <span className="material-symbols-outlined text-lg">logout</span>
+            <FiLogOut className="text-lg" />
             Sign Out
           </button>
         </div>
@@ -247,7 +235,7 @@ export default function Layout({ children, user, onLogout }) {
           <div className="flex items-center gap-4 flex-1">
             <div className="relative max-w-md w-full">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                <span className="material-symbols-outlined text-xl">search</span>
+                <FiSearch className="text-xl" />
               </span>
               <form onSubmit={handleSearchSubmit}>
                 <input
@@ -310,7 +298,7 @@ export default function Layout({ children, user, onLogout }) {
                 onClick={() => setShowNotifications(!showNotifications)}
                 className="relative p-2.5 rounded-xl hover:bg-slate-100 transition-colors"
               >
-                <span className="material-symbols-outlined text-slate-600 text-xl">notifications</span>
+                <FiBell className="text-slate-600 text-xl" />
                 {unreadCount > 0 && (
                   <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
                 )}
@@ -384,7 +372,7 @@ export default function Layout({ children, user, onLogout }) {
                     {notifications.length === 0 ? (
                       <div className="p-8 text-center">
                         <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-slate-100 flex items-center justify-center">
-                          <span className="material-symbols-outlined text-slate-400">notifications_none</span>
+                          <FiBellOff className="text-slate-400" />
                         </div>
                         <p className="text-slate-500 text-sm">No notifications yet</p>
                       </div>
@@ -410,9 +398,10 @@ export default function Layout({ children, user, onLogout }) {
                               </div>
                             ) : (
                               <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                                <span className="material-symbols-outlined text-primary text-lg">
-                                  {getNotificationIcon(notif.type)}
-                                </span>
+                                {(() => {
+                                  const IconComponent = getNotificationIcon(notif.type);
+                                  return <IconComponent className="text-primary text-lg" />;
+                                })()}
                               </div>
                             )}
                             <div className="flex-1 min-w-0">
@@ -435,9 +424,9 @@ export default function Layout({ children, user, onLogout }) {
             </div>
 
             <button className="hidden md:flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-slate-100 transition-colors">
-              <span className="material-symbols-outlined text-slate-600" style={{ fontSize: '18px' }}>location_on</span>
+              <FiMapPin className="text-slate-600" style={{ fontSize: '18px' }} />
               <span className="text-sm font-medium text-slate-600">Location</span>
-              <span className="material-symbols-outlined text-slate-400 text-lg">expand_more</span>
+              <FiChevronDown className="text-slate-400 text-lg" />
             </button>
           </div>
         </header>
@@ -453,9 +442,7 @@ export default function Layout({ children, user, onLogout }) {
             className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}
             onClick={() => setSidebarOpen(false)}
           >
-            <span className="material-symbols-outlined">
-              {item.icon}
-            </span>
+            <item.icon />
             {item.label}
           </NavLink>
         ))}

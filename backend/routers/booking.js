@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
+const { auth } = require('../middleware/authMiddleware');
 const { getBookings, createBooking, updateBookingStatus, cancelBooking } = require('../controllers/bookingController');
 
-router.get('/', getBookings);
-router.post('/', createBooking);
-router.put('/:id', updateBookingStatus);
-router.delete('/:id', cancelBooking);
+router.get('/', auth, getBookings);
+router.post('/', auth, createBooking);
+router.put('/:id', auth, updateBookingStatus);
+router.delete('/:id', auth, cancelBooking);
 
 module.exports = router;

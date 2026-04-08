@@ -1,9 +1,34 @@
 const Provider = require('../models/Provider');
 const User = require('../models/User');
+const Booking = require('../models/Booking');
+const Review = require('../models/Review');
+
+const calculateProviderStats = async (providerId) => {
+  try {
+    const [completedBookings, reviews] = await Promise.all([
+      Booking.countDocuments({ provider: providerId, status: 'completed' }),
+      Review.find({ provider: providerId })
+    ]);
+    
+    const jobsDone = completedBookings;
+    let rating = 0;
+    let reviewCount = reviews.length;
+    
+    if (reviews.length > 0) {
+      const sum = reviews.reduce((acc, r) => acc + r.rating, 0);
+      rating = Math.round((sum / reviews.length) * 10) / 10;
+    }
+    
+    return { jobsDone, rating, reviewCount };
+  } catch (error) {
+    console.error('Error calculating provider stats:', error);
+    return { jobsDone: 0, rating: 0, reviewCount: 0 };
+  }
+};
 
 exports.getProviders = async (req, res) => {
   try {
-    const { search, category, sort } = req.query;
+    const { search, category, sort, lat, lng } = req.query;
     
     let query = { available: true };
 
@@ -21,24 +46,43 @@ exports.getProviders = async (req, res) => {
     let sortOption = { rating: -1 };
     if (sort === 'price') {
       sortOption = { hourlyRate: 1 };
-    } else if (sort === 'distance') {
+    } else if (sort === 'distance' && lat && lng) {
       sortOption = { distance: 1 };
     }
 
     const providers = await Provider.find(query)
-      .populate('user', 'name avatar')
+      .populate('user', 'name avatar phone location')
+      .populate('category')
       .sort(sortOption);
 
-    res.json({
-      success: true,
-      count: providers.length,
-      providers,
-    });
+    const providersList = await Promise.all(providers.map(async p => {
+      const stats = await calculateProviderStats(p._id);
+      return {
+        id: p.user._id.toString(),
+        providerDbId: p._id.toString(),
+        name: p.user.name,
+        email: p.user.email,
+        avatar: p.user.avatar,
+        phone: p.user.phone,
+        location: p.user.location,
+        role: 'provider',
+        professionId: p.category?._id?.toString(),
+        profession: p.profession,
+        bio: p.bio,
+        hourlyRate: p.hourlyRate,
+        distance: p.distance || 1.0,
+        experience: p.experience,
+        verified: p.verified,
+        rating: stats.rating,
+        reviewCount: stats.reviewCount,
+        jobsDone: stats.jobsDone,
+        serviceArea: p.serviceArea,
+      };
+    }));
+
+    res.json(providersList);
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    res.status(500).json({ error: error.message });
   }
 };
 
@@ -69,9 +113,10 @@ exports.getProvider = async (req, res) => {
 
 exports.createProvider = async (req, res) => {
   try {
+    const userId = req.headers['x-user-id']; // FIXED: #1 - Use x-user-id header
     const providerData = {
       ...req.body,
-      user: req.user.id,
+      user: userId,
     };
 
     const provider = await Provider.create(providerData);

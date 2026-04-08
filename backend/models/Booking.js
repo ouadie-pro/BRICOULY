@@ -50,3 +50,7 @@ const bookingSchema = new mongoose.Schema({
 });
 
 module.exports = mongoose.model('Booking', bookingSchema);
+
+// FIXED: #18 - Add database indexes
+bookingSchema.index({ user: 1, createdAt: -1 });
+bookingSchema.index({ provider: 1, createdAt: -1 });

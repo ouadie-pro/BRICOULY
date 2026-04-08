@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../services/api';
+import {
+  FiArrowLeft, FiUserPlus, FiUserMinus, FiEdit, FiX, FiCheckCircle, FiCamera,
+  FiMessageCircle, FiMail, FiPhone, FiMapPin, FiFileText, FiCalendar, FiPlus,
+  FiTrash2, FiStar, FiCheck, FiUsers, FiImage, FiHeart
+} from 'react-icons/fi';
 
 export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther }) {
   const { id: userId } = useParams();
@@ -9,10 +14,14 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('');
+  const [city, setCity] = useState('');
   const [bio, setBio] = useState('');
+  const [hourlyRate, setHourlyRate] = useState('');
+  const [profession, setProfession] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedAvatar, setUploadedAvatar] = useState(null);
   const [articles, setArticles] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [followers, setFollowers] = useState([]);
   const [following, setFollowing] = useState([]);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -20,8 +29,8 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
   const [showArticleForm, setShowArticleForm] = useState(false);
   const [articleTitle, setArticleTitle] = useState('');
   const [articleContent, setArticleContent] = useState('');
-  const [articleImage, setArticleImage] = useState(null);
-  const [articleImagePreview, setArticleImagePreview] = useState(null);
+  const [articleImages, setArticleImages] = useState([]);
+  const [articleImagePreviews, setArticleImagePreviews] = useState([]);
   const [isSubmittingArticle, setIsSubmittingArticle] = useState(false);
   const [activeTab, setActiveTab] = useState('info');
   const [portfolio, setPortfolio] = useState([]);
@@ -61,17 +70,22 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
           setName(userData.name || '');
           setPhone(userData.phone || '');
           setLocation(userData.location || userData.address || '');
+          setCity(userData.city || '');
           setBio(userData.bio || '');
+          setHourlyRate(userData.hourlyRate || '');
+          setProfession(userData.profession || '');
         }
 
-        const [userArticles, userFollowers, userFollowing] = await Promise.all([
+        const [userArticles, userFollowers, userFollowing, userReviews] = await Promise.all([
           api.getUserArticles(targetUserId),
           api.getFollowers(targetUserId),
           api.getFollowing(targetUserId),
+          api.getProviderReviews?.(targetUserId).catch(() => []),
         ]);
-        setArticles(userArticles);
-        setFollowers(userFollowers);
-        setFollowing(userFollowing);
+        setArticles(userArticles || []);
+        setFollowers(userFollowers || []);
+        setFollowing(userFollowing || []);
+        setReviews(userReviews || []);
 
         // Fetch portfolio if user is a provider
         if (userData?.role === 'provider' || currentUser.role === 'provider') {
@@ -133,8 +147,12 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
 
   const handleSave = async () => {
     try {
-      const updates = { name, phone, location };
-      if (currentUser.role === 'provider') updates.bio = bio;
+      const updates = { name, phone, location, city };
+      if (currentUser.role === 'provider') {
+        updates.bio = bio;
+        updates.hourlyRate = hourlyRate;
+        updates.profession = profession;
+      }
       const result = await api.updateProfile(updates);
       if (result.success) {
         const updatedUser = { ...user, ...updates };
@@ -149,25 +167,32 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
   };
 
   const handleArticleImageSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setArticleImage(file);
-      setArticleImagePreview(URL.createObjectURL(file));
+    const files = Array.from(e.target.files);
+    if (files.length > 0) {
+      const newImages = [...articleImages, ...files].slice(0, 10);
+      setArticleImages(newImages);
+      const newPreviews = newImages.map(file => URL.createObjectURL(file));
+      setArticleImagePreviews(newPreviews);
     }
+  };
+
+  const removeArticleImage = (index) => {
+    setArticleImages(prev => prev.filter((_, i) => i !== index));
+    setArticleImagePreviews(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmitArticle = async () => {
     if (!articleTitle.trim() || !articleContent.trim()) return;
     setIsSubmittingArticle(true);
     try {
-      const result = await api.createArticle({ title: articleTitle, content: articleContent, image: articleImage });
+      const result = await api.createArticle({ title: articleTitle, content: articleContent, images: articleImages });
       if (result.success) {
         setArticles([result.article, ...articles]);
         setShowArticleForm(false);
         setArticleTitle('');
         setArticleContent('');
-        setArticleImage(null);
-        setArticleImagePreview(null);
+        setArticleImages([]);
+        setArticleImagePreviews([]);
       }
     } catch (err) {
       console.error('Error creating article:', err);
@@ -179,7 +204,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
   const handleLikeArticle = async (articleId) => {
     const res = await api.likeArticle(articleId);
     if (res.success) {
-      setArticles(articles.map((a) => (a.id === articleId ? { ...a, likes: res.likes } : a)));
+      setArticles(articles.map((a) => (a.id === articleId ? { ...a, likesCount: res.likesCount, isLiked: res.isLiked } : a)));
     }
   };
 
@@ -253,7 +278,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
             onClick={() => navigate(-1)}
             className="flex size-12 shrink-0 items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full justify-center transition-colors"
           >
-            <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>arrow_back_ios_new</span>
+            <FiArrowLeft style={{ fontSize: '24px' }} />
           </button>
           <h2 className="text-text-light dark:text-text-dark text-lg font-bold leading-tight tracking-[-0.015em] text-center flex-1">
             {isViewingOther ? user?.name : 'My Profile'}
@@ -266,18 +291,14 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                 isFollowing || followRequestSent ? 'bg-slate-200 text-slate-700' : 'bg-primary text-white'
               }`}
             >
-              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
-                {isFollowing ? 'person_remove' : 'person_add'}
-              </span>
+              {isFollowing ? <FiUserMinus style={{ fontSize: '20px' }} /> : <FiUserPlus style={{ fontSize: '20px' }} />}
             </button>
           ) : (
             <button
               onClick={() => setIsEditing(!isEditing)}
               className="flex size-12 shrink-0 items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full justify-center transition-colors"
             >
-              <span className="material-symbols-outlined text-primary" style={{ fontSize: '24px' }}>
-                {isEditing ? 'close' : 'edit'}
-              </span>
+              {isEditing ? <FiX className="text-primary" style={{ fontSize: '24px' }} /> : <FiEdit className="text-primary" style={{ fontSize: '24px' }} />}
             </button>
           )}
         </div>
@@ -300,7 +321,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                 )}
                 {user.verified && (
                   <div className="absolute bottom-1 right-1 bg-green-500 rounded-full p-1.5 border-4 border-card-light dark:border-card-dark">
-                    <span className="material-symbols-outlined text-white text-sm">verified</span>
+                    <FiCheckCircle className="text-white text-sm" />
                   </div>
                 )}
                 {isEditing && (
@@ -312,7 +333,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                     {isUploading ? (
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                     ) : (
-                      <span className="material-symbols-outlined text-white text-sm">camera_alt</span>
+                      <FiCamera className="text-white text-sm" />
                     )}
                   </button>
                 )}
@@ -345,7 +366,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                 onClick={() => navigate(`/messages/${targetUserId}`)}
                 className="w-full py-2 border border-primary text-primary rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-blue-50 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px]">chat_bubble</span>
+                <FiMessageCircle className="text-[18px]" />
                 Send Message
               </button>
             </div>
@@ -380,7 +401,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
             <h3 className="font-semibold text-text-light dark:text-text-dark mb-4">Profile Information</h3>
             <div className="space-y-4">
               <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                <span className="material-symbols-outlined text-slate-400">mail</span>
+                <FiMail className="text-slate-400" />
                 <div>
                   <p className="text-xs text-slate-500">Email</p>
                   <p className="text-sm font-medium text-text-light dark:text-text-dark">{user.email}</p>
@@ -388,7 +409,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
               </div>
 
               <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                <span className="material-symbols-outlined text-slate-400">phone</span>
+                <FiPhone className="text-slate-400" />
                 <div>
                   <p className="text-xs text-slate-500">Phone</p>
                   {isEditing ? (
@@ -406,28 +427,38 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
               </div>
 
               <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                <span className="material-symbols-outlined text-slate-400">location_on</span>
-                <div>
+                <FiMapPin className="text-slate-400" />
+                <div className="flex-1">
                   <p className="text-xs text-slate-500">Location</p>
                   {isEditing ? (
                     <input
                       type="text"
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
-                      className="text-sm font-medium bg-transparent border-b border-primary focus:outline-none"
-                      placeholder="Add location"
+                      className="text-sm font-medium bg-transparent border-b border-primary focus:outline-none w-full"
+                      placeholder="Add location (e.g., Casablanca)"
                     />
                   ) : (
-                    <p className="text-sm font-medium text-text-light dark:text-text-dark">
-                      {user.location || user.address || 'Not set'}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-text-light dark:text-text-dark">
+                        {user.location || user.address || 'Not set'}
+                      </p>
+                      {!user.location && !user.address && !isEditing && !isViewingOther && (
+                        <button
+                          onClick={() => setIsEditing(true)}
+                          className="text-xs text-primary font-medium hover:underline"
+                        >
+                          Add
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
 
               {currentUser.role === 'provider' && !isViewingOther && (
                 <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                  <span className="material-symbols-outlined text-slate-400 mt-1">description</span>
+                  <FiFileText className="text-slate-400 mt-1" />
                   <div>
                     <p className="text-xs text-slate-500">Bio</p>
                     {isEditing ? (
@@ -446,7 +477,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
               )}
 
               <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                <span className="material-symbols-outlined text-slate-400">calendar_today</span>
+                <FiCalendar className="text-slate-400" />
                 <div>
                   <p className="text-xs text-slate-500">Member Since</p>
                   <p className="text-sm font-medium text-text-light dark:text-text-dark">
@@ -494,7 +525,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                 {isUploading ? (
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                 ) : (
-                  <span className="material-symbols-outlined text-white text-sm">camera_alt</span>
+                  <FiCamera className="text-white text-sm" />
                 )}
               </button>
             )}
@@ -507,7 +538,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
             />
             {user.verified && (
               <div className="absolute bottom-2 left-2 bg-green-500 rounded-full p-1.5 border-4 border-white">
-                <span className="material-symbols-outlined text-white text-sm">verified</span>
+                <FiCheckCircle className="text-white text-sm" />
               </div>
             )}
           </div>
@@ -519,7 +550,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                   onClick={() => navigate(`/messages/${targetUserId}`)}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg border border-primary text-primary hover:bg-blue-50 transition-colors font-medium"
                 >
-                  <span className="material-symbols-outlined">chat_bubble</span>
+                  <FiMessageCircle />
                   Message
                 </button>
                 <button
@@ -531,7 +562,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                       : 'bg-primary text-white hover:bg-blue-600'
                   }`}
                 >
-                  <span className="material-symbols-outlined">{isFollowing ? 'person_remove' : 'person_add'}</span>
+                  {isFollowing ? <FiUserMinus /> : <FiUserPlus />}
                   {followLabel}
                 </button>
               </>
@@ -542,7 +573,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                   isEditing ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' : 'bg-primary text-white hover:bg-blue-600'
                 }`}
               >
-                <span className="material-symbols-outlined">{isEditing ? 'close' : 'edit'}</span>
+                {isEditing ? <FiX /> : <FiEdit />}
                 {isEditing ? 'Cancel' : 'Edit Profile'}
               </button>
             )}
@@ -588,7 +619,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
               </div>
               <div className="flex flex-col items-center">
                 <p className="text-xl font-bold text-slate-900 flex items-center gap-1">
-                  <span className="material-symbols-outlined text-amber-400 text-lg">star</span>
+                  <FiStar className="text-amber-400 text-lg" />
                   {user?.rating || 0}
                 </p>
                 <p className="text-sm text-slate-500">Rating</p>
@@ -605,7 +636,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
             <div className="space-y-4">
               <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-primary">mail</span>
+                  <FiMail className="text-primary" />
                 </div>
                 <div className="flex-1">
                   <p className="text-xs text-slate-500">Email</p>
@@ -615,7 +646,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
 
               <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-primary">phone</span>
+                  <FiPhone className="text-primary" />
                 </div>
                 <div className="flex-1">
                   <p className="text-xs text-slate-500">Phone</p>
@@ -635,7 +666,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
 
               <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-primary">location_on</span>
+                  <FiMapPin className="text-primary" />
                 </div>
                 <div className="flex-1">
                   <p className="text-xs text-slate-500">Location</p>
@@ -656,7 +687,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
               {(user?.role === 'provider' || user?.bio) && (
                 <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-50">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-primary">description</span>
+                    <FiFileText className="text-primary" />
                   </div>
                   <div className="flex-1">
                     <p className="text-xs text-slate-500 mb-1">Bio</p>
@@ -677,7 +708,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
 
               <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-primary">calendar_today</span>
+                  <FiCalendar className="text-primary" />
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">Member Since</p>
@@ -703,7 +734,14 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
         <div className="md:col-span-2">
           <div className="mt-6">
             <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
-              {['info', 'followers', 'following', ...(user?.role === 'provider' || currentUser.role === 'provider' ? ['portfolio'] : []), 'articles'].map((tab) => (
+              {[
+                'info', 
+                'followers', 
+                'following', 
+                ...(user?.role === 'provider' || currentUser.role === 'provider' ? ['portfolio'] : []),
+                ...(isViewingOther && user?.role === 'user' ? ['reviews'] : []), // FIXED: #3
+                'articles'
+              ].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -717,6 +755,8 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                     ? `Following (${following.length})`
                     : tab === 'articles'
                     ? `Articles (${articles.length})`
+                    : tab === 'reviews'
+                    ? `Reviews (${reviews.length})`
                     : 'Info'}
                 </button>
               ))}
@@ -731,7 +771,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                       onClick={() => setShowArticleForm(true)}
                       className="flex items-center gap-1 px-3 py-1.5 bg-primary text-white text-sm rounded-lg hover:bg-blue-600 transition-colors"
                     >
-                      <span className="material-symbols-outlined text-[18px]">add</span>
+                      <FiPlus className="text-[18px]" />
                       Write Article
                     </button>
                   )}
@@ -745,16 +785,31 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                         onClick={() => articleImageInputRef.current?.click()}
                         className="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center cursor-pointer hover:border-primary transition-colors mb-4"
                       >
-                        {articleImagePreview ? (
-                          <img
-                            src={articleImagePreview}
-                            alt="Preview"
-                            className="w-full max-h-48 object-contain rounded"
-                          />
+                        {articleImagePreviews.length > 0 ? (
+                          <div className="grid grid-cols-3 gap-2">
+                            {articleImagePreviews.map((preview, idx) => (
+                              <div key={idx} className="relative aspect-square">
+                                <img
+                                  src={preview}
+                                  alt={`Preview ${idx + 1}`}
+                                  className="w-full h-full object-cover rounded"
+                                />
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeArticleImage(idx);
+                                  }}
+                                  className="absolute top-1 right-1 bg-black/50 text-white p-1 rounded-full"
+                                >
+                                  <FiX className="text-[14px]" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
                         ) : (
                           <>
-                            <span className="material-symbols-outlined text-4xl text-slate-400">add_photo_alternate</span>
-                            <p className="text-slate-500 mt-2">Add cover image (optional)</p>
+                            <FiImage className="text-4xl text-slate-400" />
+                            <p className="text-slate-500 mt-2">Add images (optional)</p>
                           </>
                         )}
                       </div>
@@ -763,6 +818,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                         ref={articleImageInputRef}
                         onChange={handleArticleImageSelect}
                         accept="image/*"
+                        multiple
                         className="hidden"
                       />
                       <input
@@ -785,8 +841,8 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                             setShowArticleForm(false);
                             setArticleTitle('');
                             setArticleContent('');
-                            setArticleImage(null);
-                            setArticleImagePreview(null);
+                            setArticleImages([]);
+                            setArticleImagePreviews([]);
                           }}
                           className="flex-1 py-3 rounded-lg border border-slate-200 font-medium"
                         >
@@ -806,7 +862,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
 
                 {articles.length === 0 ? (
                   <div className="text-center py-8 bg-slate-50 rounded-xl">
-                    <span className="material-symbols-outlined text-5xl text-slate-300">article</span>
+                    <FiFileText className="text-5xl text-slate-300" />
                     <p className="text-slate-500 mt-2">No articles yet</p>
                     {isOwnProfile && (
                       <button
@@ -819,28 +875,34 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {articles.map((article) => (
-                      <div key={article.id} className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
-                        {article.imageUrl && (
-                          <div
-                            className="w-full h-48 rounded-lg bg-cover bg-center mb-4"
-                            style={{ backgroundImage: `url("${window.location.origin}${article.imageUrl}")` }}
-                          />
-                        )}
-                        <h4 className="font-bold text-slate-900 text-lg mb-2">{article.title}</h4>
-                        <p className="text-slate-600 text-sm mb-3 line-clamp-3">{article.content}</p>
-                        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                          <span className="text-xs text-slate-400">{formatDate(article.createdAt)}</span>
-                          <button
-                            onClick={() => handleLikeArticle(article.id)}
-                            className="flex items-center gap-1 text-slate-500 hover:text-red-500 text-sm transition-colors"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">favorite</span>
-                            {article.likes}
-                          </button>
+                    {articles.map((article) => {
+                      const articleImages = article.images && article.images.length > 0 
+                        ? article.images 
+                        : article.imageUrl ? [article.imageUrl] : [];
+                      return (
+                        <div key={article.id} className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
+                          {articleImages.length > 0 && (
+                            <img
+                              src={articleImages[0].startsWith('http') ? articleImages[0] : `${window.location.origin}${articleImages[0]}`}
+                              alt={article.title}
+                              className="w-full h-48 object-cover rounded-lg mb-4"
+                            />
+                          )}
+                          <h4 className="font-bold text-slate-900 text-lg mb-2">{article.title}</h4>
+                          <p className="text-slate-600 text-sm mb-3 line-clamp-3">{article.content}</p>
+                          <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                            <span className="text-xs text-slate-400">{formatDate(article.createdAt)}</span>
+                            <button
+                              onClick={() => handleLikeArticle(article.id)}
+                              className="flex items-center gap-1 text-slate-500 hover:text-red-500 text-sm transition-colors"
+                            >
+                              <FiHeart className="text-[18px]" />
+                              {article.likesCount || article.likes || 0}
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -855,7 +917,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                       onClick={() => setShowPortfolioForm(true)}
                       className="flex items-center gap-1 px-3 py-1.5 bg-primary text-white text-sm rounded-lg hover:bg-blue-600 transition-colors"
                     >
-                      <span className="material-symbols-outlined text-[18px]">add</span>
+                      <FiPlus className="text-[18px]" />
                       Add Work
                     </button>
                   )}
@@ -877,7 +939,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                           />
                         ) : (
                           <>
-                            <span className="material-symbols-outlined text-4xl text-slate-400">add_photo_alternate</span>
+                            <FiImage className="text-4xl text-slate-400" />
                             <p className="text-slate-500 mt-2">Click to select image</p>
                           </>
                         )}
@@ -922,7 +984,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
 
                 {portfolio.length === 0 ? (
                   <div className="text-center py-8 bg-slate-50 rounded-xl">
-                    <span className="material-symbols-outlined text-5xl text-slate-300">photo_library</span>
+                    <FiImage className="text-5xl text-slate-300" />
                     <p className="text-slate-500 mt-2">No portfolio items yet</p>
                     {isOwnProfile && (
                       <button
@@ -952,9 +1014,51 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                             onClick={() => handleDeletePortfolio(item._id)}
                             className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 bg-red-500 text-white p-1.5 rounded-full transition-opacity"
                           >
-                            <span className="material-symbols-outlined text-[16px]">delete</span>
+                            <FiTrash2 className="text-[16px]" />
                           </button>
                         )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'reviews' && (
+              <div className="mt-4">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Reviews Received</h3>
+                {reviews.length === 0 ? (
+                  <div className="text-center py-8 bg-slate-50 rounded-xl">
+                    <FiStar className="text-5xl text-slate-300" />
+                    <p className="text-slate-500 mt-2">No reviews yet</p>
+                    <p className="text-slate-400 text-sm mt-1">Reviews from providers will appear here</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {reviews.map((review) => (
+                      <div key={review.id} className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center">
+                            <span className="text-sm font-bold text-slate-500">
+                              {review.reviewerName?.charAt(0) || '?'}
+                            </span>
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-semibold text-slate-900">{review.reviewerName}</p>
+                            <p className="text-xs text-slate-500">{review.reviewerProfession || 'Provider'}</p>
+                          </div>
+                          <div className="flex items-center gap-0.5">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <FiStar key={star} className={`text-sm ${star <= (review.rating || 0) ? 'text-amber-400' : 'text-slate-300'}`} />
+                            ))}
+                          </div>
+                        </div>
+                        {review.comment && (
+                          <p className="text-sm text-slate-600">{review.comment}</p>
+                        )}
+                        <p className="text-xs text-slate-400 mt-2">
+                          {formatDate(review.createdAt)}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -967,7 +1071,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                 <h3 className="text-lg font-semibold text-slate-900 mb-4">Followers</h3>
                 {followers.length === 0 ? (
                   <div className="text-center py-8 bg-slate-50 rounded-xl">
-                    <span className="material-symbols-outlined text-5xl text-slate-300">people</span>
+                    <FiUsers className="text-5xl text-slate-300" />
                     <p className="text-slate-500 mt-2">No followers yet</p>
                   </div>
                 ) : (
@@ -1026,7 +1130,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
                 <h3 className="text-lg font-semibold text-slate-900 mb-4">Following</h3>
                 {following.length === 0 ? (
                   <div className="text-center py-8 bg-slate-50 rounded-xl">
-                    <span className="material-symbols-outlined text-5xl text-slate-300">people</span>
+                    <FiUsers className="text-5xl text-slate-300" />
                     <p className="text-slate-500 mt-2">Not following anyone yet</p>
                   </div>
                 ) : (

@@ -10,20 +10,15 @@ const postSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Content is required'],
   },
-  image: {
+  images: [{
     type: String,
-    default: null,
-  },
+  }],
   type: {
     type: String,
     enum: ['post', 'promo', 'tip', 'work'],
     default: 'post',
   },
-  likes: {
-    type: Number,
-    default: 0,
-  },
-  likedBy: [{
+  likes: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   }],

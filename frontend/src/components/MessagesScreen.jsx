@@ -1,6 +1,35 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../services/api';
+import { 
+  FiX, FiImage, FiVideo, FiMic, FiSend, FiPhone, FiInfo, FiMessageCircle,
+  FiArrowLeft, FiVolume2, FiSearch
+} from 'react-icons/fi';
+
+const formatRelativeTime = (dateStr) => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffHours < 1) return 'À l\'instant';
+  if (diffHours < 24) return `Il y a ${diffHours}h`;
+  if (diffDays === 1) return 'Hier';
+  if (diffDays < 7) return `Il y a ${diffDays}j`;
+  return date.toLocaleDateString('fr-FR');
+};
+
+const getMessagePreview = (msg) => {
+  const text = msg.content || msg.text || '';
+  
+  if (msg.type === 'image') return '[Photo]';
+  if (msg.type === 'video') return '[Vidéo]';
+  if (msg.type === 'voice') return '[Audio]';
+  
+  return text || '[Média]';
+};
 
 export default function MessagesScreen({ isDesktop }) {
   const { providerId } = useParams();
@@ -12,6 +41,7 @@ export default function MessagesScreen({ isDesktop }) {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [mediaPreview, setMediaPreview] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const imageInputRef = useRef(null);
   const videoInputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -39,11 +69,26 @@ export default function MessagesScreen({ isDesktop }) {
       const loadChat = async () => {
         try {
           const msgs = await api.getMessages(providerId);
-          setMessages(msgs || []);
+          // Handle both array (old format) and object with data (new format)
+          const messagesArray = Array.isArray(msgs) ? msgs : (msgs?.data || []);
+          setMessages(messagesArray || []);
           
           let providerData = await api.getProvider(providerId).catch(() => null);
           if (!providerData || providerData.error) {
             providerData = await api.getUser(providerId).catch(() => null);
+          }
+          // Ensure provider has avatar from message data if available
+          if (messagesArray.length > 0) {
+            const firstReceivedMsg = messagesArray.find(m => 
+              String(m.senderId) !== String(currentUser.id)
+            );
+            if (firstReceivedMsg && firstReceivedMsg.senderAvatar) {
+              providerData = {
+                ...providerData,
+                avatar: providerData?.avatar || firstReceivedMsg.senderAvatar,
+                name: providerData?.name || firstReceivedMsg.senderName
+              };
+            }
           }
           setProvider(providerData);
         } catch (error) {
@@ -53,7 +98,7 @@ export default function MessagesScreen({ isDesktop }) {
       };
       loadChat();
     }
-  }, [providerId]);
+  }, [providerId, currentUser.id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -107,7 +152,7 @@ export default function MessagesScreen({ isDesktop }) {
     setNewMessage('');
   };
 
-  const handleMediaSelect = (e, type) => {
+  const handleMediaSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
       const previewUrl = URL.createObjectURL(file);
@@ -177,6 +222,25 @@ export default function MessagesScreen({ isDesktop }) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const getSenderAvatar = (msg, isOwn) => {
+    if (isOwn) {
+      return currentUser?.avatar;
+    }
+    // Use message's senderAvatar first, then fall back to provider avatar
+    return msg.senderAvatar || provider?.avatar;
+  };
+
+  const getSenderName = (msg, isOwn) => {
+    if (isOwn) {
+      return currentUser?.name;
+    }
+    return msg.senderName || provider?.name;
+  };
+
+  const getAvatarFallback = (name) => {
+    return name?.charAt(0)?.toUpperCase() || '?';
+  };
+
   const renderMessageContent = (msg) => {
     const text = msg.content || msg.text || '';
     
@@ -209,14 +273,14 @@ export default function MessagesScreen({ isDesktop }) {
     if (msg.type === 'voice' && msg.mediaUrl) {
       return (
         <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary">graphic_eq</span>
+          <FiVolume2 className="text-primary" />
           <audio src={msg.mediaUrl} controls className="h-8" />
           {text && <p className="mt-1">{text}</p>}
         </div>
       );
     }
     
-    return <p>{text}</p>;
+    return <p>{text || '📎 Media'}</p>;
   };
 
   const renderMediaPreview = () => {
@@ -228,7 +292,7 @@ export default function MessagesScreen({ isDesktop }) {
           onClick={cancelMedia}
           className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
         >
-          <span className="material-symbols-outlined text-[16px]">close</span>
+          <FiX style={{ fontSize: '16px' }} />
         </button>
         {mediaPreview.type.startsWith('image') && (
           <img src={mediaPreview.url} alt="Preview" className="h-20 rounded" />
@@ -238,7 +302,7 @@ export default function MessagesScreen({ isDesktop }) {
         )}
         {mediaPreview.type.startsWith('audio') && (
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">graphic_eq</span>
+            <FiVolume2 className="text-primary" />
             <audio src={mediaPreview.url} controls className="h-8" />
           </div>
         )}
@@ -272,7 +336,7 @@ export default function MessagesScreen({ isDesktop }) {
               onClick={() => navigate(-1)}
               className="text-slate-500 hover:text-primary dark:text-slate-400 transition-colors p-1 -ml-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
             >
-              <span className="material-symbols-outlined text-[24px]">arrow_back_ios_new</span>
+              <FiArrowLeft style={{ fontSize: '24px' }} />
             </button>
             <div className="flex flex-col min-w-0">
               <h2 className="text-slate-900 dark:text-white text-base font-bold leading-tight truncate">
@@ -284,25 +348,36 @@ export default function MessagesScreen({ isDesktop }) {
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
-          {messages.map((msg) => {
+          {messages.map((msg, index) => {
             const isOwn = String(msg.senderId) === String(currentUser.id) || String(msg.sender) === String(currentUser.id);
-            const avatarUrl = isOwn ? currentUser.avatar : (provider?.avatar);
+            const avatarUrl = getSenderAvatar(msg, isOwn);
+            const senderName = getSenderName(msg, isOwn);
+            // Show avatar only on last message of consecutive group
+            const nextMsg = messages[index + 1];
+            const isNextFromSameSender = nextMsg && (
+              String(nextMsg.senderId) === String(msg.senderId) || 
+              String(nextMsg.sender) === String(msg.sender)
+            );
+            const showAvatar = !isNextFromSameSender;
+            
             return (
             <div
               key={msg.id || msg._id}
               className={`flex items-end gap-2 ${isOwn ? 'flex-row-reverse' : ''}`}
             >
-              {avatarUrl ? (
+              {showAvatar && avatarUrl ? (
                 <div
-                  className="w-8 h-8 rounded-full bg-cover bg-center shrink-0"
+                  className="w-8 h-8 rounded-full bg-cover bg-center shrink-0 flex-shrink-0"
                   style={{ backgroundImage: `url("${avatarUrl}")` }}
                 />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-slate-300 shrink-0 flex items-center justify-center">
-                  <span className="text-xs font-bold text-slate-500">
-                    {isOwn ? (currentUser.name?.charAt(0) || '?') : (provider?.name?.charAt(0) || '?')}
+              ) : showAvatar ? (
+                <div className="w-8 h-8 rounded-full bg-primary shrink-0 flex items-center justify-center flex-shrink-0">
+                  <span className="text-xs font-bold text-white">
+                    {getAvatarFallback(senderName)}
                   </span>
                 </div>
+              ) : (
+                <div className="w-8 shrink-0" />
               )}
               <div className={`max-w-[80%] px-4 py-3 rounded-2xl text-[15px] ${
                 isOwn
@@ -328,14 +403,35 @@ export default function MessagesScreen({ isDesktop }) {
               {renderRecorder()}
             </div>
           )}
-          <form onSubmit={handleSend} className="flex items-end gap-2">
-            <div className="flex items-center gap-1">
+          <form onSubmit={handleSend} className="flex items-center gap-2">
+            <div className="flex items-center gap-1 shrink-0">
+              <input
+                type="file"
+                ref={imageInputRef}
+                onChange={(e) => handleMediaSelect(e)}
+                accept="image/*"
+                className="hidden"
+              />
               <button
                 type="button"
-                onClick={() => setShowMediaPicker(!showMediaPicker)}
+                onClick={() => imageInputRef.current?.click()}
                 className="flex items-center justify-center size-10 rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700"
               >
-                <span className="material-symbols-outlined text-[20px]">add_photo_alternate</span>
+                <FiImage style={{ fontSize: '20px' }} />
+              </button>
+              <input
+                type="file"
+                ref={videoInputRef}
+                onChange={(e) => handleMediaSelect(e)}
+                accept="video/*"
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => videoInputRef.current?.click()}
+                className="flex items-center justify-center size-10 rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700"
+              >
+                <FiVideo style={{ fontSize: '20px' }} />
               </button>
               <button
                 type="button"
@@ -344,15 +440,15 @@ export default function MessagesScreen({ isDesktop }) {
                   isRecording ? 'bg-red-500 text-white' : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
-                <span className="material-symbols-outlined text-[20px]">{isRecording ? 'stop' : 'mic'}</span>
+                {isRecording ? <FiX /> : <FiMic style={{ fontSize: '20px' }} />}
               </button>
             </div>
-            <div className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center min-h-[44px] px-4 py-2 focus-within:ring-2 focus-within:ring-primary/50">
+            <div className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center min-h-[44px] px-4 py-2 border border-transparent focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all duration-200">
               <input
                 type="text"
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                className="w-full bg-transparent border-none p-0 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-0 text-[15px]"
+                className="w-full bg-transparent border-none p-0 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none text-[15px]"
                 placeholder="Type a message..."
               />
             </div>
@@ -361,60 +457,43 @@ export default function MessagesScreen({ isDesktop }) {
               disabled={!newMessage.trim() && !mediaPreview}
               className={`flex items-center justify-center size-10 rounded-full ${(!newMessage.trim() && !mediaPreview) ? 'bg-slate-300' : 'bg-primary text-white'}`}
             >
-              <span className="material-symbols-outlined text-[20px]">send</span>
+              <FiSend style={{ fontSize: '20px' }} />
             </button>
           </form>
-          {showMediaPicker && (
-            <div className="absolute bottom-20 left-4 bg-white dark:bg-slate-800 rounded-lg shadow-lg p-2 flex gap-2">
-              <input
-                type="file"
-                ref={imageInputRef}
-                onChange={(e) => handleMediaSelect(e, 'image')}
-                accept="image/*"
-                className="hidden"
-              />
-              <button
-                onClick={() => imageInputRef.current?.click()}
-                className="flex flex-col items-center p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
-              >
-                <span className="material-symbols-outlined text-primary">image</span>
-                <span className="text-xs">Image</span>
-              </button>
-              <input
-                type="file"
-                ref={videoInputRef}
-                onChange={(e) => handleMediaSelect(e, 'video')}
-                accept="video/*"
-                className="hidden"
-              />
-              <button
-                onClick={() => videoInputRef.current?.click()}
-                className="flex flex-col items-center p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
-              >
-                <span className="material-symbols-outlined text-purple-500">videocam</span>
-                <span className="text-xs">Video</span>
-              </button>
-            </div>
-          )}
         </footer>
       </div>
     );
   }
 
   return (
-    <div className="flex gap-6 h-[calc(100vh-64px)]">
-      <div className="w-80 bg-white rounded-xl border border-slate-200 flex flex-col shrink-0">
-        <div className="p-4 border-b border-slate-200">
-          <h2 className="text-lg font-bold text-slate-900">Messages</h2>
+    <div className="flex gap-6 h-[calc(100vh-64px)] overflow-hidden">
+      <div className="w-80 bg-white rounded-xl border border-slate-200 flex flex-col shrink-0 overflow-hidden">
+        <div className="p-4 border-b border-slate-200 flex-shrink-0">
+          <h2 className="text-lg font-bold text-slate-900 mb-3">Messages</h2>
+          <div className="relative">
+            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" style={{ fontSize: '16px' }} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search conversations..."
+              className="w-full h-9 pl-9 pr-3 rounded-lg bg-slate-100 text-sm border-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto min-h-0">
           {conversations.length === 0 ? (
             <div className="p-4 text-center text-slate-500">
-              <span className="material-symbols-outlined text-4xl mb-2">chat_bubble</span>
+              <FiMessageCircle style={{ fontSize: '40px' }} className="text-4xl mb-2" />
               <p className="text-sm">No conversations yet</p>
             </div>
           ) : (
-            conversations.map((conv) => (
+            conversations
+              .filter((conv) => {
+                if (!searchQuery) return true;
+                return conv.userName?.toLowerCase().includes(searchQuery.toLowerCase());
+              })
+              .map((conv) => (
               <Link
                 key={conv.userId}
                 to={`/messages/${conv.userId}`}
@@ -422,19 +501,33 @@ export default function MessagesScreen({ isDesktop }) {
                   String(providerId) === String(conv.userId) ? 'bg-blue-50' : ''
                 }`}
               >
-                <div
-                  className="w-12 h-12 rounded-full bg-cover bg-center"
-                  style={{ backgroundImage: `url("${conv.userAvatar}")` }}
-                />
+                {conv.userAvatar ? (
+                  <div
+                    className="w-12 h-12 rounded-full bg-cover bg-center"
+                    style={{ backgroundImage: `url("${conv.userAvatar}")` }}
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm font-bold text-white">
+                      {conv.userName?.charAt(0)?.toUpperCase() || '?'}
+                    </span>
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-center">
                     <h3 className="font-semibold text-slate-900 truncate">{conv.userName}</h3>
-                    <span className="text-xs text-slate-400">{conv.lastMessageTime?.split('T')[0]}</span>
+                    <span className="text-xs text-slate-400">
+                      {formatRelativeTime(conv.lastMessageTime || conv.updatedAt)}
+                    </span>
                   </div>
-                  <p className="text-sm text-slate-500 truncate">{conv.lastMessage}</p>
+                  <p className="text-sm text-slate-500 truncate">
+                    {getMessagePreview(conv)}
+                  </p>
                 </div>
-                {conv.unread && (
-                  <span className="w-3 h-3 bg-primary rounded-full"></span>
+                {conv.unreadCount > 0 && (
+                  <span className="min-w-[20px] h-5 bg-primary text-white text-xs rounded-full flex items-center justify-center px-1.5">
+                    {conv.unreadCount > 99 ? '99+' : conv.unreadCount}
+                  </span>
                 )}
               </Link>
             ))
@@ -442,10 +535,10 @@ export default function MessagesScreen({ isDesktop }) {
         </div>
       </div>
 
-      <div className="flex-1 bg-white rounded-xl border border-slate-200 flex flex-col">
+      <div className="flex-1 bg-white rounded-xl border border-slate-200 flex flex-col overflow-hidden">
         {providerId ? (
           <>
-            <header className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+            <header className="flex items-center justify-between px-6 py-4 border-b border-slate-200 flex-shrink-0 bg-white z-10">
               <div className="flex items-center gap-3">
                 <div className="relative">
                   {provider?.avatar ? (
@@ -454,49 +547,52 @@ export default function MessagesScreen({ isDesktop }) {
                       style={{ backgroundImage: `url("${provider.avatar}")` }}
                     />
                   ) : (
-                    <div className="w-12 h-12 rounded-full bg-slate-300 border border-slate-200 flex items-center justify-center">
-                      <span className="text-sm font-bold text-slate-500">
-                        {provider?.name ? provider.name.charAt(0).toUpperCase() : '?'}
+                    <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center border border-slate-200">
+                      <span className="text-sm font-bold text-white">
+                        {provider?.name?.charAt(0)?.toUpperCase() || '?'}
                       </span>
                     </div>
                   )}
                   <div className="absolute bottom-0 right-0 size-3 bg-green-500 rounded-full border-2 border-white"></div>
                 </div>
                 <div className="flex flex-col">
-                  <h2 className="text-lg font-bold text-slate-900">{provider?.name}</h2>
-                  <p className="text-primary text-sm font-medium">{provider?.profession}</p>
+                  <h2 className="text-lg font-bold text-slate-900">{provider?.name || 'Unknown User'}</h2>
+                  <p className="text-primary text-sm font-medium">{provider?.profession || provider?.role || ''}</p>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button className="flex items-center justify-center w-10 h-10 rounded-full text-primary hover:bg-primary/10 transition-colors">
-                  <span className="material-symbols-outlined text-[24px]">call</span>
-                </button>
-                <button className="flex items-center justify-center w-10 h-10 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
-                  <span className="material-symbols-outlined text-[24px]">info</span>
-                </button>
               </div>
             </header>
 
-            <main className="flex-1 overflow-y-auto p-6 space-y-4">
-              {messages.map((msg) => {
+            <main className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0">
+              {messages.map((msg, index) => {
                 const isOwn = String(msg.senderId) === String(currentUser.id) || String(msg.sender) === String(currentUser.id);
-                const avatarUrl = isOwn ? currentUser.avatar : (provider?.avatar);
+                const avatarUrl = getSenderAvatar(msg, isOwn);
+                const senderName = getSenderName(msg, isOwn);
+                // Show avatar only on last message of consecutive group
+                const nextMsg = messages[index + 1];
+                const isNextFromSameSender = nextMsg && (
+                  String(nextMsg.senderId) === String(msg.senderId) || 
+                  String(nextMsg.sender) === String(msg.sender)
+                );
+                const showAvatar = !isNextFromSameSender;
+                
                 return (
                 <div
                   key={msg.id || msg._id}
                   className={`flex items-end gap-3 ${isOwn ? 'flex-row-reverse' : ''}`}
                 >
-                  {avatarUrl ? (
+                  {showAvatar && avatarUrl ? (
                     <div
-                      className="w-8 h-8 rounded-full bg-cover bg-center shrink-0"
+                      className="w-8 h-8 rounded-full bg-cover bg-center shrink-0 flex-shrink-0"
                       style={{ backgroundImage: `url("${avatarUrl}")` }}
                     />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-slate-300 shrink-0 flex items-center justify-center">
-                      <span className="text-xs font-bold text-slate-500">
-                        {isOwn ? (currentUser.name?.charAt(0) || '?') : (provider?.name?.charAt(0) || '?')}
+                  ) : showAvatar ? (
+                    <div className="w-8 h-8 rounded-full bg-primary shrink-0 flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-bold text-white">
+                        {getAvatarFallback(senderName)}
                       </span>
                     </div>
+                  ) : (
+                    <div className="w-8 shrink-0" />
                   )}
         
                   <div className={`flex flex-col gap-1 max-w-[60%] ${isOwn ? 'items-end' : 'items-start'}`}>
@@ -508,7 +604,7 @@ export default function MessagesScreen({ isDesktop }) {
                       {renderMessageContent(msg)}
                     </div>
                     <span className="text-[11px] text-slate-400 px-1">
-                      {msg.time || msg.createdAt}
+                      {formatRelativeTime(msg.createdAt || msg.time)}
                     </span>
                   </div>
                 </div>
@@ -517,7 +613,7 @@ export default function MessagesScreen({ isDesktop }) {
               <div ref={messagesEndRef} />
             </main>
 
-            <footer className="px-6 py-4 border-t border-slate-200">
+            <footer className="px-6 py-4 border-t border-slate-200 flex-shrink-0 bg-white z-10">
               {mediaPreview && (
                 <div className="mb-2">
                   {renderMediaPreview()}
@@ -528,14 +624,35 @@ export default function MessagesScreen({ isDesktop }) {
                   {renderRecorder()}
                 </div>
               )}
-              <form onSubmit={handleSend} className="flex items-end gap-3">
-                <div className="flex items-center gap-1">
+              <form onSubmit={handleSend} className="flex items-center gap-3">
+                <div className="flex items-center gap-1 shrink-0">
+                  <input
+                    type="file"
+                    ref={imageInputRef}
+                    onChange={(e) => handleMediaSelect(e)}
+                    accept="image/*"
+                    className="hidden"
+                  />
                   <button
                     type="button"
-                    onClick={() => setShowMediaPicker(!showMediaPicker)}
+                    onClick={() => imageInputRef.current?.click()}
                     className="flex items-center justify-center w-10 h-10 rounded-full text-slate-500 hover:bg-slate-200"
                   >
-                    <span className="material-symbols-outlined text-[20px]">add_photo_alternate</span>
+                    <FiImage style={{ fontSize: '20px' }} />
+                  </button>
+                  <input
+                    type="file"
+                    ref={videoInputRef}
+                    onChange={(e) => handleMediaSelect(e)}
+                    accept="video/*"
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => videoInputRef.current?.click()}
+                    className="flex items-center justify-center w-10 h-10 rounded-full text-slate-500 hover:bg-slate-200"
+                  >
+                    <FiVideo style={{ fontSize: '20px' }} />
                   </button>
                   <button
                     type="button"
@@ -544,15 +661,15 @@ export default function MessagesScreen({ isDesktop }) {
                       isRecording ? 'bg-red-500 text-white' : 'text-slate-500 hover:bg-slate-200'
                     }`}
                   >
-                    <span className="material-symbols-outlined text-[20px]">{isRecording ? 'stop' : 'mic'}</span>
+                {isRecording ? <FiX /> : <FiMic style={{ fontSize: '20px' }} />}
                   </button>
                 </div>
-                <div className="flex-1 bg-slate-100 rounded-2xl flex items-center px-4 py-3 focus-within:ring-2 focus-within:ring-primary/50">
+                <div className="flex-1 bg-slate-100 rounded-2xl flex items-center px-4 py-3 border border-transparent focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all duration-200">
                   <input
                     type="text"
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
-                    className="w-full bg-transparent border-none p-0 text-slate-900 placeholder-slate-400 focus:ring-0 text-[15px]"
+                    className="w-full bg-transparent border-none p-0 text-slate-900 placeholder-slate-400 focus:outline-none text-[15px]"
                     placeholder="Type a message..."
                   />
                 </div>
@@ -561,47 +678,15 @@ export default function MessagesScreen({ isDesktop }) {
                   disabled={!newMessage.trim() && !mediaPreview}
                   className={`flex items-center justify-center w-12 h-12 rounded-full shadow-sm transition-all ${(!newMessage.trim() && !mediaPreview) ? 'bg-slate-300 text-slate-400 cursor-not-allowed' : 'bg-primary text-white hover:bg-primary/90'}`}
                 >
-                  <span className="material-symbols-outlined text-[20px]">send</span>
+                  <FiSend style={{ fontSize: '20px' }} />
                 </button>
               </form>
-              {showMediaPicker && (
-                <div className="absolute bottom-20 left-6 bg-white dark:bg-slate-800 rounded-lg shadow-lg p-2 flex gap-2 z-10">
-                  <input
-                    type="file"
-                    ref={imageInputRef}
-                    onChange={(e) => handleMediaSelect(e, 'image')}
-                    accept="image/*"
-                    className="hidden"
-                  />
-                  <button
-                    onClick={() => imageInputRef.current?.click()}
-                    className="flex flex-col items-center p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
-                  >
-                    <span className="material-symbols-outlined text-primary">image</span>
-                    <span className="text-xs">Image</span>
-                  </button>
-                  <input
-                    type="file"
-                    ref={videoInputRef}
-                    onChange={(e) => handleMediaSelect(e, 'video')}
-                    accept="video/*"
-                    className="hidden"
-                  />
-                  <button
-                    onClick={() => videoInputRef.current?.click()}
-                    className="flex flex-col items-center p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
-                  >
-                    <span className="material-symbols-outlined text-purple-500">videocam</span>
-                    <span className="text-xs">Video</span>
-                  </button>
-                </div>
-              )}
             </footer>
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <span className="material-symbols-outlined text-6xl text-slate-200">chat</span>
+              <FiMessageCircle style={{ fontSize: '60px' }} className="text-6xl text-slate-200" />
               <p className="text-slate-500 mt-4">Select a conversation to start messaging</p>
             </div>
           </div>

@@ -1,6 +1,209 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
+import { 
+  FiHeart, FiMessageCircle, FiShare2, FiStar, FiMapPin, FiSearch, 
+  FiMenu, FiBell, FiPlayCircle, FiImage, FiX, FiFilter, FiSettings,
+  FiHome, FiUser, FiChevronDown, FiTrash2, FiChevronLeft, FiChevronRight
+} from 'react-icons/fi';
+import { GoTasklist } from 'react-icons/go';
+import { getCategoryIcon, categoryIcons, defaultCategories } from '../utils/categoryIcons.jsx';
+
+const ImageGrid = ({ images, compact = false, title = '' }) => {
+  const [lightboxIndex, setLightboxIndex] = useState(null);
+  const count = images.length;
+
+  const openLightbox = (index) => {
+    setLightboxIndex(index);
+  };
+
+  const closeLightbox = () => {
+    setLightboxIndex(null);
+  };
+
+  const goNext = () => {
+    setLightboxIndex((prev) => (prev + 1) % count);
+  };
+
+  const goPrev = () => {
+    setLightboxIndex((prev) => (prev - 1 + count) % count);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (lightboxIndex === null) return;
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'ArrowRight') goNext();
+      if (e.key === 'ArrowLeft') goPrev();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxIndex, count]);
+
+  if (count === 0) return null;
+
+  const renderSingle = () => (
+    <div 
+      className="cursor-pointer" 
+      onClick={() => openLightbox(0)}
+    >
+      <img 
+        src={images[0]} 
+        alt={title || 'Post image'}
+        className="w-full max-h-[400px] object-cover rounded-xl"
+        loading="lazy"
+      />
+    </div>
+  );
+
+  const renderTwo = () => (
+    <div className="grid grid-cols-2 gap-0.5 h-[300px]">
+      {images.map((img, idx) => (
+        <div 
+          key={idx} 
+          className="relative cursor-pointer overflow-hidden rounded-xl"
+          onClick={() => openLightbox(idx)}
+        >
+          <img 
+            src={img} 
+            alt={`Image ${idx + 1}`} 
+            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+            loading="lazy"
+          />
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderThree = () => (
+    <div className="grid grid-rows-2 gap-0.5 h-[400px]">
+      <div 
+        className="cursor-pointer overflow-hidden rounded-xl"
+        onClick={() => openLightbox(0)}
+      >
+        <img 
+          src={images[0]} 
+          alt="Image 1" 
+          className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+          loading="lazy"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-0.5">
+        {[1, 2].map((idx) => (
+          <div 
+            key={idx} 
+            className="relative cursor-pointer overflow-hidden rounded-xl"
+            onClick={() => openLightbox(idx)}
+          >
+            <img 
+              src={images[idx]} 
+              alt={`Image ${idx + 1}`} 
+              className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+              loading="lazy"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderFourPlus = () => {
+    const visible = images.slice(0, 4);
+    const remaining = images.length - 4;
+    
+    return (
+      <div className="grid grid-cols-2 gap-0.5 h-[400px]">
+        {visible.map((img, idx) => (
+          <div 
+            key={idx} 
+            className="relative cursor-pointer overflow-hidden rounded-xl"
+            onClick={() => openLightbox(idx)}
+          >
+            <img 
+              src={img} 
+              alt={`Image ${idx + 1}`} 
+              className={`w-full h-full object-cover hover:scale-105 transition-transform duration-300 ${
+                idx === 3 && remaining > 0 ? 'opacity-40' : ''
+              }`}
+              loading="lazy"
+            />
+            {idx === 3 && remaining > 0 && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                <span className="text-white font-bold text-4xl">+{remaining}</span>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <>
+      <div className={`mb-4 ${compact ? 'rounded-lg' : 'rounded-xl'} overflow-hidden`}>
+        {count === 1 && renderSingle()}
+        {count === 2 && renderTwo()}
+        {count === 3 && renderThree()}
+        {count >= 4 && renderFourPlus()}
+      </div>
+
+      {lightboxIndex !== null && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center"
+          onClick={closeLightbox}
+        >
+          <button 
+            className="absolute top-4 right-4 p-2 text-white/80 hover:text-white transition-colors z-10"
+            onClick={closeLightbox}
+          >
+            <FiX style={{ fontSize: '32px' }} />
+          </button>
+          
+          <button 
+            className="absolute left-4 p-3 text-white/80 hover:text-white transition-colors z-10 bg-black/30 rounded-full"
+            onClick={(e) => { e.stopPropagation(); goPrev(); }}
+          >
+            <FiChevronLeft style={{ fontSize: '32px' }} />
+          </button>
+          
+          <div 
+            className="max-w-4xl max-h-[90vh] w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img 
+              src={images[lightboxIndex]} 
+              alt={`Image ${lightboxIndex + 1}`}
+              className="w-full h-full max-h-[85vh] object-contain rounded-lg"
+            />
+            <div className="flex justify-center items-center gap-4 mt-4 text-white">
+              <span className="text-sm opacity-70">
+                {lightboxIndex + 1} / {count}
+              </span>
+              <div className="flex gap-1">
+                {images.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setLightboxIndex(idx)}
+                    className={`w-2 h-2 rounded-full transition-colors ${
+                      idx === lightboxIndex ? 'bg-white' : 'bg-white/40'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+          
+          <button 
+            className="absolute right-4 p-3 text-white/80 hover:text-white transition-colors z-10 bg-black/30 rounded-full"
+            onClick={(e) => { e.stopPropagation(); goNext(); }}
+          >
+            <FiChevronRight style={{ fontSize: '32px' }} />
+          </button>
+        </div>
+      )}
+    </>
+  );
+};
 
 const banner = {
   badge: 'New Offer',
@@ -20,51 +223,110 @@ export default function HomeScreen({ isDesktop }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showPostForm, setShowPostForm] = useState(false);
   const [postContent, setPostContent] = useState('');
-  const [postImage, setPostImage] = useState(null);
-  const [postImagePreview, setPostImagePreview] = useState(null);
+  const [postImages, setPostImages] = useState([]);
+  const [postImagePreviews, setPostImagePreviews] = useState([]);
   const [isPosting, setIsPosting] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
+  const [locationError, setLocationError] = useState(false);
   const postImageInputRef = useRef(null);
-  const navigate = useNavigate();
+
+  const handlePostImageSelect = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length > 0) {
+      const newImages = [...postImages, ...files].slice(0, 10);
+      setPostImages(newImages);
+      const newPreviews = newImages.map(file => URL.createObjectURL(file));
+      setPostImagePreviews(newPreviews);
+    }
+  };
+
+  const removePostImage = (index) => {
+    setPostImages(prev => prev.filter((_, i) => i !== index));
+    setPostImagePreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleCreatePost = async () => {
+    if (!postContent.trim() && postImages.length === 0) return;
+    if (postContent.trim().length < 10 && postImages.length === 0) {
+      alert('Post must have at least 10 characters or an image');
+      return;
+    }
+    setIsPosting(true);
+    try {
+      const result = await api.createPost({ content: postContent, images: postImages });
+      if (result.success) {
+        setFeed((prev) => [normalizePost(result.post), ...prev]);
+        setShowPostForm(false);
+        setPostContent('');
+        setPostImages([]);
+        setPostImagePreviews([]);
+      }
+    } catch (err) {
+      console.error('Error creating post:', err);
+    } finally {
+      setIsPosting(false);
+    }
+  };
 
   // Normalize a post into unified feed item shape
-  const normalizePost = (p) => ({
-    feedId: `post-${p.id}`,
-    type: 'post',
-    id: p.id,
-    authorName: p.authorName,
-    authorAvatar: p.authorAvatar,
-    authorRole: p.authorRole,
-    authorProfession: p.authorProfession,
-    title: null,
-    content: p.content,
-    image: p.image || null,
-    likes: p.likes || 0,
-    liked: p.liked || false,
-    commentsCount: p.commentsCount || 0,
-    createdAt: p.createdAt,
-  });
+  const normalizePost = (p) => {
+    let images = [];
+    if (p.images && Array.isArray(p.images)) {
+      images = p.images.map(img => 
+        img.startsWith('http') ? img : `${window.location.origin}${img}`
+      );
+    } else if (p.image) {
+      const img = p.image.startsWith('http') ? p.image : `${window.location.origin}${p.image}`;
+      images = [img];
+    }
+    return {
+      feedId: `post-${p.id}`,
+      type: 'post',
+      id: p.id,
+      authorId: p.authorId,
+      authorName: p.authorName,
+      authorAvatar: p.authorAvatar,
+      authorRole: p.authorRole,
+      authorProfession: p.authorProfession,
+      title: null,
+      content: p.content,
+      images,
+      likesCount: p.likesCount || p.likes || 0,
+      isLiked: p.isLiked || p.liked || false,
+      commentsCount: p.commentsCount || 0,
+      createdAt: p.createdAt,
+    };
+  };
 
   // Normalize an article into unified feed item shape
-  const normalizeArticle = (a) => ({
-    feedId: `article-${a.id || a._id}`,
-    type: 'article',
-    id: a.id || a._id,
-    authorName: a.authorName || a.author?.name || 'Unknown',
-    authorAvatar: a.authorAvatar || a.author?.avatar || null,
-    authorRole: a.authorRole || a.author?.role || null,
-    authorProfession: a.authorProfession || a.author?.profession || null,
-    title: a.title || null,
-    content: a.content,
-    image: a.imageUrl
-      ? a.imageUrl.startsWith('http')
-        ? a.imageUrl
-        : `${window.location.origin}${a.imageUrl}`
-      : null,
-    likes: a.likes || 0,
-    liked: a.liked || false,
-    commentsCount: a.commentsCount || 0,
-    createdAt: a.createdAt,
-  });
+  const normalizeArticle = (a) => {
+    let images = [];
+    if (a.images && Array.isArray(a.images)) {
+      images = a.images.map(img => 
+        img.startsWith('http') ? img : `${window.location.origin}${img}`
+      );
+    } else if (a.imageUrl) {
+      const img = a.imageUrl.startsWith('http') ? a.imageUrl : `${window.location.origin}${a.imageUrl}`;
+      images = [img];
+    }
+    return {
+      feedId: `article-${a.id || a._id}`,
+      type: 'article',
+      id: a.id || a._id,
+      authorId: a.authorId || a.userId || a.author?._id || null,
+      authorName: a.authorName || a.userName || a.author?.name || 'Unknown',
+      authorAvatar: a.authorAvatar || a.userAvatar || a.author?.avatar || null,
+      authorRole: a.authorRole || a.userRole || a.author?.role || null,
+      authorProfession: a.authorProfession || a.author?.profession || null,
+      title: a.title || null,
+      content: a.content,
+      images,
+      likesCount: a.likesCount || 0,
+      isLiked: a.isLiked || false,
+      commentsCount: a.commentsCount || 0,
+      createdAt: a.createdAt,
+    };
+  };
 
   const buildFeed = (posts, articles) => {
     const normalized = [
@@ -107,10 +369,24 @@ export default function HomeScreen({ isDesktop }) {
           api.getProfessions(),
           api.getProviders({ sort: 'rating' }),
         ]);
-        setCategories(Array.isArray(professionsData) ? professionsData : []);
+        let cats = Array.isArray(professionsData) ? professionsData : [];
+        if (cats.length === 0) {
+          cats = defaultCategories;
+        } else {
+          cats = cats.map(cat => {
+            const defaults = defaultCategories.find(d => d.name.toLowerCase() === cat.name?.toLowerCase());
+            return {
+              ...cat,
+              icon: cat.icon || defaults?.icon || 'more',
+              color: cat.color || defaults?.color || 'bg-slate-100 text-slate-500',
+            };
+          });
+        }
+        setCategories(cats);
         setProviders(Array.isArray(provs) ? provs.slice(0, 6) : []);
       } catch (error) {
         console.error('Error fetching home data:', error);
+        setCategories(defaultCategories);
       }
     };
 
@@ -132,6 +408,68 @@ export default function HomeScreen({ isDesktop }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+          setLocationError(false);
+        },
+        () => {
+          setLocationError(true);
+        },
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+      );
+    } else {
+      setLocationError(true);
+    }
+  }, []);
+
+  const calculateDistance = (lat1, lng1, lat2, lng2) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  const getSortedProviders = () => {
+    let sorted = [...providers];
+    if (userLocation && !locationError) {
+      sorted = sorted.map(p => {
+        if (p.location?.lat && p.location?.lng) {
+          const distance = calculateDistance(
+            userLocation.lat, userLocation.lng,
+            p.location.lat, p.location.lng
+          );
+          return { ...p, calculatedDistance: Math.round(distance * 10) / 10 };
+        }
+        return { ...p, calculatedDistance: p.distance || 0 };
+      });
+      sorted.sort((a, b) => (a.calculatedDistance || 0) - (b.calculatedDistance || 0));
+    } else {
+      sorted.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    }
+    return sorted;
+  };
+
+  const formatCurrency = (amount) => {
+    return `${amount} MAD`;
+  };
+
+  const formatDistance = (distance) => {
+    if (userLocation && !locationError) {
+      return `${distance} km`;
+    }
+    return `${Math.round(distance * 10) / 10} km`;
+  };
+
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
@@ -141,10 +479,10 @@ export default function HomeScreen({ isDesktop }) {
 
   const handleLikeItem = async (item) => {
     const { feedId, type, id } = item;
-    const isLiked = likedItems.has(feedId);
-    const newLikes = isLiked
-      ? Math.max(0, (item.likes || 0) - 1)
-      : (item.likes || 0) + 1;
+    const isLiked = item.isLiked || likedItems.has(feedId);
+    const newLikesCount = isLiked
+      ? Math.max(0, (item.likesCount || 0) - 1)
+      : (item.likesCount || 0) + 1;
 
     // Optimistic update
     setLikedItems((prev) => {
@@ -156,7 +494,7 @@ export default function HomeScreen({ isDesktop }) {
     setFeed((prev) =>
       prev.map((f) =>
         f.feedId === feedId
-          ? { ...f, likes: newLikes, liked: !isLiked }
+          ? { ...f, likesCount: newLikesCount, isLiked: !isLiked }
           : f
       )
     );
@@ -170,13 +508,13 @@ export default function HomeScreen({ isDesktop }) {
       setFeed((prev) =>
         prev.map((f) =>
           f.feedId === feedId
-            ? { ...f, likes: res.likes, liked: res.liked ?? !isLiked }
+            ? { ...f, likesCount: res.likesCount, isLiked: res.isLiked ?? !isLiked }
             : f
         )
       );
       setLikedItems((prev) => {
         const next = new Set(prev);
-        if (res.liked ?? !isLiked) next.add(feedId);
+        if (res.isLiked ?? !isLiked) next.add(feedId);
         else next.delete(feedId);
         return next;
       });
@@ -191,7 +529,7 @@ export default function HomeScreen({ isDesktop }) {
       setFeed((prev) =>
         prev.map((f) =>
           f.feedId === feedId
-            ? { ...f, likes: item.likes, liked: isLiked }
+            ? { ...f, likesCount: item.likesCount, isLiked }
             : f
         )
       );
@@ -201,13 +539,10 @@ export default function HomeScreen({ isDesktop }) {
   const handleLoadComments = async (item) => {
     const { feedId, type, id } = item;
     if (!itemComments[feedId]) {
-      // Articles and posts both use the same comments endpoint keyed by post id
-      // For articles we fall back to getComments if there's a shared endpoint,
-      // otherwise show empty. Adjust if your backend exposes /articles/:id/comments.
       const comments =
         type === 'post'
           ? await api.getComments(id)
-          : await api.getComments(id).catch(() => []);
+          : await api.getArticleComments(id).catch(() => []);
       if (Array.isArray(comments)) {
         setItemComments((prev) => ({ ...prev, [feedId]: comments }));
       }
@@ -231,7 +566,10 @@ export default function HomeScreen({ isDesktop }) {
     const content = commentInputs[feedId];
     if (!content?.trim()) return;
 
-    const res = await api.addComment(id, content);
+    const res = type === 'post' 
+      ? await api.addComment(id, content)
+      : await api.addArticleComment(id, content);
+    
     if (res.success) {
       setItemComments((prev) => ({
         ...prev,
@@ -248,37 +586,27 @@ export default function HomeScreen({ isDesktop }) {
     }
   };
 
-  const handlePostImageSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setPostImage(file);
-      setPostImagePreview(URL.createObjectURL(file));
-    }
-  };
-
-  const handleCreatePost = async () => {
-    if (!postContent.trim() && !postImage) return;
-    setIsPosting(true);
+  const handleDeletePost = async (feedId, type) => {
+    const confirmMsg = type === 'article' 
+      ? 'Are you sure you want to delete this article?' 
+      : 'Are you sure you want to delete this post?';
+    if (!window.confirm(confirmMsg)) return;
     try {
-      let imageUrl = null;
-      if (postImage) {
-        const uploadRes = await api.uploadMedia(postImage);
-        if (uploadRes.success) {
-          imageUrl = uploadRes.filePath;
+      if (type === 'article') {
+        const articleId = feedId.replace('article-', '');
+        const result = await api.deleteArticle?.(articleId);
+        if (result?.success) {
+          setFeed((prev) => prev.filter((f) => f.feedId !== feedId));
+        }
+      } else {
+        const postId = feedId.replace('post-', '');
+        const result = await api.deletePost?.(postId);
+        if (result?.success || result?.message === 'Post deleted') {
+          setFeed((prev) => prev.filter((f) => f.feedId !== feedId));
         }
       }
-      const result = await api.createPost({ content: postContent, image: imageUrl });
-      if (result.success) {
-        setFeed((prev) => [normalizePost(result.post), ...prev]);
-        setShowPostForm(false);
-        setPostContent('');
-        setPostImage(null);
-        setPostImagePreview(null);
-      }
     } catch (err) {
-      console.error('Error creating post:', err);
-    } finally {
-      setIsPosting(false);
+      console.error('Error deleting item:', err);
     }
   };
 
@@ -289,21 +617,22 @@ export default function HomeScreen({ isDesktop }) {
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffHours < 1) return 'Just now';
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+    if (diffHours < 1) return 'À l\'instant';
+    if (diffHours < 24) return `Il y a ${diffHours}h`;
+    if (diffDays === 1) return 'Hier';
+    if (diffDays < 7) return `Il y a ${diffDays}j`;
+    if (diffDays < 30) return `Il y a ${Math.floor(diffDays / 7)} sem.`;
+    return date.toLocaleDateString('fr-FR');
   };
 
   // Shared FeedCard component used by both mobile and desktop
   const FeedCard = ({ item, compact = false }) => {
-    const { feedId, type } = item;
-    const isLiked = likedItems.has(feedId);
+    const { feedId, type, id, authorName, authorId } = item;
+    const isLiked = item.isLiked || likedItems.has(feedId);
     const isExpanded = expandedItems.has(feedId);
     const comments = itemComments[feedId] || [];
-    const heartStyle = isLiked
-      ? { fontVariationSettings: "'FILL' 1" }
-      : { fontVariationSettings: "'FILL' 0" };
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const isOwnPost = storedUser?.name === authorName || storedUser?.id === authorId;
 
     return (
       <div
@@ -356,14 +685,32 @@ export default function HomeScreen({ isDesktop }) {
           {/* Badge: article vs post */}
           <div className="flex items-center gap-1.5 shrink-0">
             {type === 'article' && (
-              <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+              <span className="hidden px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
                 Article
               </span>
             )}
-            {item.authorRole === 'provider' && (
+            {item.authorRole === 'provider' && item.isVerified && (
               <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
                 Verified Pro
               </span>
+            )}
+            {type === 'post' && isOwnPost && (
+              <button
+                onClick={() => handleDeletePost(feedId, type)}
+                className="p-1.5 hover:bg-red-50 rounded-full transition-colors text-slate-400 hover:text-red-500"
+                title="Delete post"
+              >
+                <FiTrash2 style={{ fontSize: '16px' }} />
+              </button>
+            )}
+            {type === 'article' && isOwnPost && (
+              <button
+                onClick={() => handleDeletePost(feedId, type)}
+                className="p-1.5 hover:bg-red-50 rounded-full transition-colors text-slate-400 hover:text-red-500"
+                title="Delete article"
+              >
+                <FiTrash2 style={{ fontSize: '16px' }} />
+              </button>
             )}
           </div>
         </div>
@@ -388,14 +735,18 @@ export default function HomeScreen({ isDesktop }) {
           {item.content}
         </p>
 
-        {/* Image */}
-        {item.image && (
-          <div
-            className={`w-full rounded-xl overflow-hidden bg-slate-100 mb-3 ${
-              compact ? 'h-40' : 'h-56'
-            }`}
-            style={{ backgroundImage: `url("${item.image}")`, backgroundSize: 'cover', backgroundPosition: 'center' }}
-          />
+        {/* Multi-Image Display - Facebook Style */}
+        {item.images && item.images.length > 0 && (
+          <>
+            <ImageGrid images={item.images} compact={compact} title={item.title} />
+            {type === 'article' && (
+              <div className="absolute top-3 left-3">
+                <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-white/95 backdrop-blur-sm text-purple-700 shadow-lg">
+                  Article
+                </span>
+              </div>
+            )}
+          </>
         )}
 
         {/* Actions */}
@@ -412,31 +763,24 @@ export default function HomeScreen({ isDesktop }) {
                 : 'text-slate-500 hover:text-red-500 hover:bg-red-50'
             }`}
           >
-            <span
-              className="material-symbols-outlined"
-              style={{ ...heartStyle, fontSize: compact ? '18px' : '20px' }}
-            >
-              favorite
-            </span>
-            <span className="text-sm font-medium">{item.likes}</span>
+            <FiHeart 
+              style={{ 
+                fontSize: compact ? '18px' : '20px',
+                fill: isLiked ? 'currentColor' : 'none'
+              }} 
+            />
+            <span className="text-sm font-medium">{item.likesCount || 0}</span>
           </button>
           <button
             onClick={() => handleToggleComments(item)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-500 hover:text-primary hover:bg-blue-50 transition-all"
           >
-            <span
-              className="material-symbols-outlined"
-              style={{ fontSize: compact ? '18px' : '20px' }}
-            >
-              chat_bubble
-            </span>
+            <FiMessageCircle style={{ fontSize: compact ? '18px' : '20px' }} />
             <span className="text-sm font-medium">{item.commentsCount || 0}</span>
           </button>
           {!compact && (
             <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-500 hover:text-primary hover:bg-blue-50 transition-all ml-auto">
-              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
-                share
-              </span>
+              <FiShare2 style={{ fontSize: '20px' }} />
             </button>
           )}
         </div>
@@ -564,33 +908,18 @@ export default function HomeScreen({ isDesktop }) {
               </div>
             </div>
             <button className="relative flex items-center justify-center size-10 rounded-full bg-white dark:bg-surface-dark shadow-card border border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-200">
-              <span
-                className="material-symbols-outlined"
-                style={{ fontSize: '24px' }}
-              >
-                notifications
-              </span>
+              <FiBell style={{ fontSize: '24px' }} />
               <span className="absolute top-2 right-2 size-2 bg-red-500 rounded-full border border-white dark:border-surface-dark"></span>
             </button>
           </div>
 
           <div className="flex items-center">
             <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors">
-              <span
-                className="material-symbols-outlined text-primary"
-                style={{ fontSize: '18px' }}
-              >
-                location_on
-              </span>
+              <FiMapPin className="text-primary" style={{ fontSize: '18px' }} />
               <span className="text-primary text-sm font-semibold">
                 Downtown, NY
               </span>
-              <span
-                className="material-symbols-outlined text-primary"
-                style={{ fontSize: '18px' }}
-              >
-                expand_more
-              </span>
+              <FiChevronDown className="text-primary" style={{ fontSize: '18px' }} />
             </button>
           </div>
 
@@ -598,12 +927,7 @@ export default function HomeScreen({ isDesktop }) {
             <div className="flex w-full items-stretch gap-3 h-12">
               <div className="relative flex-1 group">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none">
-                  <span
-                    className="material-symbols-outlined"
-                    style={{ fontSize: '24px' }}
-                  >
-                    search
-                  </span>
+                  <FiSearch style={{ fontSize: '24px' }} />
                 </div>
                 <input
                   type="text"
@@ -617,12 +941,7 @@ export default function HomeScreen({ isDesktop }) {
                 type="submit"
                 className="flex items-center justify-center aspect-square h-full bg-primary text-white rounded-xl shadow-lg shadow-primary/30 active:scale-95 transition-transform"
               >
-                <span
-                  className="material-symbols-outlined"
-                  style={{ fontSize: '24px' }}
-                >
-                  tune
-                </span>
+                <FiSettings style={{ fontSize: '24px' }} />
               </button>
             </div>
           </form>
@@ -667,12 +986,7 @@ export default function HomeScreen({ isDesktop }) {
                   <div
                     className={`size-14 rounded-2xl flex items-center justify-center shadow-sm transition-colors ${cat.color} group-hover:bg-primary group-hover:text-white`}
                   >
-                    <span
-                      className="material-symbols-outlined"
-                      style={{ fontSize: '28px' }}
-                    >
-                      {cat.icon}
-                    </span>
+                    {getCategoryIcon(cat.icon, 28)}
                   </div>
                   <span className="text-xs font-medium text-slate-700 dark:text-slate-300 text-center">
                     {cat.name}
@@ -713,7 +1027,7 @@ export default function HomeScreen({ isDesktop }) {
                   onClick={() => setShowPostForm(true)}
                   className="flex-1 text-left px-4 py-2.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-sm"
                 >
-                  What's on your mind?
+                  Share an update or tip...
                 </button>
               </div>
             </div>
@@ -728,34 +1042,33 @@ export default function HomeScreen({ isDesktop }) {
                       onClick={() => setShowPostForm(false)}
                       className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full"
                     >
-                      <span className="material-symbols-outlined">close</span>
+                      <FiX />
                     </button>
                   </div>
                   <textarea
                     value={postContent}
                     onChange={(e) => setPostContent(e.target.value)}
-                    placeholder="What's on your mind?"
+                    placeholder="Share an update or tip..."
                     className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent resize-none focus:outline-none focus:border-primary"
                     rows={4}
                   />
-                  {postImagePreview && (
-                    <div className="relative mt-4">
-                      <img
-                        src={postImagePreview}
-                        alt="Preview"
-                        className="w-full max-h-48 object-contain rounded-lg"
-                      />
-                      <button
-                        onClick={() => {
-                          setPostImage(null);
-                          setPostImagePreview(null);
-                        }}
-                        className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">
-                          close
-                        </span>
-                      </button>
+                  {postImagePreviews.length > 0 && (
+                    <div className="mt-4 grid grid-cols-3 gap-2">
+                      {postImagePreviews.map((preview, idx) => (
+                        <div key={idx} className="relative aspect-square">
+                          <img
+                            src={preview}
+                            alt={`Preview ${idx + 1}`}
+                            className="w-full h-full object-cover rounded-lg"
+                          />
+                          <button
+                            onClick={() => removePostImage(idx)}
+                            className="absolute top-1 right-1 bg-black/50 text-white p-1 rounded-full"
+                          >
+                            <FiX className="text-[14px]" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   )}
                   <div className="flex gap-3 mt-4">
@@ -763,22 +1076,21 @@ export default function HomeScreen({ isDesktop }) {
                       onClick={() => postImageInputRef.current?.click()}
                       className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
                     >
-                      <span className="material-symbols-outlined text-primary">
-                        image
-                      </span>
-                      Photo
+                      <FiImage className="text-primary" />
+                      Photo {postImages.length > 0 && `(${postImages.length})`}
                     </button>
                     <input
                       type="file"
                       ref={postImageInputRef}
                       onChange={handlePostImageSelect}
                       accept="image/*"
+                      multiple
                       className="hidden"
                     />
                     <div className="flex-1"></div>
                     <button
                       onClick={handleCreatePost}
-                      disabled={(!postContent.trim() && !postImage) || isPosting}
+                      disabled={(!postContent.trim() && postImages.length === 0) || isPosting}
                       className="px-6 py-2 rounded-lg bg-primary text-white font-medium disabled:opacity-50"
                     >
                       {isPosting ? 'Posting...' : 'Post'}
@@ -802,16 +1114,16 @@ export default function HomeScreen({ isDesktop }) {
                 Popular Near You
               </h2>
               <button className="text-slate-400 dark:text-slate-500 hover:text-primary transition-colors">
-                <span
-                  className="material-symbols-outlined"
-                  style={{ fontSize: '24px' }}
-                >
-                  filter_list
-                </span>
+                <FiFilter style={{ fontSize: '24px' }} />
               </button>
             </div>
+            {locationError && (
+              <div className="mb-4 px-4 py-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-amber-700 dark:text-amber-400 text-sm">
+                Location unavailable. Showing top-rated providers.
+              </div>
+            )}
             <div className="flex flex-col gap-4">
-              {providers.slice(0, 3).map((provider) => (
+              {getSortedProviders().slice(0, 3).map((provider) => (
                 <Link
                   key={provider._id || provider.id}
                   to={`/provider/${provider._id || provider.id}`}
@@ -842,12 +1154,7 @@ export default function HomeScreen({ isDesktop }) {
                           {provider.name}
                         </h3>
                         <div className="flex items-center gap-1 bg-yellow-100 dark:bg-yellow-900/30 px-1.5 py-0.5 rounded text-xs font-bold text-yellow-700 dark:text-yellow-500">
-                          <span
-                            className="material-symbols-outlined"
-                            style={{ fontSize: '14px' }}
-                          >
-                            star
-                          </span>
+                          <FiStar style={{ fontSize: '14px' }} />
                           {provider.rating}
                         </div>
                       </div>
@@ -856,18 +1163,15 @@ export default function HomeScreen({ isDesktop }) {
                       </p>
                     </div>
                     <div className="flex items-end justify-between mt-2">
-                      <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500 text-xs">
-                        <span
-                          className="material-symbols-outlined"
-                          style={{ fontSize: '14px' }}
-                        >
-                          location_on
-                        </span>
-                        {provider.distance} km
-                      </div>
+                        <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500 text-xs">
+                          <FiMapPin style={{ fontSize: '14px' }} />
+                          {provider.calculatedDistance !== undefined 
+                            ? `${provider.calculatedDistance} km`
+                            : `${Math.round((provider.distance || 0) * 10) / 10} km`}
+                        </div>
                       <div className="flex items-center gap-3">
                         <span className="font-bold text-primary">
-                          ${provider.hourlyRate}
+                          {formatCurrency(provider.hourlyRate || 0)}
                           <span className="text-xs font-normal text-slate-400 dark:text-slate-500">
                             /hr
                           </span>
@@ -890,40 +1194,35 @@ export default function HomeScreen({ isDesktop }) {
               className="flex flex-col items-center gap-1 text-primary w-16"
               onClick={() => navigate('/home')}
             >
-              <span
-                className="material-symbols-outlined filled"
-                style={{ fontVariationSettings: "'FILL' 1" }}
-              >
-                home
-              </span>
+              <FiHome />
               <span className="text-[10px] font-bold">Home</span>
             </button>
             <button
               className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 w-16"
               onClick={() => navigate('/search')}
             >
-              <span className="material-symbols-outlined">search</span>
+              <FiSearch />
               <span className="text-[10px] font-medium">Search</span>
             </button>
             <button
               className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 w-16"
               onClick={() => navigate('/videos')}
             >
-              <span className="material-symbols-outlined">play_circle</span>
+              <FiPlayCircle />
               <span className="text-[10px] font-medium">Videos</span>
             </button>
             <button
               className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 w-16"
               onClick={() => navigate('/messages/1')}
             >
-              <span className="material-symbols-outlined">chat_bubble</span>
+              <FiMessageCircle />
               <span className="text-[10px] font-medium">Messages</span>
             </button>
             <button
               className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 w-16"
               onClick={() => navigate('/profile')}
             >
-              <span className="material-symbols-outlined">person</span>
+              <FiUser />
               <span className="text-[10px] font-medium">Profile</span>
             </button>
           </div>
@@ -969,16 +1268,11 @@ export default function HomeScreen({ isDesktop }) {
               className="flex flex-col items-center gap-3 group p-4 rounded-xl hover:bg-slate-50 transition-colors"
               onClick={() => navigate(`/search?q=${cat.name}`)}
             >
-              <div
-                className={`size-16 rounded-2xl flex items-center justify-center shadow-sm transition-colors ${cat.color} group-hover:bg-primary group-hover:text-white`}
-              >
-                <span
-                  className="material-symbols-outlined"
-                  style={{ fontSize: '32px' }}
-                >
-                  {cat.icon}
-                </span>
-              </div>
+                  <div
+                    className={`size-16 rounded-2xl flex items-center justify-center shadow-sm transition-colors ${cat.color} group-hover:bg-primary group-hover:text-white`}
+                  >
+                    {getCategoryIcon(cat.icon, 32)}
+                  </div>
               <span className="text-sm font-medium text-slate-700 text-center">
                 {cat.name}
               </span>
@@ -1015,12 +1309,12 @@ export default function HomeScreen({ isDesktop }) {
                 </div>
               )}
             </div>
-            <button
-              onClick={() => setShowPostForm(true)}
-              className="flex-1 text-left px-5 py-3 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors text-slate-500 font-medium"
-            >
-              What's on your mind?
-            </button>
+              <button
+                onClick={() => setShowPostForm(true)}
+                className="flex-1 text-left px-5 py-3 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors text-slate-500 font-medium"
+              >
+                Share an update or tip...
+              </button>
           </div>
         </div>
 
@@ -1034,7 +1328,7 @@ export default function HomeScreen({ isDesktop }) {
                   onClick={() => setShowPostForm(false)}
                   className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full"
                 >
-                  <span className="material-symbols-outlined">close</span>
+                  <FiX />
                 </button>
               </div>
               <div className="flex items-center gap-3 mb-4">
@@ -1070,47 +1364,45 @@ export default function HomeScreen({ isDesktop }) {
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent resize-none focus:outline-none focus:border-primary"
                 rows={4}
               />
-              {postImagePreview && (
-                <div className="relative mt-4">
-                  <img
-                    src={postImagePreview}
-                    alt="Preview"
-                    className="w-full max-h-48 object-contain rounded-lg"
-                  />
-                  <button
-                    onClick={() => {
-                      setPostImage(null);
-                      setPostImagePreview(null);
-                    }}
-                    className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">
-                      close
-                    </span>
-                  </button>
+              {postImagePreviews.length > 0 && (
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  {postImagePreviews.map((preview, idx) => (
+                    <div key={idx} className="relative aspect-square">
+                      <img
+                        src={preview}
+                        alt={`Preview ${idx + 1}`}
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                      <button
+                        onClick={() => removePostImage(idx)}
+                        className="absolute top-1 right-1 bg-black/50 text-white p-1 rounded-full"
+                      >
+                        <FiX className="text-[14px]" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
               <div className="flex gap-3 mt-4">
                 <button
                   onClick={() => postImageInputRef.current?.click()}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
-                >
-                  <span className="material-symbols-outlined text-primary">
-                    image
-                  </span>
-                  Photo
+                  >
+                  <FiImage className="text-primary" />
+                  Photo {postImages.length > 0 && `(${postImages.length})`}
                 </button>
                 <input
                   type="file"
                   ref={postImageInputRef}
                   onChange={handlePostImageSelect}
                   accept="image/*"
+                  multiple
                   className="hidden"
                 />
                 <div className="flex-1"></div>
                 <button
                   onClick={handleCreatePost}
-                  disabled={(!postContent.trim() && !postImage) || isPosting}
+                  disabled={(!postContent.trim() && postImages.length === 0) || isPosting}
                   className="px-6 py-2 rounded-lg bg-primary text-white font-medium disabled:opacity-50"
                 >
                   {isPosting ? 'Posting...' : 'Post'}
@@ -1134,19 +1426,19 @@ export default function HomeScreen({ isDesktop }) {
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-slate-900 text-xl font-bold">Popular Near You</h2>
           <button className="text-slate-400 hover:text-primary transition-colors">
-            <span
-              className="material-symbols-outlined"
-              style={{ fontSize: '24px' }}
-            >
-              filter_list
-            </span>
+            <FiFilter style={{ fontSize: '24px' }} />
           </button>
         </div>
+        {locationError && (
+          <div className="mb-4 px-4 py-2 bg-amber-50 rounded-lg text-amber-700 text-sm">
+            Location unavailable. Showing top-rated providers.
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {providers.slice(0, 6).map((provider) => (
+          {getSortedProviders().slice(0, 6).map((provider) => (
             <Link
-              key={provider.id}
-              to={`/provider/${provider.id}`}
+              key={provider.id || provider._id}
+              to={`/provider/${provider.id || provider._id}`}
               className="flex gap-4 p-5 rounded-2xl bg-white shadow-sm border border-slate-200 hover:shadow-md hover:border-primary/30 transition-all"
             >
               <div
@@ -1170,12 +1462,7 @@ export default function HomeScreen({ isDesktop }) {
                   <div className="flex justify-between items-start">
                     <h3 className="font-bold text-slate-900">{provider.name}</h3>
                     <div className="flex items-center gap-1 bg-yellow-100 px-1.5 py-0.5 rounded text-xs font-bold text-yellow-700">
-                      <span
-                        className="material-symbols-outlined"
-                        style={{ fontSize: '14px' }}
-                      >
-                        star
-                      </span>
+                      <FiStar style={{ fontSize: '14px' }} />
                       {provider.rating}
                     </div>
                   </div>
@@ -1185,17 +1472,14 @@ export default function HomeScreen({ isDesktop }) {
                 </div>
                 <div className="flex items-end justify-between mt-3">
                   <div className="flex items-center gap-1 text-slate-400 text-xs">
-                    <span
-                      className="material-symbols-outlined"
-                      style={{ fontSize: '14px' }}
-                    >
-                      location_on
-                    </span>
-                    {provider.distance} km
+                    <FiMapPin style={{ fontSize: '14px' }} />
+                    {provider.calculatedDistance !== undefined 
+                      ? `${provider.calculatedDistance} km`
+                      : `${Math.round((provider.distance || 0) * 10) / 10} km`}
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-bold text-primary">
-                      ${provider.hourlyRate}
+                      {formatCurrency(provider.hourlyRate || 0)}
                       <span className="text-xs font-normal text-slate-400">
                         /hr
                       </span>

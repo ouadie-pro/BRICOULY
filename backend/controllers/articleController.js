@@ -5,18 +5,38 @@ const Provider = require('../models/Provider');
 
 exports.getArticles = async (req, res) => {
   try {
-    const articles = await Article.find().populate('user', 'name avatar role').sort({ createdAt: -1 });
-    const articlesWithUsers = articles.map(a => ({
-      id: a._id.toString(),
-      userId: a.user._id.toString(),
-      userName: a.user.name,
-      userAvatar: a.user.avatar,
-      userRole: a.user.role,
-      title: a.title,
-      content: a.content,
-      imageUrl: a.imageUrl,
-      likes: a.likes,
-      createdAt: a.createdAt,
+    const userId = req.headers['x-user-id'];
+    const articles = await Article.find()
+      .populate('user', 'name avatar role')
+      .sort({ createdAt: -1 });
+    
+    const articlesWithUsers = await Promise.all(articles.map(async a => {
+      let authorProfession = null;
+      if (a.user.role === 'provider') {
+        const provider = await Provider.findOne({ user: a.user._id });
+        authorProfession = provider?.profession || null;
+      }
+      
+      const isLiked = userId ? a.likes.some(id => id.toString() === userId) : false;
+      const images = a.images?.map(img => 
+        img.startsWith('http') ? img : `${req.protocol}://${req.get('host')}${img}`
+      ) || [];
+      
+      return {
+        id: a._id.toString(),
+        authorId: a.user._id.toString(),
+        authorName: a.user.name,
+        authorAvatar: a.user.avatar,
+        authorRole: a.user.role,
+        authorProfession,
+        title: a.title,
+        content: a.content,
+        images,
+        likesCount: a.likes?.length || 0,
+        isLiked,
+        commentsCount: a.commentsCount || 0,
+        createdAt: a.createdAt,
+      };
     }));
     res.json(articlesWithUsers);
   } catch (error) {
@@ -31,8 +51,8 @@ exports.getUserArticles = async (req, res) => {
       id: a._id.toString(),
       title: a.title,
       content: a.content,
-      imageUrl: a.imageUrl,
-      likes: a.likes,
+      images: a.images || [],
+      likesCount: a.likes?.length || 0,
       commentsCount: a.commentsCount || 0,
       createdAt: a.createdAt,
     }));
@@ -51,29 +71,47 @@ exports.createArticle = async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     
-    const { title, content } = req.body;
+    const { title, content, type } = req.body;
+    
+    let images = [];
+    if (req.files && req.files.length > 0) {
+      images = req.files.map(file => `/uploads/${file.filename}`);
+    }
     
     const article = await Article.create({
       user: userId,
       title: title || '',
       content: content || '',
-      imageUrl: req.file ? `/uploads/${req.file.filename}` : null,
+      images,
     });
     
     const populatedArticle = await Article.findById(article._id).populate('user', 'name avatar role');
+    
+    let authorProfession = null;
+    if (user.role === 'provider') {
+      const provider = await Provider.findOne({ user: userId });
+      authorProfession = provider?.profession || null;
+    }
+    
+    const imageUrls = populatedArticle.images?.map(img => 
+      img.startsWith('http') ? img : `${req.protocol}://${req.get('host')}${img}`
+    ) || [];
     
     res.json({ 
       success: true, 
       article: {
         id: populatedArticle._id.toString(),
-        userId: populatedArticle.user._id.toString(),
-        userName: populatedArticle.user.name,
-        userAvatar: populatedArticle.user.avatar,
-        userRole: populatedArticle.user.role,
+        authorId: populatedArticle.user._id.toString(),
+        authorName: populatedArticle.user.name,
+        authorAvatar: populatedArticle.user.avatar,
+        authorRole: populatedArticle.user.role,
+        authorProfession,
         title: populatedArticle.title,
         content: populatedArticle.content,
-        imageUrl: populatedArticle.imageUrl,
-        likes: populatedArticle.likes,
+        images: imageUrls,
+        likesCount: 0,
+        isLiked: false,
+        commentsCount: 0,
         createdAt: populatedArticle.createdAt,
       }
     });
@@ -84,16 +122,30 @@ exports.createArticle = async (req, res) => {
 
 exports.likeArticle = async (req, res) => {
   try {
+    const userId = req.headers['x-user-id'];
+    const mongoose = require('mongoose');
     const article = await Article.findById(req.params.id);
     
     if (!article) {
       return res.status(404).json({ error: 'Article not found' });
     }
     
-    article.likes += 1;
+    const userIdObj = new mongoose.Types.ObjectId(userId);
+    const alreadyLiked = article.likes.some(id => id.toString() === userId);
+    
+    if (alreadyLiked) {
+      article.likes = article.likes.filter(id => id.toString() !== userId);
+    } else {
+      article.likes.push(userIdObj);
+    }
+    
     await article.save();
     
-    res.json({ success: true, likes: article.likes });
+    res.json({ 
+      success: true, 
+      likesCount: article.likes.length, 
+      isLiked: !alreadyLiked 
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

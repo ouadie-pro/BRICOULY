@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { FiMessageCircle } from 'react-icons/fi';
 
 export default function ConversationList({ conversations, currentUserId, selectedUserId }) {
   const formatTime = (date) => {
@@ -27,7 +28,7 @@ export default function ConversationList({ conversations, currentUserId, selecte
       <div className="flex-1 flex items-center justify-center bg-white rounded-xl border border-slate-200">
         <div className="text-center p-8">
           <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-slate-100 flex items-center justify-center">
-            <span className="material-symbols-outlined text-4xl text-slate-400">chat</span>
+            <FiMessageCircle style={{ fontSize: '40px' }} className="text-4xl text-slate-400" />
           </div>
           <h3 className="text-lg font-semibold text-slate-700 mb-2">No conversations yet</h3>
           <p className="text-slate-500 text-sm">

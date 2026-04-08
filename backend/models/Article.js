@@ -14,14 +14,13 @@ const articleSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Content is required'],
   },
-  imageUrl: {
+  images: [{
     type: String,
-    default: null,
-  },
-  likes: {
-    type: Number,
-    default: 0,
-  },
+  }],
+  likes: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  }],
   commentsCount: {
     type: Number,
     default: 0,
