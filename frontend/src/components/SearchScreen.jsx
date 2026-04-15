@@ -92,7 +92,10 @@ export default function SearchScreen({ isDesktop }) {
           search: searchQuery,
           sort: sortBy,
         });
-        setProviders(Array.isArray(data) ? data : []);
+        // Backend returns { data: [...], pagination: {...} }
+        const providersList = Array.isArray(data) ? data : (data?.data || []);
+        setProviders(providersList);
+        console.log('[SearchScreen] Providers fetched:', providersList.length);
       } catch (error) {
         console.error('Error fetching providers:', error);
         setProviders([]);

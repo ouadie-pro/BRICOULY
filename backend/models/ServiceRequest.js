@@ -9,7 +9,7 @@ const serviceRequestSchema = new mongoose.Schema({
   provider: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Provider',
-    required: true,
+    required: false,
   },
   serviceName: {
     type: String,
@@ -18,6 +18,26 @@ const serviceRequestSchema = new mongoose.Schema({
   description: {
     type: String,
     default: '',
+  },
+  preferredDate: {
+    type: Date,
+  },
+  preferredTime: {
+    type: String,
+    enum: ['morning', 'afternoon', 'evening', ''],
+    default: '',
+  },
+  location: {
+    type: String,
+    default: '',
+  },
+  budget: {
+    type: Number,
+  },
+  urgency: {
+    type: String,
+    enum: ['normal', 'urgent', ''],
+    default: 'normal',
   },
   status: {
     type: String,
@@ -35,3 +55,5 @@ module.exports = mongoose.model('ServiceRequest', serviceRequestSchema);
 // FIXED: #18 - Add database indexes
 serviceRequestSchema.index({ client: 1, createdAt: -1 });
 serviceRequestSchema.index({ provider: 1, createdAt: -1 });
+serviceRequestSchema.index({ serviceName: 1 });
+serviceRequestSchema.index({ status: 1 });

@@ -59,6 +59,9 @@ exports.getProviders = async (req, res) => {
     console.log('[getProviders] Found providers:', providers.length, 'total:', total);
     
     let providersList = await Promise.all(providers.map(async p => {
+      if (!p.user) {
+        return null;
+      }
       const stats = await calculateProviderStats(p._id);
       const userLat = p.user.location?.lat;
       const userLng = p.user.location?.lng;
@@ -71,8 +74,8 @@ exports.getProviders = async (req, res) => {
       return {
         id: p.user._id.toString(),
         providerDbId: p._id.toString(),
-        name: p.user.name,
-        email: p.user.email,
+        name: p.user.name || 'Unknown',
+        email: p.user.email || '',
         avatar: p.user.avatar,
         phone: p.user.phone,
         location: p.user.location,
@@ -90,6 +93,8 @@ exports.getProviders = async (req, res) => {
         serviceArea: p.serviceArea,
       };
     }));
+
+    providersList = providersList.filter(p => p !== null);
     
     // FIXED: #20 - Apply filters after pagination
     if (profession) {
@@ -154,31 +159,12 @@ exports.getProviderById = async (req, res) => {
       provider = await Provider.findById(id).populate('user', 'name avatar phone location email').populate('category');
     }
     
-    // FIXED: Return default response for non-providers instead of 404
     if (!provider) {
-      console.log('[getProviderById] User is not a provider, returning default');
-      return res.json({
+      console.log('[getProviderById] Provider not found for ID:', id);
+      return res.status(404).json({
+        success: false,
+        error: 'Provider not found',
         id: id,
-        name: '',
-        email: '',
-        avatar: '',
-        phone: '',
-        location: '',
-        role: 'user',
-        professionId: null,
-        profession: '',
-        bio: '',
-        hourlyRate: 0,
-        distance: 0,
-        experience: '',
-        verified: false,
-        rating: 0,
-        reviewCount: 0,
-        jobsDone: 0,
-        serviceArea: '',
-        services: [],
-        portfolio: [],
-        reviews: [],
       });
     }
     

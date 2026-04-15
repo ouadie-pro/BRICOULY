@@ -372,6 +372,18 @@ export const api = {
   },
 
   submitReview: async (reviewData) => {
+    // If reviewId is provided, update the review instead of creating
+    if (reviewData.reviewId) {
+      const { reviewId, ...updateData } = reviewData;
+      return safeFetch(`${API_BASE}/reviews`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': getUserId(),
+        },
+        body: JSON.stringify({ reviewId, ...updateData }),
+      });
+    }
     return safeFetch(`${API_BASE}/reviews`, {
       method: 'POST',
       headers: {

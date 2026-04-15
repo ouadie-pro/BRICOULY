@@ -139,6 +139,8 @@ export default function ProviderProfileScreen({ isDesktop }) {
   const [completedBookings, setCompletedBookings] = useState([]);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
+  const [userReview, setUserReview] = useState(null);
+  const [editingReview, setEditingReview] = useState(false);
   
   // Service form state
   const [showServiceForm, setShowServiceForm] = useState(false);
@@ -185,11 +187,14 @@ export default function ProviderProfileScreen({ isDesktop }) {
   }, [portfolioLightboxIndex]);
 
   useEffect(() => {
+    console.log('[ProviderProfileScreen] Fetching provider with ID:', id);
     const fetchData = async () => {
       setLoading(true);
       setError(null);
       try {
         const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        console.log('[ProviderProfileScreen] Current user:', currentUser.id);
+        
         const [providerData, reviewsData, myFollowingIds, servicesData, portfolioData, bookingsData] = await Promise.all([
           api.getProvider(id),
           api.getProviderReviews(id),
@@ -198,6 +203,12 @@ export default function ProviderProfileScreen({ isDesktop }) {
           api.getProviderPortfolio(id),
           currentUser.role === 'user' ? api.getCompletedBookings() : Promise.resolve([]),
         ]);
+
+        console.log('[ProviderProfileScreen] Provider data received:', providerData);
+        console.log('[ProviderProfileScreen] Reviews data:', reviewsData?.length);
+
+        // Compute isOwnProfile using fetched data
+        const isOwnProfile = String(currentUser.id) === String(providerData?.id);
 
         // Increment profile view (don't await, fire and forget)
         if (!isOwnProfile) {
@@ -217,25 +228,42 @@ export default function ProviderProfileScreen({ isDesktop }) {
           setCompletedBookings(providerBookings);
         }
 
-        if (providerData && !providerData.error) {
+        // Check for provider data validity
+        if (providerData && !providerData.error && providerData.name) {
           setProvider(providerData);
           if (providerData.services?.length > 0) {
             setSelectedService(providerData.services[0].name);
           }
+        } else if (providerData?.success === false || providerData?.error) {
+          console.error('[ProviderProfileScreen] Provider API error:', providerData.error);
+          setError(providerData?.error || 'Failed to load provider');
+        } else if (!providerData?.name) {
+          console.error('[ProviderProfileScreen] Provider data missing or invalid:', providerData);
+          setError('Provider not found');
         } else {
-          setError(providerData?.error || 'Provider not found');
+          setError('Failed to load provider');
         }
 
         setReviews(reviewsData || []);
         setServices(servicesData || []);
         setPortfolio(portfolioData || []);
 
+        // Check if current user has already reviewed this provider
+        const currentUserId = currentUser?.id;
+        if (currentUserId && Array.isArray(reviewsData)) {
+          const existingUserReview = reviewsData.find(
+            r => String(r.userId || r.clientId) === String(currentUserId)
+          );
+          setUserReview(existingUserReview || null);
+        }
+
         if (Array.isArray(myFollowingIds)) {
           const isFollowing = myFollowingIds.some((fId) => String(fId) === String(id));
           setFollowing(isFollowing);
         }
       } catch (err) {
-        setError('Failed to load provider');
+        console.error('[ProviderProfileScreen] Unexpected error:', err);
+        setError('Failed to load provider. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -363,7 +391,16 @@ export default function ProviderProfileScreen({ isDesktop }) {
     }
     // Refresh reviews
     api.getProviderReviews(id).then(reviewsData => {
-      setReviews(reviewsData || []);
+      const reviews = reviewsData || [];
+      setReviews(reviews);
+      // Update userReview state
+      const currentUserId = currentUser?.id;
+      if (currentUserId) {
+        const existingUserReview = reviews.find(
+          r => String(r.userId || r.clientId) === String(currentUserId)
+        );
+        setUserReview(existingUserReview || null);
+      }
     });
     // Update provider rating in local state
     if (result.newRating !== undefined) {
@@ -373,6 +410,18 @@ export default function ProviderProfileScreen({ isDesktop }) {
         reviewCount: result.reviewCount
       }));
     }
+    setEditingReview(false);
+  };
+
+  const handleOpenReviewModal = () => {
+    if (userReview) {
+      setEditingReview(true);
+      setSelectedBooking(null);
+    } else {
+      setSelectedBooking(null);
+      setEditingReview(false);
+    }
+    setShowRatingModal(true);
   };
 
   if (error) {
@@ -633,17 +682,20 @@ export default function ProviderProfileScreen({ isDesktop }) {
 
             {activeTab === 'reviews' && (
               <div className="space-y-4">
-                {/* Leave a review button for completed bookings */}
-                {!isOwnProfile && currentUser.role === 'user' && completedBookings.length > 0 && (
+                {/* Write a Review button for clients */}
+                {!isOwnProfile && currentUser.role === 'user' && (
                   <div className="bg-gradient-to-r from-primary/10 to-blue-50 dark:from-primary/5 dark:to-blue-900/20 p-4 rounded-xl border border-primary/20">
                     <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
-                      Vous avez complété un service avec {provider.name}. Partagez votre expérience !
+                      {userReview 
+                        ? 'Vous avez déjà noté ce professionnel. Modifiez votre avis !'
+                        : `Vous avez utilisé les services de ${provider.name} ? Partagez votre expérience !`
+                      }
                     </p>
                     <button
-                      onClick={() => handleOpenRatingModal(completedBookings[0])}
+                      onClick={handleOpenReviewModal}
                       className="w-full py-3 bg-primary text-white font-bold rounded-xl hover:bg-blue-600 transition-colors"
                     >
-                      Laisser un avis
+                      {userReview ? 'Modifier mon avis' : 'Laisser un avis'}
                     </button>
                   </div>
                 )}
@@ -983,17 +1035,20 @@ export default function ProviderProfileScreen({ isDesktop }) {
 
             {activeTab === 'reviews' && (
               <div className="space-y-4">
-                {/* Leave a review button for completed bookings */}
-                {!isOwnProfile && currentUser.role === 'user' && completedBookings.length > 0 && (
+                {/* Write a Review button for clients */}
+                {!isOwnProfile && currentUser.role === 'user' && (
                   <div className="bg-gradient-to-r from-primary/10 to-blue-50 dark:from-primary/5 dark:to-blue-900/20 p-5 rounded-xl border border-primary/20">
                     <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
-                      Vous avez complété un service avec {provider.name}. Partagez votre expérience !
+                      {userReview 
+                        ? 'Vous avez déjà noté ce professionnel. Modifiez votre avis !'
+                        : `Vous avez utilisé les services de ${provider.name} ? Partagez votre expérience !`
+                      }
                     </p>
                     <button
-                      onClick={() => handleOpenRatingModal(completedBookings[0])}
+                      onClick={handleOpenReviewModal}
                       className="w-full py-3 bg-primary text-white font-bold rounded-xl hover:bg-blue-600 transition-colors"
                     >
-                      Laisser un avis
+                      {userReview ? 'Modifier mon avis' : 'Laisser un avis'}
                     </button>
                   </div>
                 )}
@@ -1280,9 +1335,11 @@ export default function ProviderProfileScreen({ isDesktop }) {
         onClose={() => {
           setShowRatingModal(false);
           setSelectedBooking(null);
+          setEditingReview(false);
         }}
         provider={provider}
         booking={selectedBooking}
+        existingReview={editingReview ? userReview : null}
         onReviewSubmitted={handleReviewSubmitted}
       />
     </div>

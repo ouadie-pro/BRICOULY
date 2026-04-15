@@ -56,12 +56,15 @@ exports.getProviders = async (req, res) => {
       .sort(sortOption);
 
     const providersList = await Promise.all(providers.map(async p => {
+      if (!p.user) {
+        return null;
+      }
       const stats = await calculateProviderStats(p._id);
       return {
         id: p.user._id.toString(),
         providerDbId: p._id.toString(),
-        name: p.user.name,
-        email: p.user.email,
+        name: p.user.name || 'Unknown',
+        email: p.user.email || '',
         avatar: p.user.avatar,
         phone: p.user.phone,
         location: p.user.location,
@@ -80,7 +83,9 @@ exports.getProviders = async (req, res) => {
       };
     }));
 
-    res.json(providersList);
+    const filteredProviders = providersList.filter(p => p !== null);
+
+    res.json(filteredProviders);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -9,9 +9,10 @@ import {
 import { GoTasklist } from 'react-icons/go';
 import { getCategoryIcon, categoryIcons, defaultCategories } from '../utils/categoryIcons.jsx';
 
-const ImageGrid = ({ images, compact = false, title = '' }) => {
+const ImageGrid = ({ images, compact = false, title = '', video = null }) => {
   const [lightboxIndex, setLightboxIndex] = useState(null);
   const count = images.length;
+  const [videoPlaying, setVideoPlaying] = useState(false);
 
   const openLightbox = (index) => {
     setLightboxIndex(index);
@@ -40,35 +41,45 @@ const ImageGrid = ({ images, compact = false, title = '' }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [lightboxIndex, count]);
 
-  if (count === 0) return null;
+  if (count === 0 && !video) return null;
 
-  const renderSingle = () => (
-    <div 
-      className="cursor-pointer" 
-      onClick={() => openLightbox(0)}
-    >
-      <img 
-        src={images[0]} 
-        alt={title || 'Post image'}
-        className="w-full max-h-[400px] object-cover rounded-xl"
-        loading="lazy"
+  const imgClass = "w-full h-full object-cover transition-all duration-300 hover:brightness-90 cursor-pointer";
+
+  const renderVideo = () => (
+    <div className="w-full rounded-xl overflow-hidden border border-gray-100">
+      <video
+        src={video}
+        controls
+        className="w-full max-h-[500px] object-cover"
+        onPlay={() => setVideoPlaying(true)}
+        onPause={() => setVideoPlaying(false)}
       />
     </div>
   );
 
+  const renderSingle = () => (
+    <img 
+      src={images[0]} 
+      alt={title || 'Post image'}
+      className="w-full max-h-[500px] object-cover rounded-xl"
+      loading="lazy"
+      onClick={() => openLightbox(0)}
+    />
+  );
+
   const renderTwo = () => (
-    <div className="grid grid-cols-2 gap-0.5 h-[300px]">
+    <div className="grid grid-cols-2 gap-1 h-[300px]">
       {images.map((img, idx) => (
         <div 
           key={idx} 
-          className="relative cursor-pointer overflow-hidden rounded-xl"
-          onClick={() => openLightbox(idx)}
+          className="relative overflow-hidden rounded-lg"
         >
           <img 
             src={img} 
             alt={`Image ${idx + 1}`} 
-            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+            className={imgClass}
             loading="lazy"
+            onClick={() => openLightbox(idx)}
           />
         </div>
       ))}
@@ -76,29 +87,29 @@ const ImageGrid = ({ images, compact = false, title = '' }) => {
   );
 
   const renderThree = () => (
-    <div className="grid grid-rows-2 gap-0.5 h-[400px]">
+    <div className="grid grid-cols-3 gap-1 h-[400px]">
       <div 
-        className="cursor-pointer overflow-hidden rounded-xl"
+        className="col-span-2 row-span-2 overflow-hidden rounded-lg"
         onClick={() => openLightbox(0)}
       >
         <img 
           src={images[0]} 
           alt="Image 1" 
-          className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+          className={imgClass}
           loading="lazy"
         />
       </div>
-      <div className="grid grid-cols-2 gap-0.5">
+      <div className="flex flex-col gap-1">
         {[1, 2].map((idx) => (
           <div 
             key={idx} 
-            className="relative cursor-pointer overflow-hidden rounded-xl"
+            className="relative overflow-hidden rounded-lg flex-1"
             onClick={() => openLightbox(idx)}
           >
             <img 
               src={images[idx]} 
               alt={`Image ${idx + 1}`} 
-              className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+              className={imgClass}
               loading="lazy"
             />
           </div>
@@ -112,24 +123,25 @@ const ImageGrid = ({ images, compact = false, title = '' }) => {
     const remaining = images.length - 4;
     
     return (
-      <div className="grid grid-cols-2 gap-0.5 h-[400px]">
+      <div className="grid grid-cols-2 gap-1 h-[400px]">
         {visible.map((img, idx) => (
           <div 
             key={idx} 
-            className="relative cursor-pointer overflow-hidden rounded-xl"
-            onClick={() => openLightbox(idx)}
+            className="relative overflow-hidden rounded-lg"
           >
             <img 
               src={img} 
               alt={`Image ${idx + 1}`} 
-              className={`w-full h-full object-cover hover:scale-105 transition-transform duration-300 ${
-                idx === 3 && remaining > 0 ? 'opacity-40' : ''
-              }`}
+              className={`${imgClass} ${idx === 3 && remaining > 0 ? 'brightness-50' : ''}`}
               loading="lazy"
+              onClick={() => openLightbox(idx)}
             />
             {idx === 3 && remaining > 0 && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                <span className="text-white font-bold text-4xl">+{remaining}</span>
+              <div 
+                className="absolute inset-0 flex items-center justify-center cursor-pointer"
+                onClick={() => openLightbox(idx)}
+              >
+                <span className="text-white font-bold text-3xl">+{remaining}</span>
               </div>
             )}
           </div>
@@ -140,8 +152,9 @@ const ImageGrid = ({ images, compact = false, title = '' }) => {
 
   return (
     <>
-      <div className={`mb-4 ${compact ? 'rounded-lg' : 'rounded-xl'} overflow-hidden`}>
-        {count === 1 && renderSingle()}
+      <div className={`mb-4 overflow-hidden rounded-xl border border-gray-100 ${compact ? '' : ''}`}>
+        {video && !videoPlaying && renderVideo()}
+        {count === 1 && !video && renderSingle()}
         {count === 2 && renderTwo()}
         {count === 3 && renderThree()}
         {count >= 4 && renderFourPlus()}
@@ -153,14 +166,14 @@ const ImageGrid = ({ images, compact = false, title = '' }) => {
           onClick={closeLightbox}
         >
           <button 
-            className="absolute top-4 right-4 p-2 text-white/80 hover:text-white transition-colors z-10"
+            className="absolute top-4 right-4 p-2 text-white/80 hover:text-white transition-colors z-10 w-12 h-12 flex items-center justify-center rounded-full bg-black/30 hover:bg-black/50"
             onClick={closeLightbox}
           >
-            <FiX style={{ fontSize: '32px' }} />
+            <FiX style={{ fontSize: '24px' }} />
           </button>
           
           <button 
-            className="absolute left-4 p-3 text-white/80 hover:text-white transition-colors z-10 bg-black/30 rounded-full"
+            className="absolute left-4 p-3 text-white/80 hover:text-white transition-colors z-10 bg-black/30 hover:bg-black/50 rounded-full"
             onClick={(e) => { e.stopPropagation(); goPrev(); }}
           >
             <FiChevronLeft style={{ fontSize: '32px' }} />
@@ -194,7 +207,7 @@ const ImageGrid = ({ images, compact = false, title = '' }) => {
           </div>
           
           <button 
-            className="absolute right-4 p-3 text-white/80 hover:text-white transition-colors z-10 bg-black/30 rounded-full"
+            className="absolute right-4 p-3 text-white/80 hover:text-white transition-colors z-10 bg-black/30 hover:bg-black/50 rounded-full"
             onClick={(e) => { e.stopPropagation(); goNext(); }}
           >
             <FiChevronRight style={{ fontSize: '32px' }} />
@@ -279,6 +292,10 @@ export default function HomeScreen({ isDesktop }) {
       const img = p.image.startsWith('http') ? p.image : `${window.location.origin}${p.image}`;
       images = [img];
     }
+    let video = null;
+    if (p.video) {
+      video = p.video.startsWith('http') ? p.video : `${window.location.origin}${p.video}`;
+    }
     return {
       feedId: `post-${p.id}`,
       type: 'post',
@@ -291,6 +308,7 @@ export default function HomeScreen({ isDesktop }) {
       title: null,
       content: p.content,
       images,
+      video,
       likesCount: p.likesCount || p.likes || 0,
       isLiked: p.isLiked || p.liked || false,
       commentsCount: p.commentsCount || 0,
@@ -309,6 +327,10 @@ export default function HomeScreen({ isDesktop }) {
       const img = a.imageUrl.startsWith('http') ? a.imageUrl : `${window.location.origin}${a.imageUrl}`;
       images = [img];
     }
+    let video = null;
+    if (a.video) {
+      video = a.video.startsWith('http') ? a.video : `${window.location.origin}${a.video}`;
+    }
     return {
       feedId: `article-${a.id || a._id}`,
       type: 'article',
@@ -321,6 +343,7 @@ export default function HomeScreen({ isDesktop }) {
       title: a.title || null,
       content: a.content,
       images,
+      video,
       likesCount: a.likesCount || 0,
       isLiked: a.isLiked || false,
       commentsCount: a.commentsCount || 0,
@@ -383,7 +406,10 @@ export default function HomeScreen({ isDesktop }) {
           });
         }
         setCategories(cats);
-        setProviders(Array.isArray(provs) ? provs.slice(0, 6) : []);
+        // Backend returns { data: [...], pagination: {...} }
+        const providersList = Array.isArray(provs) ? provs : (provs?.data || []);
+        setProviders(providersList.slice(0, 6));
+        console.log('[HomeScreen] Providers fetched:', providersList.length);
       } catch (error) {
         console.error('Error fetching home data:', error);
         setCategories(defaultCategories);
@@ -738,7 +764,7 @@ export default function HomeScreen({ isDesktop }) {
         {/* Multi-Image Display - Facebook Style */}
         {item.images && item.images.length > 0 && (
           <>
-            <ImageGrid images={item.images} compact={compact} title={item.title} />
+            <ImageGrid images={item.images} compact={compact} title={item.title} video={item.video} />
             {type === 'article' && (
               <div className="absolute top-3 left-3">
                 <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-white/95 backdrop-blur-sm text-purple-700 shadow-lg">

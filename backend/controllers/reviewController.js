@@ -152,3 +152,54 @@ exports.createReview = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.updateReview = async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const { reviewId } = req.body;
+    const { rating, comment, punctuality, professionalism } = req.body;
+    
+    if (!reviewId) {
+      return res.status(400).json({ error: 'Review ID is required' });
+    }
+    
+    const review = await Review.findById(reviewId);
+    
+    if (!review) {
+      return res.status(404).json({ error: 'Review not found' });
+    }
+    
+    // Verify the review belongs to this user
+    if (review.user.toString() !== userId) {
+      return res.status(403).json({ error: 'Not authorized to update this review' });
+    }
+    
+    // Update the review
+    if (rating) review.rating = parseInt(rating);
+    if (comment !== undefined) review.comment = comment;
+    if (punctuality) review.punctuality = parseInt(punctuality);
+    if (professionalism) review.professionalism = parseInt(professionalism);
+    
+    await review.save();
+    
+    // Update provider stats
+    await updateProviderStats(review.provider);
+    
+    // Get updated provider
+    const provider = await Provider.findById(review.provider);
+    
+    res.json({
+      success: true,
+      review: {
+        id: review._id.toString(),
+        rating: review.rating,
+        comment: review.comment,
+        createdAt: review.createdAt
+      },
+      newRating: provider?.rating || 0,
+      reviewCount: provider?.reviewCount || 0
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

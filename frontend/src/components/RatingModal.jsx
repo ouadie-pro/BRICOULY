@@ -38,7 +38,8 @@ export default function RatingModal({
   onClose, 
   provider, 
   booking, 
-  onReviewSubmitted 
+  onReviewSubmitted,
+  existingReview = null
 }) {
   const [selectedRating, setSelectedRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
@@ -50,14 +51,21 @@ export default function RatingModal({
 
   useEffect(() => {
     if (isOpen) {
-      setSelectedRating(0);
-      setHoverRating(0);
-      setComment('');
-      setPunctuality(5);
-      setProfessionalism(5);
+      if (existingReview) {
+        setSelectedRating(existingReview.rating || 0);
+        setComment(existingReview.comment || '');
+        setPunctuality(existingReview.punctuality || 5);
+        setProfessionalism(existingReview.professionalism || 5);
+      } else {
+        setSelectedRating(0);
+        setHoverRating(0);
+        setComment('');
+        setPunctuality(5);
+        setProfessionalism(5);
+      }
       setError('');
     }
-  }, [isOpen]);
+  }, [isOpen, existingReview]);
 
   if (!isOpen || !provider) return null;
 
@@ -72,14 +80,23 @@ export default function RatingModal({
     setError('');
 
     try {
-      const result = await api.submitReview({
+      const reviewData = {
         providerId: provider.id,
-        bookingId: booking?.id || booking?._id,
         rating: selectedRating,
         comment,
         punctuality,
         professionalism,
-      });
+      };
+      
+      if (booking) {
+        reviewData.bookingId = booking.id || booking._id;
+      }
+      
+      if (existingReview) {
+        reviewData.reviewId = existingReview.id || existingReview._id;
+      }
+
+      const result = await api.submitReview(reviewData);
 
       if (result.success || result.review) {
         if (onReviewSubmitted) {
@@ -109,7 +126,7 @@ export default function RatingModal({
       <div className="bg-white dark:bg-surface-dark rounded-2xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-            Évaluer {provider.name}
+            {existingReview ? 'Modifier mon avis' : `Évaluer ${provider.name}`}
           </h3>
           <button
             onClick={onClose}

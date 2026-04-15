@@ -11,6 +11,9 @@ exports.getArticles = async (req, res) => {
       .sort({ createdAt: -1 });
     
     const articlesWithUsers = await Promise.all(articles.map(async a => {
+      if (!a.user) {
+        return null;
+      }
       let authorProfession = null;
       if (a.user.role === 'provider') {
         const provider = await Provider.findOne({ user: a.user._id });
@@ -25,7 +28,7 @@ exports.getArticles = async (req, res) => {
       return {
         id: a._id.toString(),
         authorId: a.user._id.toString(),
-        authorName: a.user.name,
+        authorName: a.user.name || 'Unknown',
         authorAvatar: a.user.avatar,
         authorRole: a.user.role,
         authorProfession,
@@ -38,7 +41,9 @@ exports.getArticles = async (req, res) => {
         createdAt: a.createdAt,
       };
     }));
-    res.json(articlesWithUsers);
+
+    const validArticles = articlesWithUsers.filter(a => a !== null);
+    res.json(validArticles);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

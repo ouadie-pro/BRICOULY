@@ -8,28 +8,51 @@ exports.createServiceRequest = async (req, res) => {
     console.log('[createServiceRequest] Request received', { headers: req.headers, body: req.body });
     const clientId = req.headers['x-user-id'];
     console.log('[createServiceRequest] clientId:', clientId);
-    const { providerId, serviceName, description } = req.body;
+    const { 
+      providerId, 
+      serviceName, 
+      description,
+      preferredDate,
+      preferredTime,
+      location,
+      budget,
+      urgency
+    } = req.body;
     
-    console.log('[createServiceRequest] providerId:', providerId);
-    const provider = await Provider.findOne({ user: providerId });
-    if (!provider) {
-      return res.status(404).json({ error: 'Provider not found' });
+    let providerMongoId = null;
+    let notificationUserId = null;
+    
+    if (providerId) {
+      console.log('[createServiceRequest] providerId:', providerId);
+      const provider = await Provider.findOne({ user: providerId });
+      if (!provider) {
+        return res.status(404).json({ error: 'Provider not found' });
+      }
+      providerMongoId = provider._id;
+      notificationUserId = providerId;
     }
     
     const serviceRequest = await ServiceRequest.create({
       client: clientId,
-      provider: provider._id,
+      provider: providerMongoId,
       serviceName,
-      description,
+      description: description || '',
+      preferredDate: preferredDate || null,
+      preferredTime: preferredTime || '',
+      location: location || '',
+      budget: budget || null,
+      urgency: urgency || 'normal',
       status: 'pending',
     });
     
-    await Notification.create({
-      user: providerId,
-      type: 'request',
-      title: 'New Service Request',
-      text: `${serviceName} - ${description.substring(0, 50)}`,
-    });
+    if (notificationUserId) {
+      await Notification.create({
+        user: notificationUserId,
+        type: 'request',
+        title: 'New Service Request',
+        text: `${serviceName} - ${(description || '').substring(0, 50)}`,
+      });
+    }
     
     res.json({ success: true, request: serviceRequest });
   } catch (error) {
@@ -64,23 +87,37 @@ exports.getServiceRequests = async (req, res) => {
     
     const enrichedRequests = await Promise.all(userRequests.map(async (r) => {
       let otherUser;
+      let otherUserName = 'Unknown';
+      let otherUserAvatar = '';
+      let otherUserProfession = '';
+      
       // FIXED: #3 - Use 'user' instead of 'client'
-      if (user.role === 'user') {
+      if (user.role === 'user' && r.provider) {
         otherUser = await User.findById(r.provider.user);
-      } else {
+        otherUserName = otherUser?.name || 'Unknown';
+        otherUserAvatar = otherUser?.avatar || '';
+        otherUserProfession = r.provider.profession || '';
+      } else if (r.client) {
         otherUser = await User.findById(r.client);
+        otherUserName = otherUser?.name || 'Unknown';
+        otherUserAvatar = otherUser?.avatar || '';
       }
       return {
         id: r._id.toString(),
         clientId: r.client.toString(),
-        providerId: r.provider._id.toString(),
+        providerId: r.provider ? r.provider._id.toString() : null,
         serviceName: r.serviceName,
         description: r.description,
+        preferredDate: r.preferredDate,
+        preferredTime: r.preferredTime,
+        location: r.location,
+        budget: r.budget,
+        urgency: r.urgency,
         status: r.status,
         createdAt: r.createdAt,
-        otherUserName: otherUser?.name || 'Unknown',
-        otherUserAvatar: otherUser?.avatar || '',
-        otherUserProfession: '',
+        otherUserName,
+        otherUserAvatar,
+        otherUserProfession,
       };
     }));
     
