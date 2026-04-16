@@ -1,8 +1,46 @@
 const API_BASE = '/api';
 
+function getStoredUser() {
+  try {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return null;
+    return JSON.parse(userStr);
+  } catch (e) {
+    console.error('Error parsing stored user:', e);
+    return null;
+  }
+}
+
+function getUserId() {
+  const user = getStoredUser();
+  if (!user) return null;
+  return user?.id || user?._id || null;
+}
+
 async function safeFetch(url, options = {}) {
   try {
-    const res = await fetch(url, options);
+    const token = localStorage.getItem('token');
+    const userId = getUserId();
+    
+    const headers = {
+      ...options.headers,
+    };
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    if (userId) {
+      headers['x-user-id'] = userId;
+    }
+    
+    const isFormData = options.body instanceof FormData;
+    
+    if (!isFormData && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json';
+    }
+    
+    const res = await fetch(url, { ...options, headers });
     let data;
     
     try {
@@ -34,34 +72,13 @@ async function safeFetch(url, options = {}) {
   }
 }
 
-// Get userId from localStorage
-export const getUserId = () => {
-  try {
-    const userStr = localStorage.getItem('user');
-    
-    if (!userStr) {
-      return null;
-    }
-    
-    const user = JSON.parse(userStr);
-    const userId = user?.id || user?._id;
-
-    if (!userId) {
-      return null;
-    }
-
-    return userId;
-  } catch (e) {
-    return null;
-  }
-};
+export { getUserId };
 
 export const api = {
   // Auth
   login: async (email, password) => {
     return safeFetch(`${API_BASE}/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
   },
@@ -69,24 +86,17 @@ export const api = {
   signup: async (userData) => {
     return safeFetch(`${API_BASE}/auth/signup`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(userData),
     });
   },
 
   getCurrentUser: async () => {
-    return safeFetch(`${API_BASE}/auth/me`, {
-      headers: { 'x-user-id': getUserId() },
-    });
+    return safeFetch(`${API_BASE}/auth/me`);
   },
 
   updateProfile: async (updates) => {
-    return safeFetch(`${API_BASE}/users/profile`, {
+    return safeFetch(`${API_BASE}/auth/profile`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': getUserId(),
-      },
       body: JSON.stringify(updates),
     });
   },
@@ -94,11 +104,14 @@ export const api = {
   uploadAvatar: async (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    return safeFetch(`${API_BASE}/users/avatar`, {
+    return safeFetch(`${API_BASE}/auth/avatar`, {
       method: 'POST',
-      headers: { 'x-user-id': getUserId() },
       body: formData,
     });
+  },
+
+  getSpecializations: async () => {
+    return safeFetch(`${API_BASE}/auth/specializations`);
   },
 
   // Professions
@@ -109,7 +122,6 @@ export const api = {
   addProfession: async (professionData) => {
     return safeFetch(`${API_BASE}/professions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(professionData),
     });
   },
@@ -136,10 +148,6 @@ export const api = {
   addService: async (serviceData) => {
     return safeFetch(`${API_BASE}/services`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': getUserId(),
-      },
       body: JSON.stringify(serviceData),
     });
   },
@@ -147,10 +155,6 @@ export const api = {
   updateService: async (serviceId, serviceData) => {
     return safeFetch(`${API_BASE}/services/${serviceId}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': getUserId(),
-      },
       body: JSON.stringify(serviceData),
     });
   },
@@ -158,7 +162,6 @@ export const api = {
   deleteService: async (serviceId) => {
     return safeFetch(`${API_BASE}/services/${serviceId}`, {
       method: 'DELETE',
-      headers: { 'x-user-id': getUserId() },
     });
   },
 
@@ -170,10 +173,6 @@ export const api = {
   addPortfolio: async (portfolioData) => {
     return safeFetch(`${API_BASE}/portfolio`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': getUserId(),
-      },
       body: JSON.stringify(portfolioData),
     });
   },
@@ -184,7 +183,6 @@ export const api = {
     if (caption) formData.append('caption', caption);
     return safeFetch(`${API_BASE}/portfolio/upload`, {
       method: 'POST',
-      headers: { 'x-user-id': getUserId() },
       body: formData,
     });
   },
@@ -192,44 +190,95 @@ export const api = {
   deletePortfolio: async (portfolioId) => {
     return safeFetch(`${API_BASE}/portfolio/${portfolioId}`, {
       method: 'DELETE',
-      headers: { 'x-user-id': getUserId() },
     });
   },
 
-  // Service Requests
+  // Service Requests (Service Marketplace)
+  getServiceTypes: async () => {
+    return safeFetch(`${API_BASE}/service-requests/service-types`);
+  },
+
+  getServiceRequests: async (params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.status) queryParams.append('status', params.status);
+    if (params.serviceType) queryParams.append('serviceType', params.serviceType);
+    if (params.page) queryParams.append('page', params.page);
+    if (params.limit) queryParams.append('limit', params.limit);
+    const query = queryParams.toString();
+    return safeFetch(`${API_BASE}/service-requests/all${query ? '?' + query : ''}`);
+  },
+
+  getProviderServiceRequests: async (params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.status) queryParams.append('status', params.status);
+    if (params.page) queryParams.append('page', params.page);
+    if (params.limit) queryParams.append('limit', params.limit);
+    const query = queryParams.toString();
+    return safeFetch(`${API_BASE}/service-requests/provider${query ? '?' + query : ''}`);
+  },
+
+  getClientServiceRequests: async (params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.status) queryParams.append('status', params.status);
+    if (params.page) queryParams.append('page', params.page);
+    if (params.limit) queryParams.append('limit', params.limit);
+    const query = queryParams.toString();
+    return safeFetch(`${API_BASE}/service-requests/client${query ? '?' + query : ''}`);
+  },
+
+  getServiceRequest: async (requestId) => {
+    return safeFetch(`${API_BASE}/service-requests/${requestId}`);
+  },
+
   createServiceRequest: async (requestData) => {
     return safeFetch(`${API_BASE}/service-requests`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': getUserId(),
-      },
       body: JSON.stringify(requestData),
     });
   },
 
-  getServiceRequests: async () => {
-    return safeFetch(`${API_BASE}/service-requests`, {
-      headers: { 'x-user-id': getUserId() },
+  updateServiceRequest: async (requestId, updateData) => {
+    return safeFetch(`${API_BASE}/service-requests/${requestId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updateData),
     });
   },
 
-  updateServiceRequest: async (requestId, status) => {
+  deleteServiceRequest: async (requestId) => {
     return safeFetch(`${API_BASE}/service-requests/${requestId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  applyToServiceRequest: async (requestId, applicationData) => {
+    return safeFetch(`${API_BASE}/service-requests/${requestId}/apply`, {
+      method: 'POST',
+      body: JSON.stringify(applicationData || {}),
+    });
+  },
+
+  cancelServiceApplication: async (requestId) => {
+    return safeFetch(`${API_BASE}/service-requests/${requestId}/apply`, {
+      method: 'DELETE',
+    });
+  },
+
+  updateApplicationStatus: async (requestId, applicationId, status, message) => {
+    return safeFetch(`${API_BASE}/service-requests/${requestId}/applications/${applicationId}/status`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': getUserId(),
-      },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, message }),
+    });
+  },
+
+  completeServiceRequest: async (requestId) => {
+    return safeFetch(`${API_BASE}/service-requests/${requestId}/complete`, {
+      method: 'PUT',
     });
   },
 
   // Posts
   getPosts: async () => {
-    return safeFetch(`${API_BASE}/posts`, {
-      headers: { 'x-user-id': getUserId() },
-    });
+    return safeFetch(`${API_BASE}/posts`);
   },
 
   createPost: async (postData) => {
@@ -241,7 +290,6 @@ export const api = {
     }
     return safeFetch(`${API_BASE}/posts`, {
       method: 'POST',
-      headers: { 'x-user-id': getUserId() },
       body: formData,
     });
   },
@@ -249,14 +297,12 @@ export const api = {
   likePost: async (postId) => {
     return safeFetch(`${API_BASE}/posts/${postId}/like`, {
       method: 'POST',
-      headers: { 'x-user-id': getUserId() },
     });
   },
 
   deletePost: async (postId) => {
     return safeFetch(`${API_BASE}/posts/${postId}`, {
       method: 'DELETE',
-      headers: { 'x-user-id': getUserId() },
     });
   },
 
@@ -267,10 +313,6 @@ export const api = {
   addComment: async (postId, content) => {
     return safeFetch(`${API_BASE}/posts/${postId}/comments`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': getUserId(),
-      },
       body: JSON.stringify({ content }),
     });
   },
@@ -283,10 +325,6 @@ export const api = {
   addArticleComment: async (articleId, content) => {
     return safeFetch(`${API_BASE}/articles/${articleId}/comments`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': getUserId(),
-      },
       body: JSON.stringify({ content }),
     });
   },
@@ -303,7 +341,6 @@ export const api = {
     if (description) formData.append('description', description);
     return safeFetch(`${API_BASE}/videos`, {
       method: 'POST',
-      headers: { 'x-user-id': getUserId() },
       body: formData,
     });
   },
@@ -311,7 +348,6 @@ export const api = {
   likeVideo: async (videoId) => {
     return safeFetch(`${API_BASE}/videos/${videoId}/like`, {
       method: 'POST',
-      headers: { 'x-user-id': getUserId() },
     });
   },
 
@@ -324,7 +360,6 @@ export const api = {
   deleteVideo: async (videoId) => {
     return safeFetch(`${API_BASE}/videos/${videoId}`, {
       method: 'DELETE',
-      headers: { 'x-user-id': getUserId() },
     });
   },
 
@@ -347,7 +382,6 @@ export const api = {
     }
     return safeFetch(`${API_BASE}/articles`, {
       method: 'POST',
-      headers: { 'x-user-id': getUserId() },
       body: formData,
     });
   },
@@ -355,63 +389,48 @@ export const api = {
   likeArticle: async (articleId) => {
     return safeFetch(`${API_BASE}/articles/${articleId}/like`, {
       method: 'POST',
-      headers: { 'x-user-id': getUserId() },
     });
   },
 
   deleteArticle: async (articleId) => {
     return safeFetch(`${API_BASE}/articles/${articleId}`, {
       method: 'DELETE',
-      headers: { 'x-user-id': getUserId() },
     });
   },
 
   // Reviews
   getProviderReviews: async (providerId) => {
-    return safeFetch(`${API_BASE}/providers/${providerId}/reviews`);
+    return safeFetch(`${API_BASE}/reviews/${providerId}`);
   },
 
   submitReview: async (reviewData) => {
-    // If reviewId is provided, update the review instead of creating
     if (reviewData.reviewId) {
       const { reviewId, ...updateData } = reviewData;
-      return safeFetch(`${API_BASE}/reviews`, {
+      return safeFetch(`${API_BASE}/reviews/${reviewId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': getUserId(),
-        },
-        body: JSON.stringify({ reviewId, ...updateData }),
+        body: JSON.stringify(updateData),
       });
     }
     return safeFetch(`${API_BASE}/reviews`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': getUserId(),
-      },
       body: JSON.stringify(reviewData),
     });
   },
 
-  getCompletedBookings: async () => {
-    return safeFetch(`${API_BASE}/bookings?status=completed`, {
-      headers: { 'x-user-id': getUserId() },
+  deleteReview: async (reviewId) => {
+    return safeFetch(`${API_BASE}/reviews/${reviewId}`, {
+      method: 'DELETE',
     });
+  },
+
+  getCompletedBookings: async () => {
+    return safeFetch(`${API_BASE}/bookings?status=completed`);
   },
 
   // Follow
   followUser: async (targetUserId) => {
     return safeFetch(`${API_BASE}/follow/${targetUserId}`, {
       method: 'POST',
-      headers: { 'x-user-id': getUserId() },
-    });
-  },
-
-  followProvider: async (targetUserId) => {
-    return safeFetch(`${API_BASE}/follow/${targetUserId}`, {
-      method: 'POST',
-      headers: { 'x-user-id': getUserId() },
     });
   },
 
@@ -420,55 +439,34 @@ export const api = {
       throw new Error('Request ID is required');
     }
     
-    const userId = getUserId();
-    console.log('respondToFollowRequest - userId:', userId, 'requestId:', requestId, 'action:', action);
-    
-    if (!userId) {
-      throw new Error('User not logged in');
-    }
+    console.log('respondToFollowRequest - requestId:', requestId, 'action:', action);
     
     return safeFetch(`${API_BASE}/follow/respond`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': userId,
-      },
       body: JSON.stringify({ requestId, action }),
-    });
-},
-
-  getFollowRequests: async () => {
-    return safeFetch(`${API_BASE}/follow/requests`, {
-      headers: { 'x-user-id': getUserId() },
     });
   },
 
+  getFollowRequests: async () => {
+    return safeFetch(`${API_BASE}/follow/requests`);
+  },
+
   getMyFollowing: async () => {
-    return safeFetch(`${API_BASE}/follow/following`, {
-      headers: { 'x-user-id': getUserId() },
-    });
+    return safeFetch(`${API_BASE}/follow/following`);
   },
 
   // Conversations & Messages
   getConversations: async () => {
-    return safeFetch(`${API_BASE}/messages/conversations`, {
-      headers: { 'x-user-id': getUserId() },
-    });
+    return safeFetch(`${API_BASE}/messages/conversations`);
   },
 
   getMessages: async (userId) => {
-    return safeFetch(`${API_BASE}/messages/${userId}`, {
-      headers: { 'x-user-id': getUserId() },
-    });
+    return safeFetch(`${API_BASE}/messages/${userId}`);
   },
 
   sendMessage: async (receiverId, content) => {
     return safeFetch(`${API_BASE}/messages`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': getUserId(),
-      },
       body: JSON.stringify({ receiverId, content }),
     });
   },
@@ -478,7 +476,6 @@ export const api = {
     formData.append('file', file);
     return safeFetch(`${API_BASE}/messages/media`, {
       method: 'POST',
-      headers: { 'x-user-id': getUserId() },
       body: formData,
     });
   },
@@ -486,32 +483,23 @@ export const api = {
   sendMediaMessage: async (receiverId, mediaUrl, type, content = '') => {
     return safeFetch(`${API_BASE}/messages`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': getUserId(),
-      },
       body: JSON.stringify({ receiverId, content, mediaUrl, type }),
     });
   },
 
   // Notifications
   getNotifications: async () => {
-    return safeFetch(`${API_BASE}/notifications`, {
-      headers: { 'x-user-id': getUserId() },
-    });
+    return safeFetch(`${API_BASE}/notifications`);
   },
 
   markNotificationsRead: async () => {
     return safeFetch(`${API_BASE}/notifications/read`, {
       method: 'PUT',
-      headers: { 'x-user-id': getUserId() },
     });
   },
 
   getUnreadCount: async () => {
-    return safeFetch(`${API_BASE}/notifications/unread-count`, {
-      headers: { 'x-user-id': getUserId() },
-    });
+    return safeFetch(`${API_BASE}/notifications/unread-count`);
   },
 
   // Categories
@@ -522,6 +510,11 @@ export const api = {
   // User Search
   searchUsers: async (query) => {
     return safeFetch(`${API_BASE}/users/search?q=${encodeURIComponent(query)}`);
+  },
+
+  // Search Providers by Service
+  searchProvidersByService: async (service) => {
+    return safeFetch(`${API_BASE}/providers/search?service=${encodeURIComponent(service)}`);
   },
 
   // Get single user
@@ -540,15 +533,11 @@ export const api = {
 
   // Provider Dashboard Stats
   getProviderStats: async (providerId) => {
-    return safeFetch(`${API_BASE}/providers/${providerId}/stats`, {
-      headers: { 'x-user-id': getUserId() },
-    });
+    return safeFetch(`${API_BASE}/providers/${providerId}/stats`);
   },
 
   getWeeklyActivity: async (providerId) => {
-    return safeFetch(`${API_BASE}/providers/${providerId}/activity`, {
-      headers: { 'x-user-id': getUserId() },
-    });
+    return safeFetch(`${API_BASE}/providers/${providerId}/activity`);
   },
 
   incrementProfileView: async (userId) => {

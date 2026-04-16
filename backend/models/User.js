@@ -1,6 +1,21 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
+const SERVICE_SPECIALIZATIONS = [
+  'plumber',
+  'electrician',
+  'painter',
+  'carpenter',
+  'cleaner',
+  'mover',
+  'hvac',
+  'landscaper',
+  'roofer',
+  'appliance_repair',
+  'carpenter',
+  'general'
+];
+
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -32,8 +47,13 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['user', 'provider', 'admin'],
-    default: 'user',
+    enum: ['client', 'provider', 'admin'],
+    default: 'client',
+  },
+  specialization: {
+    type: String,
+    enum: [...SERVICE_SPECIALIZATIONS, ''],
+    default: '',
   },
   googleId: {
     type: String,
@@ -92,5 +112,15 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
   if (!this.password) return false;
   return bcrypt.compare(candidatePassword, this.password);
 };
+
+userSchema.methods.toJSON = function () {
+  const obj = this.toObject();
+  obj.id = obj._id.toString();
+  delete obj._id;
+  delete obj.__v;
+  return obj;
+};
+
+userSchema.statics.SERVICE_SPECIALIZATIONS = SERVICE_SPECIALIZATIONS;
 
 module.exports = mongoose.model('User', userSchema);

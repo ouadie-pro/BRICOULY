@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import WelcomeScreen from './components/WelcomeScreen';
 import AuthScreen from './components/AuthScreen';
@@ -14,7 +14,6 @@ import MyRequestsScreen from './components/MyRequestsScreen';
 import ProfileScreen from './components/ProfileScreen';
 import VideosScreen from './components/VideosScreen';
 
-// FIXED: #19 - Move ProtectedRoute outside the App component
 function ProtectedRoute({ user, loading, children }) {
   const logout = () => {
     localStorage.removeItem('user');
@@ -37,9 +36,7 @@ function ProtectedRoute({ user, loading, children }) {
 
 function App() {
   const [user, setUser] = useState(null);
-  const [isDesktop, setIsDesktop] = useState(window.innerWidth > 1024);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -55,26 +52,12 @@ function App() {
       }
     }
     setLoading(false);
-
-    const handleResize = () => {
-      setIsDesktop(window.innerWidth > 1024);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
   }, []);
-
-  const handleLogout = () => {
-    localStorage.removeItem('user');
-    setUser(null);
-    navigate('/');
-  };
 
   const handleUserUpdate = (updatedUser) => {
     setUser(updatedUser);
     localStorage.setItem('user', JSON.stringify(updatedUser));
   };
-
-  // FIXED: #19 - Removed inline ProtectedRoute (now defined above)
 
   return (
     <Routes>

@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const reviewSchema = new mongoose.Schema({
-  user: {
+  clientId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
@@ -11,9 +11,9 @@ const reviewSchema = new mongoose.Schema({
     ref: 'Provider',
     required: true,
   },
-  booking: {
+  serviceRequestId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Booking',
+    ref: 'ServiceRequest',
   },
   rating: {
     type: Number,
@@ -44,30 +44,7 @@ const reviewSchema = new mongoose.Schema({
   },
 });
 
-reviewSchema.statics.calcAverageRating = async function (providerId) {
-  const stats = await this.aggregate([
-    { $match: { provider: providerId } },
-    {
-      $group: {
-        _id: '$provider',
-        avgRating: { $avg: '$rating' },
-        count: { $sum: 1 },
-      },
-    },
-  ]);
-
-  if (stats.length > 0) {
-    await this.model('Provider').findByIdAndUpdate(providerId, {
-      rating: Math.round(stats[0].avgRating * 10) / 10,
-      reviewCount: stats[0].count,
-    });
-  }
-};
-
-reviewSchema.post('save', function () {
-  this.constructor.calcAverageRating(this.provider);
-});
-
-reviewSchema.index({ user: 1, provider: 1 }, { unique: true });
+reviewSchema.index({ clientId: 1, provider: 1 });
+reviewSchema.index({ serviceRequestId: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model('Review', reviewSchema);

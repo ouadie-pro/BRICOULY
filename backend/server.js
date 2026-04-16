@@ -3,12 +3,8 @@ const cors = require('cors');
 const path = require('path');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
-const multer = require('multer');
 const fs = require('fs');
-const rateLimit = require('express-rate-limit');
 const passport = require('passport');
-// NOTE: express-mongo-sanitize disabled - incompatible with Express 5
-// const mongoSanitize = require('express-mongo-sanitize');
 const http = require('http');
 const { Server } = require('socket.io');
 
@@ -16,7 +12,7 @@ dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
-// FIXED: #15 - Add Socket.io for real-time messaging
+
 const io = new Server(server, {
   cors: {
     origin: '*',
@@ -24,20 +20,9 @@ const io = new Server(server, {
   }
 });
 
-// Make io available globally
 app.set('io', io);
 
 const PORT = process.env.PORT || 3001;
-
-// NOTE: express-mongo-sanitize disabled - incompatible with Express 5
-// FIXED: #11 - Add rate limiting
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // limit each IP to 10 requests per windowMs
-  message: { success: false, error: 'Too many attempts. Please try again in 15 minutes.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
 
 app.use(cors());
 app.use(express.json({ limit: '100mb' }));
@@ -50,9 +35,7 @@ app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
     const duration = Date.now() - start;
-    const status = res.statusCode;
-    const statusSymbol = status >= 500 ? '❌' : status >= 400 ? '⚠️' : '✅';
-    console.log(`${statusSymbol} ${req.method} ${req.url} - ${status} (${duration}ms)`);
+    console.log(`${req.method} ${req.url} - ${res.statusCode} (${duration}ms)`);
   });
   next();
 });
@@ -131,8 +114,7 @@ app.use('/api/service-requests', require('./routers/serviceRequest'));
 app.use('/api/messages', require('./routers/message'));
 app.use('/api/notifications', require('./routers/notification'));
 app.use('/api/bookings', require('./routers/booking'));
-
-// FIXED: #8 - Inline /api/following route removed (now handled by routers/follow.js)
+app.use('/api/applications', require('./routers/application'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -140,14 +122,7 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error('\n==========================================');
-  console.error('🔥 UNHANDLED ERROR:');
-  console.error('   Route:', req.method, req.url);
-  console.error('   Error name:', err.name);
-  console.error('   Error message:', err.message);
-  console.error('   Error code:', err.code);
-  console.error('   Stack:', err.stack);
-  console.error('==========================================\n');
+  console.error(`${err.name}: ${err.message}`);
   
   if (err.name === 'MongoServerError') {
     return res.status(500).json({
@@ -177,7 +152,6 @@ app.use((err, req, res, next) => {
     success: false,
     error: 'Internal server error',
     message: err.message,
-    // FIXED: #13 - Hide stack trace in production
     ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
   });
 });

@@ -28,32 +28,42 @@ const calculateProviderStats = async (providerId) => {
 
 exports.getProviders = async (req, res) => {
   try {
-    const { search, category, sort, lat, lng } = req.query;
+    const { search, profession, sort } = req.query;
+    
+    console.log('[getProviders] Query params:', { search, profession, sort });
     
     let query = { available: true };
 
+    if (profession) {
+      query.profession = { $regex: new RegExp(`^${profession}$`, 'i') };
+    }
+
     if (search) {
+      const searchLower = search.toLowerCase().trim();
       query.$or = [
-        { profession: { $regex: search, $options: 'i' } },
-        { bio: { $regex: search, $options: 'i' } },
+        { name: { $regex: searchLower, $options: 'i' } },
+        { profession: { $regex: searchLower, $options: 'i' } },
+        { bio: { $regex: searchLower, $options: 'i' } },
+        { location: { $regex: searchLower, $options: 'i' } },
       ];
     }
 
-    if (category) {
-      query.category = category;
+    let sortOption = { rating: -1 };
+    if (sort === 'price_low') {
+      sortOption = { hourlyRate: 1 };
+    } else if (sort === 'price_high') {
+      sortOption = { hourlyRate: -1 };
+    } else if (sort === 'rating') {
+      sortOption = { rating: -1 };
     }
 
-    let sortOption = { rating: -1 };
-    if (sort === 'price') {
-      sortOption = { hourlyRate: 1 };
-    } else if (sort === 'distance' && lat && lng) {
-      sortOption = { distance: 1 };
-    }
+    console.log('[getProviders] MongoDB Query:', JSON.stringify(query, null, 2));
 
     const providers = await Provider.find(query)
       .populate('user', 'name avatar phone location')
-      .populate('category')
       .sort(sortOption);
+
+    console.log('[getProviders] Found providers:', providers.length);
 
     const providersList = await Promise.all(providers.map(async p => {
       if (!p.user) {
@@ -69,7 +79,6 @@ exports.getProviders = async (req, res) => {
         phone: p.user.phone,
         location: p.user.location,
         role: 'provider',
-        professionId: p.category?._id?.toString(),
         profession: p.profession,
         bio: p.bio,
         hourlyRate: p.hourlyRate,
@@ -85,9 +94,72 @@ exports.getProviders = async (req, res) => {
 
     const filteredProviders = providersList.filter(p => p !== null);
 
+    console.log('[getProviders] Returning providers:', filteredProviders.length);
+
     res.json(filteredProviders);
   } catch (error) {
+    console.error('[getProviders] Error:', error.message);
     res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getProvidersByService = async (req, res) => {
+  try {
+    const { service } = req.query;
+    
+    if (!service) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Service parameter is required' 
+      });
+    }
+    
+    const serviceLower = service.toLowerCase().trim();
+    
+    const providers = await Provider.find({
+      profession: { $regex: serviceLower, $options: 'i' },
+      available: true
+    })
+      .populate('user', 'name avatar phone email location city')
+      .sort({ rating: -1 });
+
+    const providersList = await Promise.all(providers.map(async p => {
+      if (!p.user) {
+        return null;
+      }
+      const stats = await calculateProviderStats(p._id);
+      return {
+        id: p.user._id.toString(),
+        providerDbId: p._id.toString(),
+        name: p.user.name || 'Unknown',
+        email: p.user.email || '',
+        avatar: p.user.avatar,
+        phone: p.user.phone,
+        location: p.user.location,
+        city: p.user.city,
+        role: 'provider',
+        profession: p.profession,
+        bio: p.bio,
+        hourlyRate: p.hourlyRate,
+        experience: p.experience,
+        verified: p.verified,
+        rating: stats.rating,
+        reviewCount: stats.reviewCount,
+        jobsDone: stats.jobsDone,
+        serviceArea: p.serviceArea,
+      };
+    }));
+
+    const filteredProviders = providersList.filter(p => p !== null);
+
+    res.json({
+      success: true,
+      service: service,
+      count: filteredProviders.length,
+      providers: filteredProviders
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 };
 
@@ -118,7 +190,17 @@ exports.getProvider = async (req, res) => {
 
 exports.createProvider = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id']; // FIXED: #1 - Use x-user-id header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    
+    const jwt = require('jsonwebtoken');
+    const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const userId = decoded.id;
+    
     const providerData = {
       ...req.body,
       user: userId,

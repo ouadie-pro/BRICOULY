@@ -5,21 +5,24 @@ const User = require('../models/User');
 exports.getVideos = async (req, res) => {
   try {
     const videos = await Video.find().populate('user', 'name avatar role').sort({ createdAt: -1 });
-    const videosWithUsers = videos.map(v => ({
-      id: v._id.toString(),
-      userId: v.user._id.toString(),
-      userName: v.user.name,
-      userAvatar: v.user.avatar,
-      userRole: v.user.role,
-      videoUrl: v.videoUrl,
-      title: v.title,
-      description: v.description,
-      likes: v.likes,
-      views: v.views,
-      createdAt: v.createdAt,
-    }));
+    const videosWithUsers = videos
+      .filter(v => v.user)
+      .map(v => ({
+        id: v._id.toString(),
+        userId: v.user._id.toString(),
+        userName: v.user.name,
+        userAvatar: v.user.avatar,
+        userRole: v.user.role,
+        videoUrl: v.videoUrl,
+        title: v.title,
+        description: v.description,
+        likes: v.likes,
+        views: v.views,
+        createdAt: v.createdAt,
+      }));
     res.json(videosWithUsers);
   } catch (error) {
+    console.error('getVideos error:', error);
     res.status(500).json({ error: error.message });
   }
 };

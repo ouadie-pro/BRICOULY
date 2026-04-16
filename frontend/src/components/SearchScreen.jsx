@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { 
-  FiArrowLeft, FiSearch, FiX, FiStar, FiMapPin, FiCheck, FiFilter, FiCheckCircle,
-  FiThumbsUp, FiBriefcase, FiClock
+  FiArrowLeft, FiSearch, FiX, FiStar, FiMapPin, FiCheck, FiCheckCircle,
+  FiBriefcase, FiClock
 } from 'react-icons/fi';
 
 const StarRating = ({ rating, count }) => {
@@ -44,30 +44,12 @@ const getResponseTimeDisplay = (responseTime) => {
 export default function SearchScreen({ isDesktop }) {
   const { q } = useParams();
   const [providers, setProviders] = useState([]);
-  const [filteredProviders, setFilteredProviders] = useState([]);
   const [professions, setProfessions] = useState([]);
   const [searchQuery, setSearchQuery] = useState(q || '');
   const [selectedProfession, setSelectedProfession] = useState('');
   const [sortBy, setSortBy] = useState('rating');
-  const [distanceFilter, setDistanceFilter] = useState('');
-  const [availabilityFilter, setAvailabilityFilter] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-
-  const distanceOptions = [
-    { value: '', label: 'Any distance' },
-    { value: '5', label: 'Within 5 km' },
-    { value: '10', label: 'Within 10 km' },
-    { value: '20', label: 'Within 20 km' },
-    { value: '50', label: 'Within 50 km' },
-  ];
-
-  const availabilityOptions = [
-    { value: '', label: 'Any time' },
-    { value: 'today', label: 'Available today' },
-    { value: 'week', label: 'This week' },
-  ];
 
   const filters = [
     { value: 'rating', label: 'Top Rated' },
@@ -87,12 +69,18 @@ export default function SearchScreen({ isDesktop }) {
     const fetchProviders = async () => {
       setLoading(true);
       try {
+        console.log('[SearchScreen] Fetching providers with filters:', {
+          profession: selectedProfession,
+          search: searchQuery,
+          sort: sortBy
+        });
+        
         const data = await api.getProviders({
           profession: selectedProfession,
           search: searchQuery,
           sort: sortBy,
         });
-        // Backend returns { data: [...], pagination: {...} }
+        
         const providersList = Array.isArray(data) ? data : (data?.data || []);
         setProviders(providersList);
         console.log('[SearchScreen] Providers fetched:', providersList.length);
@@ -103,31 +91,7 @@ export default function SearchScreen({ isDesktop }) {
       setLoading(false);
     };
     fetchProviders();
-  }, [selectedProfession, sortBy]);
-
-  const applyFilters = useCallback(() => {
-    let filtered = [...providers];
-
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(p => 
-        p.name?.toLowerCase().includes(query) ||
-        p.profession?.toLowerCase().includes(query) ||
-        p.location?.toLowerCase().includes(query)
-      );
-    }
-
-    if (distanceFilter) {
-      const maxDist = parseInt(distanceFilter);
-      filtered = filtered.filter(p => (p.distance || 0) <= maxDist);
-    }
-
-    setFilteredProviders(filtered);
-  }, [providers, searchQuery, distanceFilter]);
-
-  useEffect(() => {
-    applyFilters();
-  }, [applyFilters]);
+  }, [selectedProfession, searchQuery, sortBy]);
 
   const getProviderLocation = (provider) => {
     if (provider.location) {
@@ -249,7 +213,7 @@ export default function SearchScreen({ isDesktop }) {
         Try adjusting your search or filters to find what you're looking for
       </p>
       <button 
-        onClick={() => { setSearchQuery(''); setSelectedProfession(''); setDistanceFilter(''); }}
+        onClick={() => { setSearchQuery(''); setSelectedProfession(''); }}
         className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
       >
         Clear Filters
@@ -314,7 +278,7 @@ export default function SearchScreen({ isDesktop }) {
 
         <main className="flex-1 flex flex-col gap-4 p-4 pb-24 overflow-y-auto">
           <div className="flex items-center justify-between px-1">
-            <p className="text-sm font-semibold text-slate-500">{filteredProviders.length} Professionals found</p>
+            <p className="text-sm font-semibold text-slate-500">{providers.length} Professionals found</p>
           </div>
 
           {loading ? (
@@ -327,10 +291,10 @@ export default function SearchScreen({ isDesktop }) {
                 </div>
               </div>
             </div>
-          ) : filteredProviders.length === 0 ? (
+          ) : providers.length === 0 ? (
             <EmptyState />
           ) : (
-            filteredProviders.map((provider) => (
+            providers.map((provider) => (
               <ProviderCard key={provider.id} provider={provider} />
             ))
           )}
@@ -392,17 +356,6 @@ export default function SearchScreen({ isDesktop }) {
         </div>
 
         <div className="flex items-center gap-2 ml-auto">
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`flex h-9 items-center justify-center rounded-lg px-3 transition-colors ${
-              showFilters || distanceFilter || availabilityFilter 
-                ? 'bg-blue-600 text-white border-2 border-blue-600' 
-                : 'bg-white border-2 border-slate-200 text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            <FiFilter style={{ fontSize: '16px' }} />
-            <span className="ml-1 text-sm font-medium">Filters</span>
-          </button>
           <span className="text-sm text-slate-500 font-medium">Sort:</span>
           {filters.map((f) => (
             <button
@@ -421,36 +374,7 @@ export default function SearchScreen({ isDesktop }) {
         </div>
       </div>
 
-      {showFilters && (
-        <div className="flex flex-wrap items-center gap-4 p-4 bg-white rounded-xl border border-slate-200">
-          <div>
-            <label className="text-xs text-slate-500 block mb-1">Distance</label>
-            <select
-              value={distanceFilter}
-              onChange={(e) => setDistanceFilter(e.target.value)}
-              className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-            >
-              {distanceOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs text-slate-500 block mb-1">Availability</label>
-            <select
-              value={availabilityFilter}
-              onChange={(e) => setAvailabilityFilter(e.target.value)}
-              className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-            >
-              {availabilityOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      )}
-
-      <p className="text-sm font-semibold text-slate-500">{filteredProviders.length} Professionals found</p>
+      <p className="text-sm font-semibold text-slate-500">{providers.length} Professionals found</p>
 
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -466,13 +390,13 @@ export default function SearchScreen({ isDesktop }) {
             </div>
           ))}
         </div>
-      ) : filteredProviders.length === 0 ? (
+      ) : providers.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200">
           <EmptyState />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredProviders.map((provider) => (
+          {providers.map((provider) => (
             <ProviderCard key={provider.id} provider={provider} />
           ))}
         </div>

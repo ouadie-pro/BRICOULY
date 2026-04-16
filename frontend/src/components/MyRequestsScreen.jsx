@@ -4,28 +4,28 @@ import { api } from '../services/api';
 import { FiInbox, FiPlus, FiClock, FiCheckCircle, FiXCircle, FiTool, FiFileText, FiX, FiMapPin, FiCalendar, FiDollarSign, FiAlertCircle } from 'react-icons/fi';
 
 const SERVICE_TYPES = [
-  { value: 'Plumber', label: 'Plumber' },
-  { value: 'Electrician', label: 'Electrician' },
-  { value: 'Painter', label: 'Painter' },
-  { value: 'Carpenter', label: 'Carpenter' },
-  { value: 'Home Cleaner', label: 'Home Cleaner' },
-  { value: 'Mover', label: 'Mover' },
-  { value: 'HVAC Technician', label: 'HVAC Technician' },
-  { value: 'Landscaper', label: 'Landscaper' },
-  { value: 'Roofer', label: 'Roofer' },
-  { value: 'Appliance Repair', label: 'Appliance Repair' },
+  { value: 'plumber', label: 'Plumber' },
+  { value: 'electrician', label: 'Electrician' },
+  { value: 'painter', label: 'Painter' },
+  { value: 'carpenter', label: 'Carpenter' },
+  { value: 'cleaner', label: 'Home Cleaner' },
+  { value: 'mover', label: 'Mover' },
+  { value: 'hvac', label: 'HVAC Technician' },
+  { value: 'landscaper', label: 'Landscaper' },
+  { value: 'roofer', label: 'Roofer' },
+  { value: 'appliance_repair', label: 'Appliance Repair' },
+  { value: 'general', label: 'General' },
 ];
 
 function NewRequestModal({ isOpen, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
-    serviceName: '',
+    serviceType: '',
     title: '',
     description: '',
     preferredDate: '',
-    preferredTime: '',
+    preferredTime: 'anytime',
     location: '',
     budget: '',
-    urgency: 'normal',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -39,7 +39,7 @@ function NewRequestModal({ isOpen, onClose, onSuccess }) {
     e.preventDefault();
     setError('');
 
-    if (!formData.serviceName) {
+    if (!formData.serviceType) {
       setError('Please select a service type');
       return;
     }
@@ -51,13 +51,13 @@ function NewRequestModal({ isOpen, onClose, onSuccess }) {
     setLoading(true);
     try {
       const requestData = {
-        serviceName: formData.title,
+        serviceType: formData.serviceType,
+        title: formData.title,
         description: formData.description,
         preferredDate: formData.preferredDate || null,
         preferredTime: formData.preferredTime,
         location: formData.location,
         budget: formData.budget ? parseFloat(formData.budget) : null,
-        urgency: formData.urgency,
       };
 
       const result = await api.createServiceRequest(requestData);
@@ -66,14 +66,13 @@ function NewRequestModal({ isOpen, onClose, onSuccess }) {
         onSuccess();
         onClose();
         setFormData({
-          serviceName: '',
+          serviceType: '',
           title: '',
           description: '',
           preferredDate: '',
-          preferredTime: '',
+          preferredTime: 'anytime',
           location: '',
           budget: '',
-          urgency: 'normal',
         });
       } else {
         setError(result.error || 'Failed to create request');
@@ -120,8 +119,8 @@ function NewRequestModal({ isOpen, onClose, onSuccess }) {
               Service Type *
             </label>
             <select
-              name="serviceName"
-              value={formData.serviceName}
+              name="serviceType"
+              value={formData.serviceType}
               onChange={handleChange}
               className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
             >
@@ -190,7 +189,7 @@ function NewRequestModal({ isOpen, onClose, onSuccess }) {
                 onChange={handleChange}
                 className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               >
-                <option value="">Any time</option>
+                <option value="anytime">Any time</option>
                 <option value="morning">Morning (8AM - 12PM)</option>
                 <option value="afternoon">Afternoon (12PM - 5PM)</option>
                 <option value="evening">Evening (5PM - 8PM)</option>
@@ -215,54 +214,22 @@ function NewRequestModal({ isOpen, onClose, onSuccess }) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                <span className="flex items-center gap-1">
-                  <FiDollarSign className="text-slate-400" />
-                  Budget (MAD)
-                </span>
-              </label>
-              <input
-                type="number"
-                name="budget"
-                value={formData.budget}
-                onChange={handleChange}
-                placeholder="Max budget"
-                min="0"
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Urgency
-              </label>
-              <div className="flex gap-3 mt-1">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="urgency"
-                    value="normal"
-                    checked={formData.urgency === 'normal'}
-                    onChange={handleChange}
-                    className="w-4 h-4 text-primary focus:ring-primary"
-                  />
-                  <span className="text-sm text-slate-600">Normal</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="urgency"
-                    value="urgent"
-                    checked={formData.urgency === 'urgent'}
-                    onChange={handleChange}
-                    className="w-4 h-4 text-red-500 focus:ring-red-500"
-                  />
-                  <span className="text-sm text-red-600">Urgent</span>
-                </label>
-              </div>
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              <span className="flex items-center gap-1">
+                <FiDollarSign className="text-slate-400" />
+                Budget (MAD)
+              </span>
+            </label>
+            <input
+              type="number"
+              name="budget"
+              value={formData.budget}
+              onChange={handleChange}
+              placeholder="Max budget"
+              min="0"
+              className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+            />
           </div>
 
           <div className="flex gap-3 pt-4">
@@ -294,8 +261,9 @@ export default function MyRequestsScreen({ isDesktop }) {
   const navigate = useNavigate();
 
   const fetchRequests = async () => {
-    const data = await api.getServiceRequests();
-    setRequests(Array.isArray(data) ? data : []);
+    setLoading(true);
+    const result = await api.getClientServiceRequests();
+    setRequests(result?.requests || result || []);
     setLoading(false);
   };
 
@@ -309,35 +277,27 @@ export default function MyRequestsScreen({ isDesktop }) {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-700';
-      case 'accepted': return 'bg-green-100 text-green-700';
+      case 'open': return 'bg-yellow-100 text-yellow-700';
       case 'in_progress': return 'bg-blue-100 text-blue-700';
       case 'completed': return 'bg-purple-100 text-purple-700';
-      case 'rejected': return 'bg-red-100 text-red-700';
-      case 'cancelled': return 'bg-slate-100 text-slate-700';
       default: return 'bg-slate-100 text-slate-700';
     }
   };
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'pending': return FiClock;
-      case 'accepted': return FiCheckCircle;
+      case 'open': return FiClock;
       case 'in_progress': return FiTool;
-      case 'completed': return FiFileText;
-      case 'rejected': return FiXCircle;
+      case 'completed': return FiCheckCircle;
       default: return FiClock;
     }
   };
 
   const getStatusLabel = (status) => {
     switch (status) {
-      case 'pending': return 'Pending';
-      case 'accepted': return 'Accepted';
+      case 'open': return 'Open';
       case 'in_progress': return 'In Progress';
       case 'completed': return 'Completed';
-      case 'rejected': return 'Rejected';
-      case 'cancelled': return 'Cancelled';
       default: return status;
     }
   };
@@ -349,6 +309,11 @@ export default function MyRequestsScreen({ isDesktop }) {
       day: 'numeric',
       year: 'numeric'
     });
+  };
+
+  const getServiceTypeLabel = (type) => {
+    const found = SERVICE_TYPES.find(t => t.value === type);
+    return found ? found.label : type;
   };
 
   if (!isDesktop) {
@@ -391,7 +356,8 @@ export default function MyRequestsScreen({ isDesktop }) {
                 <div key={request.id} className="bg-white rounded-xl border border-slate-200 p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <h3 className="font-semibold text-slate-900">{request.serviceName}</h3>
+                      <span className="text-xs text-primary font-medium">{getServiceTypeLabel(request.serviceType)}</span>
+                      <h3 className="font-semibold text-slate-900">{request.title}</h3>
                       <p className="text-sm text-slate-500 line-clamp-2">{request.description}</p>
                     </div>
                     <span className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${getStatusColor(request.status)}`}>
@@ -421,13 +387,15 @@ export default function MyRequestsScreen({ isDesktop }) {
                       )}
                     </div>
                   )}
-                  {request.otherUserName && request.otherUserName !== 'Unknown' && (
+                  {request.acceptedProviderId && (
                     <div className="flex items-center gap-2 mt-3">
-                      <div className="w-8 h-8 rounded-full bg-cover bg-center bg-slate-200" style={{ backgroundImage: request.otherUserAvatar ? `url("${request.otherUserAvatar}")` : undefined }} />
-                      <span className="text-sm text-slate-600">{request.otherUserName}</span>
-                      {request.otherUserProfession && (
-                        <span className="text-xs text-slate-400">• {request.otherUserProfession}</span>
-                      )}
+                      <div className="w-8 h-8 rounded-full bg-cover bg-center bg-slate-200" style={{ backgroundImage: request.acceptedProviderId?.avatar ? `url("${request.acceptedProviderId.avatar}")` : undefined }} />
+                      <span className="text-sm text-slate-600">{request.acceptedProviderId?.name || 'Provider'}</span>
+                    </div>
+                  )}
+                  {request.applicationDetails && request.applicationDetails.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-slate-100">
+                      <p className="text-xs text-slate-500 mb-2">{request.applicationDetails.length} application(s)</p>
                     </div>
                   )}
                   <div className="flex items-center justify-between mt-2">
@@ -492,8 +460,8 @@ export default function MyRequestsScreen({ isDesktop }) {
               <div key={request.id} className="bg-white rounded-xl border border-slate-200 p-5">
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <h3 className="font-semibold text-slate-900">{request.serviceName}</h3>
-                    <p className="text-xs text-primary mt-0.5">{request.urgency === 'urgent' ? 'Urgent' : 'Normal'}</p>
+                    <span className="text-xs text-primary font-medium">{getServiceTypeLabel(request.serviceType)}</span>
+                    <h3 className="font-semibold text-slate-900">{request.title}</h3>
                   </div>
                   <span className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${getStatusColor(request.status)}`}>
                     <StatusIcon style={{ fontSize: '12px' }} />
@@ -508,7 +476,7 @@ export default function MyRequestsScreen({ isDesktop }) {
                       <span className="flex items-center gap-1 bg-slate-50 text-slate-600 px-2 py-1 rounded">
                         <FiCalendar style={{ fontSize: '12px' }} />
                         {formatDate(request.preferredDate)}
-                        {request.preferredTime && ` • ${request.preferredTime}`}
+                        {request.preferredTime && request.preferredTime !== 'anytime' && ` • ${request.preferredTime}`}
                       </span>
                     )}
                     {request.location && (
@@ -526,26 +494,23 @@ export default function MyRequestsScreen({ isDesktop }) {
                   </div>
                 )}
                 
-                <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
-                  {request.otherUserName && request.otherUserName !== 'Unknown' ? (
-                    <>
-                      <div className="w-10 h-10 rounded-full bg-cover bg-center bg-slate-200" style={{ backgroundImage: request.otherUserAvatar ? `url("${request.otherUserAvatar}")` : undefined }} />
-                      <div>
-                        <p className="font-medium text-slate-900 text-sm">{request.otherUserName}</p>
-                        <p className="text-xs text-slate-500">{request.otherUserProfession}</p>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-sm text-slate-400 italic">Waiting for provider response</p>
-                  )}
-                </div>
+                {request.applicationDetails && request.applicationDetails.length > 0 && (
+                  <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
+                    <div className="w-10 h-10 rounded-full bg-cover bg-center bg-slate-200" style={{ backgroundImage: request.applicationDetails[0]?.providerAvatar ? `url("${request.applicationDetails[0].providerAvatar}")` : undefined }} />
+                    <div>
+                      <p className="font-medium text-slate-900 text-sm">{request.applicationDetails[0]?.providerName}</p>
+                      <p className="text-xs text-slate-500">{request.applicationDetails.length} application(s)</p>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="flex items-center justify-between mt-4">
                   <span className="text-xs text-slate-400">
                     {new Date(request.createdAt).toLocaleDateString()}
                   </span>
-                  {request.providerId && request.status !== 'completed' && (
+                  {request.acceptedProviderId && request.status !== 'completed' && (
                     <button 
-                      onClick={() => navigate(`/messages/${request.providerId}`)}
+                      onClick={() => navigate(`/messages/${request.acceptedProviderId._id || request.acceptedProviderId}`)}
                       className="text-primary text-sm font-medium hover:underline"
                     >
                       Message

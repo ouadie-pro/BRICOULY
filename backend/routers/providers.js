@@ -1,10 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const { auth } = require('../middleware/authMiddleware');
-const { getProviders, createProvider, updateProvider } = require('../controllers/providerController');
+const { getProviders, createProvider, updateProvider, getProvidersByService } = require('../controllers/providerController');
 const { getProviderById, getProviderReviews, getProviderServices, getProviderPortfolioById } = require('../controllers/userController');
 
 router.get('/', getProviders);
+
+router.get('/search', getProvidersByService);
+
 router.get('/:id', getProviderById);
 router.get('/:id/reviews', getProviderReviews);
 router.get('/:id/services', getProviderServices);
@@ -17,8 +20,8 @@ router.get('/:id/stats', async (req, res) => {
     const { id } = req.params;
     
     const [requests, reviews, user] = await Promise.all([
-      ServiceRequest.find({ providerId: id }),
-      Review.find({ providerId: id }),
+      ServiceRequest.find({ clientId: id }),
+      Review.find({ provider: id }),
       User.findById(id)
     ]);
     
@@ -45,7 +48,6 @@ router.get('/:id/activity', async (req, res) => {
     const ServiceRequest = require('../models/ServiceRequest');
     const Message = require('../models/Message');
     const { id } = req.params;
-    const userId = req.headers['x-user-id'];
     
     const days = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
     const today = new Date();
@@ -59,7 +61,7 @@ router.get('/:id/activity', async (req, res) => {
       nextDate.setDate(nextDate.getDate() + 1);
       
       const requestsCount = await ServiceRequest.countDocuments({
-        providerId: id,
+        clientId: id,
         createdAt: { $gte: date, $lt: nextDate }
       });
       

@@ -1,11 +1,38 @@
 const User = require('../models/User');
 const Provider = require('../models/Provider');
 const Review = require('../models/Review');
-const Booking = require('../models/Booking');
+const ServiceRequest = require('../models/ServiceRequest');
 
-const updateProviderStats = async (providerId) => {
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+
+const getUserFromRequest = async (req) => {
+  const authHeader = req.headers.authorization;
+  const userIdHeader = req.headers['x-user-id'];
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const jwt = require('jsonwebtoken');
+      const token = authHeader.split(' ')[1];
+      const decoded = jwt.verify(token, JWT_SECRET);
+      return await User.findById(decoded.id);
+    } catch (e) {
+      return null;
+    }
+  }
+  
+  if (userIdHeader) {
+    return await User.findById(userIdHeader);
+  }
+  
+  return null;
+};
+
+const updateProviderStats = async (providerUserId) => {
   try {
-    const reviews = await Review.find({ provider: providerId });
+    const provider = await Provider.findOne({ user: providerUserId });
+    if (!provider) return;
+    
+    const reviews = await Review.find({ provider: provider._id });
     const reviewCount = reviews.length;
     let rating = 0;
     
@@ -14,7 +41,7 @@ const updateProviderStats = async (providerId) => {
       rating = Math.round((sum / reviews.length) * 10) / 10;
     }
     
-    await Provider.findByIdAndUpdate(providerId, {
+    await Provider.findByIdAndUpdate(provider._id, {
       rating,
       reviewCount,
     });
@@ -25,181 +52,318 @@ const updateProviderStats = async (providerId) => {
 
 exports.getReviews = async (req, res) => {
   try {
-    console.log('[getReviews] Request received', { params: req.params, headers: req.headers });
     const { providerId } = req.params;
-    console.log('[getReviews] providerId:', providerId);
-    const provider = await Provider.findOne({ user: providerId });
     
+    const provider = await Provider.findOne({ user: providerId });
     if (!provider) {
-      return res.status(404).json({ error: 'Provider not found' });
+      return res.status(404).json({ success: false, error: 'Provider not found' });
     }
     
     const reviews = await Review.find({ provider: provider._id })
-      .populate('user', 'name avatar')
+      .populate('clientId', 'name avatar')
       .sort({ createdAt: -1 });
     
     const reviewsData = reviews.map(r => ({
       id: r._id.toString(),
-      userId: r.user._id.toString(),
-      userName: r.user.name,
-      userAvatar: r.user.avatar,
+      clientId: r.clientId._id.toString(),
+      clientName: r.clientId.name,
+      clientAvatar: r.clientId.avatar,
       rating: r.rating,
+      punctuality: r.punctuality,
+      professionalism: r.professionalism,
       comment: r.comment,
       createdAt: r.createdAt,
     }));
     
-    res.json(reviewsData);
+    res.json({
+      success: true,
+      reviews: reviewsData,
+      averageRating: provider.rating || 0,
+      reviewCount: provider.reviewCount || 0
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ success: false, error: error.message });
   }
 };
 
 exports.createReview = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
-    const user = await User.findById(userId);
+    const user = await getUserFromRequest(req);
     
     if (!user) {
-      return res.status(403).json({ error: 'Utilisateur non trouvé' });
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
     
-    const { providerId, bookingId, rating, comment, punctuality, professionalism } = req.body;
+    if (user.role !== 'client') {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Only clients can leave reviews' 
+      });
+    }
     
-    // Find the provider
+    const { providerId, serviceRequestId, rating, comment, punctuality, professionalism } = req.body;
+    
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Rating is required and must be between 1 and 5' 
+      });
+    }
+    
+    if (!providerId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Provider ID is required' 
+      });
+    }
+    
     const provider = await Provider.findOne({ user: providerId });
     if (!provider) {
-      return res.status(404).json({ error: 'Prestataire non trouvé' });
+      return res.status(404).json({ success: false, error: 'Provider not found' });
     }
     
-    // If bookingId is provided, validate that:
-    // 1. Booking exists and belongs to this user
-    // 2. Booking is completed
-    // 3. User hasn't already reviewed this booking
-    if (bookingId) {
-      const booking = await Booking.findOne({ 
-        _id: bookingId, 
-        user: userId,
-        status: 'completed'
+    if (user.id === providerId || user._id.toString() === providerId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'You cannot review yourself' 
       });
+    }
+    
+    if (serviceRequestId) {
+      const serviceRequest = await ServiceRequest.findById(serviceRequestId);
       
-      if (!booking) {
+      if (!serviceRequest) {
+        return res.status(404).json({ 
+          success: false, 
+          error: 'Service request not found' 
+        });
+      }
+      
+      if (serviceRequest.clientId.toString() !== user._id.toString()) {
         return res.status(403).json({ 
-          error: 'Vous devez compléter un service avant de noter' 
+          success: false, 
+          error: 'You can only review services you requested' 
         });
       }
       
-      // Check if already reviewed this booking
-      const existingForBooking = await Review.findOne({ 
-        booking: bookingId, 
-        user: userId 
-      });
-      if (existingForBooking) {
+      if (serviceRequest.status !== 'completed') {
         return res.status(400).json({ 
-          error: 'Vous avez déjà noté ce service' 
+          success: false, 
+          error: 'You can only review completed services' 
+        });
+      }
+      
+      if (serviceRequest.acceptedProviderId?.toString() !== providerId) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'This provider did not complete this service' 
+        });
+      }
+      
+      const existingForJob = await Review.findOne({ 
+        serviceRequestId: serviceRequestId 
+      });
+      
+      if (existingForJob) {
+        return res.status(409).json({ 
+          success: false, 
+          error: 'You have already reviewed this service' 
         });
       }
     }
     
-    // Check for duplicate review (general)
-    const existingReview = await Review.findOne({ user: userId, provider: provider._id });
-    if (existingReview && !bookingId) {
+    const existingReview = await Review.findOne({ 
+      clientId: user._id, 
+      provider: provider._id 
+    });
+    
+    if (existingReview && !serviceRequestId) {
       return res.status(409).json({ 
-        error: 'Vous avez déjà noté ce prestataire. Utilisez PUT pour mettre à jour votre avis.' 
+        success: false, 
+        error: 'You have already reviewed this provider. Use PUT to update your review.' 
       });
     }
     
-    // Create the review
     const reviewData = {
-      user: userId,
+      clientId: user._id,
       provider: provider._id,
+      serviceRequestId: serviceRequestId || null,
       rating: parseInt(rating),
       comment: comment || '',
     };
     
-    // Add booking reference if provided
-    if (bookingId) {
-      reviewData.booking = bookingId;
-    }
-    
-    // Add sub-ratings if provided
-    if (punctuality) {
-      reviewData.punctuality = parseInt(punctuality);
-    }
-    if (professionalism) {
-      reviewData.professionalism = parseInt(professionalism);
-    }
+    if (punctuality) reviewData.punctuality = parseInt(punctuality);
+    if (professionalism) reviewData.professionalism = parseInt(professionalism);
     
     const review = await Review.create(reviewData);
     
-    // Update provider stats
-    await updateProviderStats(provider._id);
+    await updateProviderStats(providerId);
     
-    // Get updated provider
-    const updatedProvider = await Provider.findById(provider._id);
+    const updatedProvider = await Provider.findOne({ user: providerId });
     
-    res.json({ 
+    res.status(201).json({ 
       success: true, 
+      message: 'Review created successfully',
       review: {
         id: review._id.toString(),
+        clientId: review.clientId.toString(),
         rating: review.rating,
+        punctuality: review.punctuality,
+        professionalism: review.professionalism,
         comment: review.comment,
         createdAt: review.createdAt
       },
-      newRating: updatedProvider.rating,
-      reviewCount: updatedProvider.reviewCount
+      providerStats: {
+        rating: updatedProvider?.rating || 0,
+        reviewCount: updatedProvider?.reviewCount || 0
+      }
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    if (error.code === 11000) {
+      return res.status(409).json({ 
+        success: false, 
+        error: 'You have already reviewed this provider for this service' 
+      });
+    }
+    res.status(500).json({ success: false, error: error.message });
   }
 };
 
 exports.updateReview = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
-    const { reviewId } = req.body;
-    const { rating, comment, punctuality, professionalism } = req.body;
+    const user = await getUserFromRequest(req);
     
-    if (!reviewId) {
-      return res.status(400).json({ error: 'Review ID is required' });
+    if (!user) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
+    
+    const { reviewId } = req.params;
+    const { rating, comment, punctuality, professionalism } = req.body;
     
     const review = await Review.findById(reviewId);
     
     if (!review) {
-      return res.status(404).json({ error: 'Review not found' });
+      return res.status(404).json({ success: false, error: 'Review not found' });
     }
     
-    // Verify the review belongs to this user
-    if (review.user.toString() !== userId) {
-      return res.status(403).json({ error: 'Not authorized to update this review' });
+    if (review.clientId.toString() !== user._id.toString()) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Not authorized to update this review' 
+      });
     }
     
-    // Update the review
-    if (rating) review.rating = parseInt(rating);
+    if (rating !== undefined) {
+      if (rating < 1 || rating > 5) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Rating must be between 1 and 5' 
+        });
+      }
+      review.rating = parseInt(rating);
+    }
+    
     if (comment !== undefined) review.comment = comment;
-    if (punctuality) review.punctuality = parseInt(punctuality);
-    if (professionalism) review.professionalism = parseInt(professionalism);
+    if (punctuality !== undefined) review.punctuality = parseInt(punctuality);
+    if (professionalism !== undefined) review.professionalism = parseInt(professionalism);
     
     await review.save();
     
-    // Update provider stats
-    await updateProviderStats(review.provider);
-    
-    // Get updated provider
     const provider = await Provider.findById(review.provider);
+    if (provider) {
+      await updateProviderStats(provider.user.toString());
+    }
     
     res.json({
       success: true,
+      message: 'Review updated successfully',
       review: {
         id: review._id.toString(),
+        clientId: review.clientId.toString(),
         rating: review.rating,
+        punctuality: review.punctuality,
+        professionalism: review.professionalism,
         comment: review.comment,
-        createdAt: review.createdAt
-      },
-      newRating: provider?.rating || 0,
-      reviewCount: provider?.reviewCount || 0
+        updatedAt: review.updatedAt
+      }
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.deleteReview = async (req, res) => {
+  try {
+    const user = await getUserFromRequest(req);
+    
+    if (!user) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    
+    const { reviewId } = req.params;
+    
+    const review = await Review.findById(reviewId);
+    
+    if (!review) {
+      return res.status(404).json({ success: false, error: 'Review not found' });
+    }
+    
+    if (review.clientId.toString() !== user._id.toString()) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Not authorized to delete this review' 
+      });
+    }
+    
+    const providerUserId = (await Provider.findById(review.provider))?.user?.toString();
+    
+    await review.deleteOne();
+    
+    if (providerUserId) {
+      await updateProviderStats(providerUserId);
+    }
+    
+    res.json({
+      success: true,
+      message: 'Review deleted successfully'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.checkCanReview = async (req, res) => {
+  try {
+    const user = await getUserFromRequest(req);
+    
+    if (!user) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    
+    const { providerId } = req.params;
+    
+    const completedServices = await ServiceRequest.find({
+      clientId: user._id,
+      status: 'completed',
+      acceptedProviderId: providerId
+    });
+    
+    const existingReview = await Review.findOne({
+      clientId: user._id,
+      provider: (await Provider.findOne({ user: providerId }))._id
+    });
+    
+    res.json({
+      success: true,
+      canReview: completedServices.length > 0 && !existingReview,
+      completedServices: completedServices.map(s => ({
+        id: s._id.toString(),
+        title: s.title,
+        completedAt: s.completedAt
+      })),
+      alreadyReviewed: !!existingReview
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 };

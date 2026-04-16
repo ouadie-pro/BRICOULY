@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const { upload } = require('../middleware/upload');
-const { signup, login, getMe, updateProfile, uploadAvatar, incrementProfileView } = require('../controllers/authController');
+const { signup, login, getMe, updateProfile, uploadAvatar, incrementProfileView, getSpecializations } = require('../controllers/authController');
 const User = require('../models/User');
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -55,7 +55,7 @@ if (passport && GoogleStrategy && process.env.GOOGLE_CLIENT_ID && process.env.GO
             name: profile.displayName,
             email: profile.emails[0].value,
             avatar: profile.photos && profile.photos[0] ? profile.photos[0].value : '',
-            role: 'user',
+            role: 'client',
             isVerified: true,
             authProvider: 'google',
           });
@@ -99,7 +99,7 @@ if (passport && FacebookStrategy && process.env.FACEBOOK_APP_ID && process.env.F
             name: `${profile.name.givenName} ${profile.name.familyName}`,
             email: email || `fb_${profile.id}@prucoly.ma`,
             avatar: profile.photos && profile.photos[0] ? profile.photos[0].value : '',
-            role: 'user',
+            role: 'client',
             isVerified: true,
             authProvider: 'facebook',
           });
@@ -119,6 +119,7 @@ router.get('/me', getMe);
 router.put('/profile', updateProfile);
 router.post('/avatar', upload.single('file'), uploadAvatar);
 router.patch('/users/:id/view', incrementProfileView);
+router.get('/specializations', getSpecializations);
 
 if (passport) {
   router.use(passport.initialize());

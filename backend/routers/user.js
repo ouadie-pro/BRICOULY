@@ -10,6 +10,7 @@ const {
   createProfession,
   getCategories
 } = require('../controllers/userController');
+const { getProvidersByService } = require('../controllers/providerController');
 
 const {
   getUserArticles
@@ -22,6 +23,7 @@ const {
 
 // Static routes MUST come before parameterized routes
 router.get('/providers', getProviders);
+router.get('/providers/search', getProvidersByService);
 router.get('/providers/:id', getProviderById);
 router.get('/providers/:id/reviews', getProviderReviews);
 router.get('/professions', getProfessions);

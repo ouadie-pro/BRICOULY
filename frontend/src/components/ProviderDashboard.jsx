@@ -34,14 +34,14 @@ export default function ProviderDashboard({ isDesktop }) {
     if (!userId) return;
     setLoading(true);
     try {
-      const [servicesData, requestsData, statsData, activityData] = await Promise.all([
+      const [servicesData, requestsResult, statsData, activityData] = await Promise.all([
         api.getProviderServices(userId),
-        api.getServiceRequests(),
+        api.getProviderServiceRequests(),
         api.getProviderStats(userId),
         api.getWeeklyActivity(userId),
       ]);
       setServices(servicesData || []);
-      setRequests(requestsData || []);
+      setRequests(requestsResult?.requests || requestsResult || []);
       setStats(statsData || { jobsDone: 0, profileViews: 0, rating: 0, unreadMessages: 0 });
       setWeeklyActivity(activityData || generateEmptyWeek());
     } catch (error) {
@@ -105,8 +105,15 @@ export default function ProviderDashboard({ isDesktop }) {
   };
 
   const handleUpdateRequest = async (requestId, status) => {
-    await api.updateServiceRequest(requestId, status);
+    await api.updateServiceRequest(requestId, { status });
     loadData(user.id);
+  };
+
+  const handleApply = async (requestId) => {
+    const res = await api.applyToServiceRequest(requestId, {});
+    if (res.success) {
+      loadData(user.id);
+    }
   };
 
   const formatPrice = (price) => {
@@ -123,7 +130,7 @@ export default function ProviderDashboard({ isDesktop }) {
   }
 
   const completionPercent = calcCompletion(user);
-  const pendingRequests = requests.filter(r => r.status === 'pending').length;
+  const openRequests = requests.filter(r => r.status === 'open').length;
 
   const statCards = [
     { icon: FiBriefcase, label: 'Travaux effectués', value: stats.jobsDone || 0, color: '#3b82f6', bgColor: '#eff6ff' },
@@ -245,7 +252,7 @@ export default function ProviderDashboard({ isDesktop }) {
             <h3 className="font-semibold text-slate-900 flex items-center gap-2">
               <FiFileText /> Demandes
             </h3>
-            {pendingRequests > 0 && <span className="badge">{pendingRequests} en attente</span>}
+            {openRequests > 0 && <span className="badge">{openRequests} en attente</span>}
           </div>
           
           {requests.length === 0 ? (
@@ -258,15 +265,12 @@ export default function ProviderDashboard({ isDesktop }) {
             <div className="space-y-2">
               {requests.map((request, index) => (
                 <div key={request._id || request.id || `request-${index}`} className="p-3 bg-slate-50 rounded-lg">
-                  <p className="font-medium text-slate-900">{request.serviceName}</p>
+                  <p className="font-medium text-slate-900">{request.title}</p>
                   <p className="text-sm text-slate-500">{request.description}</p>
                   <div className="flex items-center justify-between mt-2">
-                    <span className="text-xs text-slate-400">De: {request.otherUserName}</span>
-                    {request.status === 'pending' && (
-                      <div className="flex gap-2">
-                        <button onClick={() => handleUpdateRequest(request.id, 'accepted')} className="px-3 py-1 bg-green-600 text-white rounded text-xs">Accepter</button>
-                        <button onClick={() => handleUpdateRequest(request.id, 'rejected')} className="px-3 py-1 bg-red-600 text-white rounded text-xs">Refuser</button>
-                      </div>
+                    <span className="text-xs text-slate-400">De: {request.clientId?.name || 'Client'}</span>
+                    {request.status === 'open' && (
+                      <button onClick={() => handleApply(request.id)} className="px-3 py-1 bg-green-600 text-white rounded text-xs">Postuler</button>
                     )}
                   </div>
                 </div>
@@ -406,7 +410,7 @@ export default function ProviderDashboard({ isDesktop }) {
         <div className="requests-card">
           <div className="card-header">
             <h3>📋 Demandes de Service</h3>
-            {pendingRequests > 0 && <span className="badge">{pendingRequests} en attente</span>}
+            {openRequests > 0 && <span className="badge">{openRequests} en attente</span>}
           </div>
           
           {requests.length === 0 ? (
@@ -421,28 +425,28 @@ export default function ProviderDashboard({ isDesktop }) {
               {requests.map((request, index) => (
                 <div key={request._id || request.id || `request-${index}`} className="request-item">
                   <div className="request-avatar">
-                    {request.otherUserAvatar ? (
-                      <img src={request.otherUserAvatar} alt={request.otherUserName} />
+                    {request.clientId?.avatar ? (
+                      <img src={request.clientId.avatar} alt={request.clientId?.name} />
                     ) : (
-                      <span>{request.otherUserName?.charAt(0).toUpperCase()}</span>
+                      <span>{request.clientId?.name?.charAt(0).toUpperCase() || 'C'}</span>
                     )}
                   </div>
                   <div className="request-info">
-                    <p className="client-name">{request.otherUserName || 'Client'}</p>
-                    <p className="service-requested">{request.serviceName}</p>
+                    <p className="client-name">{request.clientId?.name || 'Client'}</p>
+                    <p className="service-requested">{request.title}</p>
+                    <p className="request-desc">{request.description?.substring(0, 80)}{request.description?.length > 80 ? '...' : ''}</p>
                     <p className="request-date">
                       <FiClock className="inline" /> {new Date(request.createdAt || Date.now()).toLocaleDateString('fr-FR')}
                     </p>
                   </div>
                   <div className="request-status">
                     <span className={`status-badge ${request.status}`}>
-                      {request.status === 'pending' ? 'En attente' : request.status === 'accepted' ? 'Accepté' : 'Refusé'}
+                      {request.status === 'open' ? 'Ouvert' : request.status === 'in_progress' ? 'En cours' : request.status === 'completed' ? 'Terminé' : request.status}
                     </span>
                   </div>
-                  {request.status === 'pending' && (
+                  {request.status === 'open' && (
                     <div className="request-actions">
-                      <button onClick={() => handleUpdateRequest(request.id, 'accepted')} className="accept-btn">✓ Accepter</button>
-                      <button onClick={() => handleUpdateRequest(request.id, 'rejected')} className="decline-btn">✗ Refuser</button>
+                      <button onClick={() => handleApply(request.id)} className="accept-btn">✓ Postuler</button>
                     </div>
                   )}
                 </div>
@@ -947,19 +951,25 @@ export default function ProviderDashboard({ isDesktop }) {
           font-weight: 500;
         }
 
-        .status-badge.pending {
+        .status-badge.pending, .status-badge.open {
           background: #fef3c7;
           color: #d97706;
         }
 
-        .status-badge.accepted {
+        .status-badge.accepted, .status-badge.in_progress {
           background: #d1fae5;
           color: #059669;
         }
 
-        .status-badge.rejected {
+        .status-badge.rejected, .status-badge.completed {
           background: #fee2e2;
           color: #dc2626;
+        }
+
+        .request-desc {
+          color: #6b7280;
+          font-size: 12px;
+          margin: 2px 0 4px 0;
         }
 
         .request-actions {

@@ -92,6 +92,9 @@ export default function AuthScreen({ onAuth }) {
         const res = await api.login(email, password);
         if (res.success) {
           localStorage.setItem('user', JSON.stringify(res.user));
+          if (res.token) {
+            localStorage.setItem('token', res.token);
+          }
           if (onAuth) onAuth(res.user);
           navigate('/home');
         } else {

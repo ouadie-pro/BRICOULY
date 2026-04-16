@@ -11,6 +11,9 @@ exports.getPosts = async (req, res) => {
       .sort({ createdAt: -1 });
     
     const postsWithAuthor = await Promise.all(posts.map(async p => {
+      if (!p.author) {
+        return null;
+      }
       let authorProfession = null;
       if (p.author.role === 'provider') {
         const provider = await Provider.findOne({ user: p.author._id });
@@ -38,8 +41,10 @@ exports.getPosts = async (req, res) => {
         createdAt: p.createdAt,
       };
     }));
-    res.json(postsWithAuthor);
+    const filteredPosts = postsWithAuthor.filter(p => p !== null);
+    res.json(filteredPosts);
   } catch (error) {
+    console.error('getPosts error:', error);
     res.status(500).json({ error: error.message });
   }
 };

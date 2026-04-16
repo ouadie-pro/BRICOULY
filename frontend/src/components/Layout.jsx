@@ -2,10 +2,9 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { 
-  FiHome, FiSearch, FiPlayCircle, FiFileText, FiMessageCircle, FiUser, 
+  FiHome, FiSearch, FiPlayCircle, FiMessageCircle, FiUser, 
   FiBell, FiBellOff, FiUserPlus, FiUsers, FiCheckCircle, FiMenu, FiX,
-  FiChevronRight, FiLogOut, FiMapPin, FiChevronDown, FiTool, FiHeart,
-  FiStar
+  FiChevronRight, FiLogOut, FiMapPin, FiChevronDown, FiTool
 } from 'react-icons/fi';
 import { GoTasklist } from 'react-icons/go';
 
@@ -40,13 +39,20 @@ export default function Layout({ children, user, onLogout }) {
         setFollowRequests(validRequests);
       } catch (error) {
         console.error('Error loading notifications:', error);
+        setNotifications([]);
+        setUnreadCount(0);
+        setFollowRequests([]);
       }
     };
-    loadNotifications();
+    
+    const userId = user?.id || user?._id;
+    if (userId) {
+      loadNotifications();
+    }
 
     const interval = setInterval(loadNotifications, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
   const handleMarkRead = async () => {
     if (isMarkingRead) return;
