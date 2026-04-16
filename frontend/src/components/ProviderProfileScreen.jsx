@@ -364,7 +364,7 @@ export default function ProviderProfileScreen({ isDesktop }) {
 
   const handleFollow = async () => {
     if (followRequestSent) return;
-    const res = await api.followProvider(id);
+    const res = await api.followUser(id);
     if (res.success) {
       if (res.message === 'Follow request sent') {
         setFollowRequestSent(true);
