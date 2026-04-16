@@ -27,27 +27,6 @@ exports.followUser = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid user ID format' });
     }
     
-    const existingFollow = await Follow.findOne({ 
-      user: new mongoose.Types.ObjectId(userId), 
-      targetUser: new mongoose.Types.ObjectId(targetUserId) 
-    });
-    
-    const existingRequest = await FollowRequest.findOne({ 
-      fromUser: new mongoose.Types.ObjectId(userId), 
-      toUser: new mongoose.Types.ObjectId(targetUserId), 
-      status: 'pending' 
-    });
-    
-    if (existingFollow) {
-      await Follow.findByIdAndDelete(existingFollow._id);
-      return res.json({ success: true, following: false });
-    } 
-    
-    if (existingRequest) {
-      await FollowRequest.findByIdAndDelete(existingRequest._id);
-      return res.json({ success: true, following: false, message: 'Request cancelled' });
-    }
-    
     const fromUser = await User.findById(userId);
     const targetUser = await User.findById(targetUserId);
     
@@ -55,26 +34,37 @@ exports.followUser = async (req, res) => {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
     
-    const followRequest = await FollowRequest.create({
-      fromUser: new mongoose.Types.ObjectId(userId),
-      toUser: new mongoose.Types.ObjectId(targetUserId),
-      status: 'pending',
+    // Check if already following - if so, unfollow
+    const existingFollow = await Follow.findOne({ 
+      user: new mongoose.Types.ObjectId(userId), 
+      targetUser: new mongoose.Types.ObjectId(targetUserId) 
     });
     
+    if (existingFollow) {
+      // Unfollow - remove the follow
+      await Follow.findByIdAndDelete(existingFollow._id);
+      return res.json({ success: true, following: false, message: 'Unfollowed successfully' });
+    }
+    
+    // Create direct follow (no request needed)
+    await Follow.create({
+      user: new mongoose.Types.ObjectId(userId),
+      targetUser: new mongoose.Types.ObjectId(targetUserId),
+    });
+    
+    // Optionally notify the target user
     await Notification.create({
       user: new mongoose.Types.ObjectId(targetUserId),
-      type: 'follow_request',
-      title: 'New Follow Request',
-      text: `${fromUser.name} wants to follow you`,
+      type: 'follow_accepted',
+      title: 'New Follower',
+      text: `${fromUser.name} started following you`,
       fromUser: new mongoose.Types.ObjectId(userId),
-      requestId: followRequest._id,
     });
     
     res.json({ 
       success: true, 
-      following: false, 
-      message: 'Follow request sent',
-      requestId: followRequest._id.toString()
+      following: true, 
+      message: 'Following successfully'
     });
   } catch (error) {
     console.error('Error in follow request:', error);
@@ -309,5 +299,30 @@ exports.getFollowingByUserId = async (req, res) => {
   } catch (error) {
     console.error('Error in getFollowingByUserId:', error.message);
     res.status(500).json({ error: error.message });
+  }
+};
+
+exports.checkFollowStatus = async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const targetUserId = req.params.userId;
+    
+    if (!userId || !targetUserId) {
+      return res.json({ following: false });
+    }
+    
+    if (!isValidObjectId(userId) || !isValidObjectId(targetUserId)) {
+      return res.json({ following: false });
+    }
+    
+    const existingFollow = await Follow.findOne({
+      user: new mongoose.Types.ObjectId(userId),
+      targetUser: new mongoose.Types.ObjectId(targetUserId)
+    });
+    
+    res.json({ following: !!existingFollow });
+  } catch (error) {
+    console.error('Error in checkFollowStatus:', error.message);
+    res.status(500).json({ following: false, error: error.message });
   }
 };

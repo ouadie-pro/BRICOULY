@@ -531,6 +531,10 @@ export const api = {
     return safeFetch(`${API_BASE}/follow/${userId}/following`);
   },
 
+  checkFollowStatus: async (targetUserId) => {
+    return safeFetch(`${API_BASE}/follow/status/${targetUserId}`);
+  },
+
   // Provider Dashboard Stats
   getProviderStats: async (providerId) => {
     return safeFetch(`${API_BASE}/providers/${providerId}/stats`);

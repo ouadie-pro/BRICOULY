@@ -135,7 +135,6 @@ export default function ProviderProfileScreen({ isDesktop }) {
   const [requestDescription, setRequestDescription] = useState('');
   const [requestSent, setRequestSent] = useState(false);
   const [following, setFollowing] = useState(false);
-  const [followRequestSent, setFollowRequestSent] = useState(false);
   const [completedBookings, setCompletedBookings] = useState([]);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
@@ -195,10 +194,10 @@ export default function ProviderProfileScreen({ isDesktop }) {
         const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
         console.log('[ProviderProfileScreen] Current user:', currentUser.id);
         
-        const [providerData, reviewsData, myFollowingIds, servicesData, portfolioData, bookingsData] = await Promise.all([
+const [providerData, reviewsData, followStatusData, servicesData, portfolioData, bookingsData] = await Promise.all([
           api.getProvider(id),
           api.getProviderReviews(id),
-          api.getMyFollowing(),
+          api.checkFollowStatus(id),
           api.getProviderServices(id),
           api.getProviderPortfolio(id),
           currentUser.role === 'user' ? api.getCompletedBookings() : Promise.resolve([]),
@@ -206,6 +205,7 @@ export default function ProviderProfileScreen({ isDesktop }) {
 
         console.log('[ProviderProfileScreen] Provider data received:', providerData);
         console.log('[ProviderProfileScreen] Reviews data:', reviewsData?.length);
+        console.log('[ProviderProfileScreen] Follow status:', followStatusData);
 
         // Compute isOwnProfile using fetched data
         const isOwnProfile = String(currentUser.id) === String(providerData?.id);
@@ -257,10 +257,8 @@ export default function ProviderProfileScreen({ isDesktop }) {
           setUserReview(existingUserReview || null);
         }
 
-        if (Array.isArray(myFollowingIds)) {
-          const isFollowing = myFollowingIds.some((fId) => String(fId) === String(id));
-          setFollowing(isFollowing);
-        }
+        // Set follow status from API
+        setFollowing(followStatusData?.following || false);
       } catch (err) {
         console.error('[ProviderProfileScreen] Unexpected error:', err);
         setError('Failed to load provider. Please try again.');
@@ -363,17 +361,9 @@ export default function ProviderProfileScreen({ isDesktop }) {
   };
 
   const handleFollow = async () => {
-    if (followRequestSent) return;
     const res = await api.followUser(id);
     if (res.success) {
-      if (res.message === 'Follow request sent') {
-        setFollowRequestSent(true);
-      } else if (res.message === 'Request cancelled') {
-        setFollowRequestSent(false);
-        setFollowing(false);
-      } else {
-        setFollowing(res.following);
-      }
+      setFollowing(res.following);
     }
   };
 
@@ -475,8 +465,8 @@ export default function ProviderProfileScreen({ isDesktop }) {
   };
 
   // Follow button label
-  const followLabel = following ? 'Following' : followRequestSent ? 'Request Sent' : 'Follow';
-  const followDisabled = followRequestSent;
+  const followLabel = following ? 'Following' : 'Follow';
+  const followDisabled = false;
 
   if (!isDesktop) {
     return (
