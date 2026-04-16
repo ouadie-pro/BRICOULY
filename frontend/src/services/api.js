@@ -285,6 +285,7 @@ export const api = {
     const formData = new FormData();
     if (postData.content) formData.append('content', postData.content);
     if (postData.type) formData.append('type', postData.type);
+    if (postData.serviceCategory) formData.append('serviceCategory', postData.serviceCategory);
     if (postData.images && postData.images.length > 0) {
       postData.images.forEach(image => formData.append('images', image));
     }
@@ -400,7 +401,7 @@ export const api = {
 
   // Reviews
   getProviderReviews: async (providerId) => {
-    return safeFetch(`${API_BASE}/reviews/${providerId}`);
+    return safeFetch(`${API_BASE}/reviews/provider/${providerId}`);
   },
 
   submitReview: async (reviewData) => {

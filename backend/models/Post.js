@@ -1,5 +1,10 @@
 const mongoose = require('mongoose');
 
+const SERVICE_CATEGORIES = [
+  'Plumber', 'Electrician', 'Painter', 'Carpenter', 'Home Cleaner', 
+  'Mover', 'HVAC Technician', 'Landscaper', 'Roofer', 'Appliance Repair', 'General'
+];
+
 const postSchema = new mongoose.Schema({
   author: {
     type: mongoose.Schema.Types.ObjectId,
@@ -17,6 +22,11 @@ const postSchema = new mongoose.Schema({
     type: String,
     enum: ['post', 'promo', 'tip', 'work'],
     default: 'post',
+  },
+  serviceCategory: {
+    type: String,
+    enum: [...SERVICE_CATEGORIES, null],
+    default: null,
   },
   likes: [{
     type: mongoose.Schema.Types.ObjectId,

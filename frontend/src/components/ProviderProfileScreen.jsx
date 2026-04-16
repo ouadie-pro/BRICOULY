@@ -253,7 +253,7 @@ const [providerData, reviewsData, followStatusData, servicesData, portfolioData,
         const currentUserId = currentUser?.id;
         if (currentUserId && Array.isArray(reviewsData)) {
           const existingUserReview = reviewsData.find(
-            r => String(r.userId || r.clientId) === String(currentUserId)
+            r => String(r.clientId) === String(currentUserId)
           );
           setUserReview(existingUserReview || null);
         }
@@ -388,7 +388,7 @@ const [providerData, reviewsData, followStatusData, servicesData, portfolioData,
       const currentUserId = currentUser?.id;
       if (currentUserId) {
         const existingUserReview = reviews.find(
-          r => String(r.userId || r.clientId) === String(currentUserId)
+          r => String(r.clientId) === String(currentUserId)
         );
         setUserReview(existingUserReview || null);
       }
@@ -673,13 +673,15 @@ const [providerData, reviewsData, followStatusData, servicesData, portfolioData,
 
             {activeTab === 'reviews' && (
               <div className="space-y-4">
-                {/* Write a Review button for clients */}
-                {!isOwnProfile && currentUser.role === 'user' && (
+                {/* Write a Review button for clients who have completed bookings */}
+                {!isOwnProfile && currentUser.role === 'user' && (completedBookings.length > 0 || userReview) && (
                   <div className="bg-gradient-to-r from-primary/10 to-blue-50 dark:from-primary/5 dark:to-blue-900/20 p-4 rounded-xl border border-primary/20">
                     <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
                       {userReview 
                         ? 'Vous avez déjà noté ce professionnel. Modifiez votre avis !'
-                        : `Vous avez utilisé les services de ${provider.name} ? Partagez votre expérience !`
+                        : completedBookings.length > 0
+                          ? `Vous avez utilisé les services de ${provider.name} ? Partagez votre expérience !`
+                          : 'Partagez votre expérience avec ce professionnel.'
                       }
                     </p>
                     <button
@@ -716,18 +718,18 @@ const [providerData, reviewsData, followStatusData, servicesData, portfolioData,
                   >
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center gap-2">
-                        {review.userAvatar ? (
+                        {review.clientAvatar ? (
                           <div
                             className="w-8 h-8 rounded-full bg-cover bg-center"
-                            style={{ backgroundImage: `url("${review.userAvatar}")` }}
+                            style={{ backgroundImage: `url("${review.clientAvatar}")` }}
                           />
                         ) : (
                           <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold">
-                            {review.userName?.charAt(0) || '?'}
+                            {review.clientName?.charAt(0) || '?'}
                           </div>
                         )}
                         <div>
-                          <p className="text-sm font-bold text-text-light dark:text-text-dark">{review.userName || review.clientName}</p>
+                          <p className="text-sm font-bold text-text-light dark:text-text-dark">{review.clientName}</p>
                           <StarRating rating={review.rating || 0} size={12} />
                         </div>
                       </div>
@@ -1026,13 +1028,15 @@ const [providerData, reviewsData, followStatusData, servicesData, portfolioData,
 
             {activeTab === 'reviews' && (
               <div className="space-y-4">
-                {/* Write a Review button for clients */}
-                {!isOwnProfile && currentUser.role === 'user' && (
+                {/* Write a Review button for clients who have completed bookings */}
+                {!isOwnProfile && currentUser.role === 'user' && (completedBookings.length > 0 || userReview) && (
                   <div className="bg-gradient-to-r from-primary/10 to-blue-50 dark:from-primary/5 dark:to-blue-900/20 p-5 rounded-xl border border-primary/20">
                     <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
                       {userReview 
                         ? 'Vous avez déjà noté ce professionnel. Modifiez votre avis !'
-                        : `Vous avez utilisé les services de ${provider.name} ? Partagez votre expérience !`
+                        : completedBookings.length > 0
+                          ? `Vous avez utilisé les services de ${provider.name} ? Partagez votre expérience !`
+                          : 'Partagez votre expérience avec ce professionnel.'
                       }
                     </p>
                     <button
@@ -1062,18 +1066,18 @@ const [providerData, reviewsData, followStatusData, servicesData, portfolioData,
                   <div key={review.id || review._id} className="border-t border-slate-200 pt-4">
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center gap-3">
-                        {review.userAvatar ? (
+                        {review.clientAvatar ? (
                           <div
                             className="w-10 h-10 rounded-full bg-cover bg-center"
-                            style={{ backgroundImage: `url("${review.userAvatar}")` }}
+                            style={{ backgroundImage: `url("${review.clientAvatar}")` }}
                           />
                         ) : (
                           <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold">
-                            {review.userName?.charAt(0) || review.clientName?.charAt(0) || '?'}
+                            {review.clientName?.charAt(0) || '?'}
                           </div>
                         )}
                         <div>
-                          <p className="font-semibold text-slate-900">{review.userName || review.clientName}</p>
+                          <p className="font-semibold text-slate-900">{review.clientName}</p>
                           <StarRating rating={review.rating || 0} size={14} />
                         </div>
                       </div>

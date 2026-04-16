@@ -6,7 +6,31 @@ const Comment = require('../models/Comment');
 exports.getPosts = async (req, res) => {
   try {
     const userId = req.headers['x-user-id'];
-    const posts = await Post.find()
+    
+    let currentUser = null;
+    let providerProfession = null;
+    
+    if (userId) {
+      currentUser = await User.findById(userId);
+      if (currentUser && currentUser.role === 'provider') {
+        const provider = await Provider.findOne({ user: userId });
+        providerProfession = provider?.profession || null;
+      }
+    }
+
+    let query = {};
+    
+    if (currentUser && currentUser.role === 'provider' && providerProfession) {
+      query = {
+        $or: [
+          { serviceCategory: providerProfession },
+          { serviceCategory: null },
+          { serviceCategory: { $exists: false } }
+        ]
+      };
+    }
+    
+    const posts = await Post.find(query)
       .populate('author', 'name avatar role')
       .sort({ createdAt: -1 });
     
@@ -38,6 +62,7 @@ exports.getPosts = async (req, res) => {
         isLiked,
         commentsCount: p.commentsCount || 0,
         type: p.type,
+        serviceCategory: p.serviceCategory,
         createdAt: p.createdAt,
       };
     }));
@@ -58,7 +83,7 @@ exports.createPost = async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     
-    const { content, type } = req.body;
+    const { content, type, serviceCategory } = req.body;
     
     let images = [];
     if (req.files && req.files.length > 0) {
@@ -70,6 +95,7 @@ exports.createPost = async (req, res) => {
       content,
       images,
       type: type || 'post',
+      serviceCategory: serviceCategory || null,
       likes: [],
       commentsCount: 0,
     });
@@ -101,6 +127,7 @@ exports.createPost = async (req, res) => {
         isLiked: false,
         commentsCount: 0,
         type: populatedPost.type,
+        serviceCategory: populatedPost.serviceCategory,
         createdAt: populatedPost.createdAt,
       }
     });

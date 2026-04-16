@@ -242,6 +242,23 @@ export default function HomeScreen({ isDesktop }) {
   const [userLocation, setUserLocation] = useState(null);
   const [locationError, setLocationError] = useState(false);
   const postImageInputRef = useRef(null);
+  const [postServiceCategory, setPostServiceCategory] = useState('');
+
+  const isClient = user?.role === 'client' || user?.role === 'user';
+
+  const POST_SERVICE_CATEGORIES = [
+    { value: 'Plumber', label: 'Plumber' },
+    { value: 'Electrician', label: 'Electrician' },
+    { value: 'Painter', label: 'Painter' },
+    { value: 'Carpenter', label: 'Carpenter' },
+    { value: 'Home Cleaner', label: 'Home Cleaner' },
+    { value: 'Mover', label: 'Mover' },
+    { value: 'HVAC Technician', label: 'HVAC Technician' },
+    { value: 'Landscaper', label: 'Landscaper' },
+    { value: 'Roofer', label: 'Roofer' },
+    { value: 'Appliance Repair', label: 'Appliance Repair' },
+    { value: 'General', label: 'General' },
+  ];
 
   const handlePostImageSelect = (e) => {
     const files = Array.from(e.target.files);
@@ -264,15 +281,25 @@ export default function HomeScreen({ isDesktop }) {
       alert('Post must have at least 10 characters or an image');
       return;
     }
+    if (isClient && !postServiceCategory) {
+      alert('Please select a service category');
+      return;
+    }
     setIsPosting(true);
     try {
-      const result = await api.createPost({ content: postContent, images: postImages });
+      const postData = { 
+        content: postContent, 
+        images: postImages,
+        ...(isClient && postServiceCategory ? { serviceCategory: postServiceCategory } : {})
+      };
+      const result = await api.createPost(postData);
       if (result.success) {
         setFeed((prev) => [normalizePost(result.post), ...prev]);
         setShowPostForm(false);
         setPostContent('');
         setPostImages([]);
         setPostImagePreviews([]);
+        setPostServiceCategory('');
       }
     } catch (err) {
       console.error('Error creating post:', err);
@@ -309,6 +336,7 @@ export default function HomeScreen({ isDesktop }) {
       content: p.content,
       images,
       video,
+      serviceCategory: p.serviceCategory || null,
       likesCount: p.likesCount || p.likes || 0,
       isLiked: p.isLiked || p.liked || false,
       commentsCount: p.commentsCount || 0,
@@ -706,6 +734,12 @@ export default function HomeScreen({ isDesktop }) {
                   <span className="text-xs text-primary font-medium">{item.authorProfession}</span>
                 </>
               )}
+              {item.serviceCategory && (
+                <>
+                  <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                  <span className="text-xs text-orange-600 font-medium">Needs: {item.serviceCategory}</span>
+                </>
+              )}
             </div>
           </div>
           {/* Badge: article vs post */}
@@ -1071,6 +1105,25 @@ export default function HomeScreen({ isDesktop }) {
                       <FiX />
                     </button>
                   </div>
+                  {isClient && (
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                        What service do you need? *
+                      </label>
+                      <select
+                        value={postServiceCategory}
+                        onChange={(e) => setPostServiceCategory(e.target.value)}
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                      >
+                        <option value="">Select a service category...</option>
+                        {POST_SERVICE_CATEGORIES.map(cat => (
+                          <option key={cat.value} value={cat.value}>
+                            {cat.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <textarea
                     value={postContent}
                     onChange={(e) => setPostContent(e.target.value)}
@@ -1116,7 +1169,7 @@ export default function HomeScreen({ isDesktop }) {
                     <div className="flex-1"></div>
                     <button
                       onClick={handleCreatePost}
-                      disabled={(!postContent.trim() && postImages.length === 0) || isPosting}
+                      disabled={(!postContent.trim() && postImages.length === 0) || (isClient && !postServiceCategory) || isPosting}
                       className="px-6 py-2 rounded-lg bg-primary text-white font-medium disabled:opacity-50"
                     >
                       {isPosting ? 'Posting...' : 'Post'}
@@ -1383,6 +1436,25 @@ export default function HomeScreen({ isDesktop }) {
                   </p>
                 </div>
               </div>
+              {isClient && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    What service do you need? *
+                  </label>
+                  <select
+                    value={postServiceCategory}
+                    onChange={(e) => setPostServiceCategory(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  >
+                    <option value="">Select a service category...</option>
+                    {POST_SERVICE_CATEGORIES.map(cat => (
+                      <option key={cat.value} value={cat.value}>
+                        {cat.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <textarea
                 value={postContent}
                 onChange={(e) => setPostContent(e.target.value)}
@@ -1428,7 +1500,7 @@ export default function HomeScreen({ isDesktop }) {
                 <div className="flex-1"></div>
                 <button
                   onClick={handleCreatePost}
-                  disabled={(!postContent.trim() && postImages.length === 0) || isPosting}
+                  disabled={(!postContent.trim() && postImages.length === 0) || (isClient && !postServiceCategory) || isPosting}
                   className="px-6 py-2 rounded-lg bg-primary text-white font-medium disabled:opacity-50"
                 >
                   {isPosting ? 'Posting...' : 'Post'}
