@@ -211,7 +211,8 @@ const [providerData, reviewsData, followStatusData, servicesData, portfolioData,
         const isOwnProfile = String(currentUser.id) === String(providerData?.id);
 
         // Increment profile view (don't await, fire and forget)
-        if (!isOwnProfile) {
+        // Only call if id looks like a valid MongoDB ObjectId (24 hex chars)
+        if (!isOwnProfile && id && /^[a-f0-9]{24}$/i.test(id)) {
           api.incrementProfileView(id).catch(() => {});
         }
 

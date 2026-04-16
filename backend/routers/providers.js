@@ -17,16 +17,24 @@ router.get('/:id/stats', async (req, res) => {
     const ServiceRequest = require('../models/ServiceRequest');
     const Review = require('../models/Review');
     const User = require('../models/User');
+    const Message = require('../models/Message');
     const { id } = req.params;
     
-    const [requests, reviews, user] = await Promise.all([
-      ServiceRequest.find({ clientId: id }),
-      Review.find({ provider: id }),
-      User.findById(id)
-    ]);
+    // For providers, we need to find requests where they are the accepted provider
+    const requests = await ServiceRequest.find({ acceptedProviderId: id });
+    const reviews = await Review.find({ provider: id });
+    const user = await User.findById(id);
     
+    // Count completed jobs
     const completedJobs = requests.filter(r => r.status === 'completed').length;
-    const unreadMessages = requests.filter(r => r.status === 'pending').length;
+    
+    // Count unread messages for this provider
+    const unreadMessages = await Message.countDocuments({
+      receiver: id,
+      read: false
+    });
+    
+    // Calculate average rating
     const avgRating = reviews.length > 0 
       ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length 
       : 0;
@@ -60,13 +68,15 @@ router.get('/:id/activity', async (req, res) => {
       const nextDate = new Date(date);
       nextDate.setDate(nextDate.getDate() + 1);
       
+      // Count service requests where this provider has applied/been accepted
       const requestsCount = await ServiceRequest.countDocuments({
-        clientId: id,
+        acceptedProviderId: id,
         createdAt: { $gte: date, $lt: nextDate }
       });
       
+      // Count messages involving this provider
       const messagesCount = await Message.countDocuments({
-        $or: [{ senderId: id }, { receiverId: id }],
+        $or: [{ sender: id }, { receiver: id }],
         createdAt: { $gte: date, $lt: nextDate }
       });
       

@@ -544,8 +544,8 @@ export const api = {
     return safeFetch(`${API_BASE}/providers/${providerId}/activity`);
   },
 
-  incrementProfileView: async (userId) => {
-    return safeFetch(`${API_BASE}/auth/users/${userId}/view`, {
+  incrementProfileView: async (targetUserId) => {
+    return safeFetch(`${API_BASE}/auth/users/${targetUserId}/view`, {
       method: 'PATCH',
     });
   },

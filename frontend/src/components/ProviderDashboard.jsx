@@ -34,16 +34,38 @@ export default function ProviderDashboard({ isDesktop }) {
     if (!userId) return;
     setLoading(true);
     try {
-      const [servicesData, requestsResult, statsData, activityData] = await Promise.all([
+      const [servicesData, requestsResult, statsData, activityData, userData] = await Promise.all([
         api.getProviderServices(userId),
         api.getProviderServiceRequests(),
         api.getProviderStats(userId),
         api.getWeeklyActivity(userId),
+        api.getUser(userId),
       ]);
-      setServices(servicesData || []);
-      setRequests(requestsResult?.requests || requestsResult || []);
+      
+      // Normalize services to use _id
+      const normalizedServices = (servicesData || []).map(s => ({
+        ...s,
+        id: s._id || s.id
+      }));
+      setServices(normalizedServices);
+      
+      // Normalize requests
+      const normalizedRequests = (requestsResult?.requests || requestsResult || []).map(r => ({
+        ...r,
+        id: r._id || r.id
+      }));
+      setRequests(normalizedRequests);
+      
+      // Set stats (default to 0 if missing)
       setStats(statsData || { jobsDone: 0, profileViews: 0, rating: 0, unreadMessages: 0 });
+      
+      // Set weekly activity
       setWeeklyActivity(activityData || generateEmptyWeek());
+      
+      // Update user data if received
+      if (userData) {
+        setUser({ ...user, ...userData });
+      }
     } catch (error) {
       console.error('Error loading data:', error);
       setServices([]);
@@ -73,10 +95,13 @@ export default function ProviderDashboard({ isDesktop }) {
 
   const handleAddService = async (e) => {
     e.preventDefault();
-    const res = await api.addService(newService);
+    const serviceId = editingService?._id || editingService?.id;
+    const res = serviceId 
+      ? await api.updateService(serviceId, newService)
+      : await api.addService(newService);
     if (res.success) {
       if (editingService) {
-        setServices(services.map(s => s.id === editingService.id ? res.service : s));
+        setServices(services.map(s => (s._id === serviceId || s.id === serviceId) ? res.service : s));
         setEditingService(null);
       } else {
         setServices([...services, res.service]);
@@ -86,10 +111,11 @@ export default function ProviderDashboard({ isDesktop }) {
     }
   };
 
-  const handleDeleteService = async (serviceId) => {
+  const handleDeleteService = async (service) => {
+    const serviceId = service._id || service.id;
     const res = await api.deleteService(serviceId);
     if (res.success) {
-      setServices(services.filter(s => s.id !== serviceId));
+      setServices(services.filter(s => (s._id !== serviceId && s.id !== serviceId)));
     }
   };
 
