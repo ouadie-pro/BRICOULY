@@ -76,11 +76,13 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
           setProfession(userData.profession || '');
         }
 
+        const isTargetProvider = userData?.role === 'provider';
+        
         const [userArticles, userFollowers, userFollowing, userReviews] = await Promise.all([
           api.getUserArticles(targetUserId),
           api.getFollowers(targetUserId),
           api.getFollowing(targetUserId),
-          api.getProviderReviews?.(targetUserId).catch(() => []),
+          isTargetProvider ? api.getProviderReviews?.(targetUserId).catch(() => []) : Promise.resolve([]),
         ]);
         setArticles(userArticles || []);
         setFollowers(userFollowers || []);

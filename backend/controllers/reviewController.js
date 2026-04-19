@@ -56,7 +56,12 @@ exports.getReviews = async (req, res) => {
     
     const provider = await Provider.findOne({ user: providerId });
     if (!provider) {
-      return res.status(404).json({ success: false, error: 'Provider not found' });
+      return res.json({
+        success: true,
+        reviews: [],
+        averageRating: 0,
+        reviewCount: 0
+      });
     }
     
     const reviews = await Review.find({ provider: provider._id })
