@@ -1,26 +1,12 @@
 const API_BASE = '/api';
 
-function getStoredUser() {
-  try {
-    const userStr = localStorage.getItem('user');
-    if (!userStr) return null;
-    return JSON.parse(userStr);
-  } catch (e) {
-    console.error('Error parsing stored user:', e);
-    return null;
-  }
-}
-
-function getUserId() {
-  const user = getStoredUser();
-  if (!user) return null;
-  return user?.id || user?._id || null;
+function getToken() {
+  return localStorage.getItem('token');
 }
 
 async function safeFetch(url, options = {}) {
   try {
-    const token = localStorage.getItem('token');
-    const userId = getUserId();
+    const token = getToken();
     
     const headers = {
       ...options.headers,
@@ -28,10 +14,6 @@ async function safeFetch(url, options = {}) {
     
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
-    }
-    
-    if (userId) {
-      headers['x-user-id'] = userId;
     }
     
     const isFormData = options.body instanceof FormData;
@@ -57,6 +39,11 @@ async function safeFetch(url, options = {}) {
     
     if (!res.ok) {
       console.error('API Error:', res.status, data);
+      if (res.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/auth';
+      }
       return { 
         ...data,
         success: false, 
@@ -71,8 +58,6 @@ async function safeFetch(url, options = {}) {
     return { success: false, error: 'Cannot connect to server. Is backend running?' };
   }
 }
-
-export { getUserId };
 
 export const api = {
   // Auth
@@ -173,15 +158,13 @@ export const api = {
   addPortfolioItem: async (formData) => {
     return safeFetch(`${API_BASE}/portfolio`, { 
       method: 'POST', 
-      headers: { 'x-user-id': getUserId() }, 
       body: formData 
     });
   },
 
   deletePortfolioItem: async (id) => {
     return safeFetch(`${API_BASE}/portfolio/${id}`, { 
-      method: 'DELETE', 
-      headers: { 'x-user-id': getUserId() } 
+      method: 'DELETE'
     });
   },
 

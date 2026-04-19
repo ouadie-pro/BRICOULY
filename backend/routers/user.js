@@ -12,15 +12,6 @@ const {
 } = require('../controllers/userController');
 const { getProvidersByService } = require('../controllers/providerController');
 
-const {
-  getUserArticles
-} = require('../controllers/articleController');
-
-const {
-  getFollowers,
-  getFollowingByUserId
-} = require('../controllers/followController');
-
 // Static routes MUST come before parameterized routes
 router.get('/providers', getProviders);
 router.get('/providers/search', getProvidersByService);
@@ -32,9 +23,6 @@ router.get('/categories', getCategories);
 router.get('/search', searchUsers);
 
 // Parameterized routes come last
-router.get('/:id/articles', getUserArticles);
-router.get('/:id/followers', getFollowers);
-router.get('/:id/following', getFollowingByUserId);
 router.get('/:id', getUserById);
 
 module.exports = router;

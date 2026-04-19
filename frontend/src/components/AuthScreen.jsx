@@ -91,25 +91,35 @@ export default function AuthScreen({ onAuth }) {
       if (mode === 'login') {
         const res = await api.login(email, password);
         if (res.success) {
+          console.log('[Auth] Login successful, user:', res.user);
           localStorage.setItem('user', JSON.stringify(res.user));
           if (res.token) {
+            console.log('[Auth] Token stored:', res.token);
             localStorage.setItem('token', res.token);
           }
-          if (onAuth) onAuth(res.user);
+          if (onAuth) {
+            console.log('[Auth] Calling onAuth with user:', res.user);
+            onAuth(res.user);
+          }
+          console.log('[Auth] Navigating to /home');
           navigate('/home');
         } else {
+          console.log('[Auth] Login failed:', res.error);
           setError(res.error || 'Login failed');
         }
       } else {
         console.log('[Auth] Signing up with:', { name, email, role });
+        const userRole = role === 'user' ? 'client' : role;
+        const selectedProfs = selectedProfessions.map(id => 
+          professions.find(p => p._id === id)?.name?.toLowerCase().replace(' ', '_')
+        ).filter(Boolean);
         const res = await api.signup({ 
           name, 
           email, 
           password, 
-          role,
+          role: userRole,
           phone,
-          professionId: role === 'provider' ? selectedProfessions[0] : null,
-          professionIds: role === 'provider' ? selectedProfessions : [],
+          specialization: role === 'provider' ? selectedProfs[0] || 'general' : undefined,
           bio: role === 'provider' ? bio : '',
           hourlyRate: role === 'provider' ? parseFloat(hourlyRate) || 0 : undefined,
         });
@@ -117,8 +127,8 @@ export default function AuthScreen({ onAuth }) {
         
         if (res.success) {
           localStorage.setItem('user', JSON.stringify(res.user));
-          if (res.token) {
-            localStorage.setItem('token', res.token);
+          if (res.accessToken) {
+            localStorage.setItem('token', res.accessToken);
           }
           if (onAuth) onAuth(res.user);
           navigate('/home');

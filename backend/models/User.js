@@ -121,6 +121,11 @@ userSchema.methods.toJSON = function () {
   return obj;
 };
 
+userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ role: 1 });
+userSchema.index({ specialization: 1 });
+userSchema.index({ createdAt: -1 });
+
 userSchema.statics.SERVICE_SPECIALIZATIONS = SERVICE_SPECIALIZATIONS;
 
 module.exports = mongoose.model('User', userSchema);

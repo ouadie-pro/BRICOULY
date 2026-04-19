@@ -98,22 +98,15 @@ const seedCategories = async () => {
   }
 };
 
-app.use('/api/auth', require('./routers/auth'));
+app.use('/api/auth', require('./features/auth/authRouter'));
 app.use('/api/categories', require('./routers/category'));
 app.use('/api/professions', require('./routers/profession'));
 app.use('/api/providers', require('./routers/providers'));
 app.use('/api/users', require('./routers/user'));
-app.use('/api/services', require('./routers/service'));
-app.use('/api/portfolio', require('./routers/portfolio'));
-app.use('/api/posts', require('./routers/post'));
-app.use('/api/videos', require('./routers/video'));
-app.use('/api/articles', require('./routers/article'));
+app.use('/api/service-requests', require('./features/serviceRequests/serviceRequestRouter'));
 app.use('/api/reviews', require('./routers/review'));
-app.use('/api/follow', require('./routers/follow'));
-app.use('/api/service-requests', require('./routers/serviceRequest'));
-app.use('/api/messages', require('./routers/message'));
+app.use('/api/messages', require('./features/messages/messageRouter'));
 app.use('/api/notifications', require('./routers/notification'));
-app.use('/api/bookings', require('./routers/booking'));
 app.use('/api/applications', require('./routers/application'));
 
 // Health check endpoint

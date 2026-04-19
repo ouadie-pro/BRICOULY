@@ -105,9 +105,8 @@ const serviceRequestSchema = new mongoose.Schema({
   },
 });
 
-serviceRequestSchema.pre('save', function (next) {
+serviceRequestSchema.pre('save', async function () {
   this.updatedAt = new Date();
-  next();
 });
 
 serviceRequestSchema.index({ clientId: 1, createdAt: -1 });
