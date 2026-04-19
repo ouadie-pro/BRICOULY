@@ -18,36 +18,53 @@ router.get('/:id/stats', async (req, res) => {
     const Review = require('../models/Review');
     const User = require('../models/User');
     const Message = require('../models/Message');
+    const Provider = require('../models/Provider');
     const { id } = req.params;
     
-    // For providers, we need to find requests where they are the accepted provider
-    const requests = await ServiceRequest.find({ acceptedProviderId: id });
-    const reviews = await Review.find({ provider: id });
-    const user = await User.findById(id);
+    // Find provider document
+    const provider = await Provider.findOne({ user: id });
+    if (!provider) {
+      return res.status(404).json({ success: false, error: 'Provider not found' });
+    }
     
-    // Count completed jobs
-    const completedJobs = requests.filter(r => r.status === 'completed').length;
+    // Count completed jobs (ServiceRequest where acceptedProviderId = provider._id AND status = 'completed')
+    const jobsDone = await ServiceRequest.countDocuments({
+      acceptedProviderId: provider._id,
+      status: 'completed'
+    });
     
-    // Count unread messages for this provider
+    // Count active jobs (ServiceRequest where acceptedProviderId = provider._id AND status = 'in_progress')
+    const activeJobs = await ServiceRequest.countDocuments({
+      acceptedProviderId: provider._id,
+      status: 'in_progress'
+    });
+    
+    // Calculate average rating from Review.find({ providerId: provider._id })
+    const reviews = await Review.find({ provider: provider._id });
+    const rating = reviews.length > 0 
+      ? Math.round((reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length) * 10) / 10
+      : 0;
+    
+    // Count unread messages (Message where receiverId = id AND read = false)
     const unreadMessages = await Message.countDocuments({
-      receiver: id,
+      receiverId: id,
       read: false
     });
     
-    // Calculate average rating
-    const avgRating = reviews.length > 0 
-      ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length 
-      : 0;
+    // Get profile views from User.findById(id).profileViews
+    const user = await User.findById(id);
+    const profileViews = user?.profileViews || 0;
     
     res.json({
-      jobsDone: completedJobs,
-      profileViews: user?.profileViews || 0,
-      rating: avgRating,
-      unreadMessages: unreadMessages
+      jobsDone,
+      activeJobs,
+      rating,
+      unreadMessages,
+      profileViews
     });
   } catch (error) {
     console.error('Stats error:', error);
-    res.json({ jobsDone: 0, profileViews: 0, rating: 0, unreadMessages: 0 });
+    res.json({ jobsDone: 0, activeJobs: 0, rating: 0, unreadMessages: 0, profileViews: 0 });
   }
 });
 
@@ -55,7 +72,14 @@ router.get('/:id/activity', async (req, res) => {
   try {
     const ServiceRequest = require('../models/ServiceRequest');
     const Message = require('../models/Message');
+    const Provider = require('../models/Provider');
     const { id } = req.params;
+    
+    // Find provider document
+    const provider = await Provider.findOne({ user: id });
+    if (!provider) {
+      return res.status(404).json({ success: false, error: 'Provider not found' });
+    }
     
     const days = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
     const today = new Date();
@@ -68,22 +92,22 @@ router.get('/:id/activity', async (req, res) => {
       const nextDate = new Date(date);
       nextDate.setDate(nextDate.getDate() + 1);
       
-      // Count service requests where this provider has applied/been accepted
-      const requestsCount = await ServiceRequest.countDocuments({
-        acceptedProviderId: id,
+      // Count views: ServiceRequest where acceptedProviderId = provider._id, created in that day
+      const views = await ServiceRequest.countDocuments({
+        acceptedProviderId: provider._id,
         createdAt: { $gte: date, $lt: nextDate }
       });
       
-      // Count messages involving this provider
-      const messagesCount = await Message.countDocuments({
-        $or: [{ sender: id }, { receiver: id }],
+      // Count messages: Message where receiverId = id, created in that day
+      const messages = await Message.countDocuments({
+        receiverId: id,
         createdAt: { $gte: date, $lt: nextDate }
       });
       
       activity.push({
         day: days[date.getDay() === 0 ? 6 : date.getDay() - 1],
-        views: requestsCount,
-        messages: messagesCount
+        views,
+        messages
       });
     }
     

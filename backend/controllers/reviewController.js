@@ -342,26 +342,45 @@ exports.checkCanReview = async (req, res) => {
     
     const { providerId } = req.params;
     
-    const completedServices = await ServiceRequest.find({
+    // Check if there are any completed service requests with this provider
+    const completedRequest = await ServiceRequest.findOne({
       clientId: user._id,
-      status: 'completed',
-      acceptedProviderId: providerId
+      acceptedProviderId: providerId,
+      status: 'completed'
     });
     
-    const existingReview = await Review.findOne({
-      clientId: user._id,
-      provider: (await Provider.findOne({ user: providerId }))._id
+    if (!completedRequest) {
+      return res.json({
+        success: true,
+        canReview: false,
+        reason: 'You can only rate a provider who completed a job for you.'
+      });
+    }
+    
+    // Check for existing review on this specific service request
+    const provider = await Provider.findOne({ user: providerId });
+    if (!provider) {
+      return res.status(404).json({ success: false, error: 'Provider not found' });
+    }
+    
+    const existingReview = await Review.findOne({ 
+      clientId: user._id, 
+      provider: provider._id,
+      serviceRequestId: completedRequest._id
     });
+    
+    if (existingReview) {
+      return res.json({
+        success: true,
+        canReview: false,
+        reason: 'You have already reviewed this provider for this job.'
+      });
+    }
     
     res.json({
       success: true,
-      canReview: completedServices.length > 0 && !existingReview,
-      completedServices: completedServices.map(s => ({
-        id: s._id.toString(),
-        title: s.title,
-        completedAt: s.completedAt
-      })),
-      alreadyReviewed: !!existingReview
+      canReview: true,
+      serviceRequestId: completedRequest._id
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

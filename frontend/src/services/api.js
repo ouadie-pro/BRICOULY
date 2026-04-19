@@ -166,30 +166,22 @@ export const api = {
   },
 
   // Portfolio
-  getProviderPortfolio: async (providerId) => {
-    return safeFetch(`${API_BASE}/providers/${providerId}/portfolio`);
+  getPortfolio: async (providerId) => {
+    return safeFetch(`${API_BASE}/portfolio/${providerId}`);
   },
 
-  addPortfolio: async (portfolioData) => {
-    return safeFetch(`${API_BASE}/portfolio`, {
-      method: 'POST',
-      body: JSON.stringify(portfolioData),
+  addPortfolioItem: async (formData) => {
+    return safeFetch(`${API_BASE}/portfolio`, { 
+      method: 'POST', 
+      headers: { 'x-user-id': getUserId() }, 
+      body: formData 
     });
   },
 
-  uploadPortfolio: async (file, caption = '') => {
-    const formData = new FormData();
-    formData.append('image', file);
-    if (caption) formData.append('caption', caption);
-    return safeFetch(`${API_BASE}/portfolio/upload`, {
-      method: 'POST',
-      body: formData,
-    });
-  },
-
-  deletePortfolio: async (portfolioId) => {
-    return safeFetch(`${API_BASE}/portfolio/${portfolioId}`, {
-      method: 'DELETE',
+  deletePortfolioItem: async (id) => {
+    return safeFetch(`${API_BASE}/portfolio/${id}`, { 
+      method: 'DELETE', 
+      headers: { 'x-user-id': getUserId() } 
     });
   },
 
@@ -422,6 +414,10 @@ export const api = {
     return safeFetch(`${API_BASE}/reviews/${reviewId}`, {
       method: 'DELETE',
     });
+  },
+
+  checkCanReview: async (providerId) => {
+    return safeFetch(`${API_BASE}/reviews/can-review/${providerId}`);
   },
 
   getCompletedBookings: async () => {

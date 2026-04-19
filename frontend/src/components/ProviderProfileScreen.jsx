@@ -108,8 +108,8 @@ const PortfolioLightbox = ({ items, currentIndex, onClose, onNext, onPrev }) => 
           alt={items[currentIndex]?.caption || items[currentIndex]?.title}
           className="w-full h-full max-h-[85vh] object-contain rounded-lg"
         />
-        {items[currentIndex]?.caption && (
-          <p className="text-white text-center mt-4">{items[currentIndex].caption}</p>
+        {items[currentIndex]?.title && (
+          <p className="text-white text-center mt-4">{items[currentIndex].title}</p>
         )}
         <div className="flex justify-center items-center gap-4 mt-4 text-white">
           <span className="text-sm opacity-70">
@@ -140,6 +140,8 @@ export default function ProviderProfileScreen({ isDesktop }) {
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [userReview, setUserReview] = useState(null);
   const [editingReview, setEditingReview] = useState(false);
+  const [canReview, setCanReview] = useState(false);
+  const [reviewCheckMessage, setReviewCheckMessage] = useState('');
   
   // Service form state
   const [showServiceForm, setShowServiceForm] = useState(false);
@@ -194,13 +196,14 @@ export default function ProviderProfileScreen({ isDesktop }) {
         const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
         console.log('[ProviderProfileScreen] Current user:', currentUser.id);
         
-const [providerData, reviewsData, followStatusData, servicesData, portfolioData, bookingsData] = await Promise.all([
+const [providerData, reviewsData, followStatusData, servicesData, portfolioData, bookingsData, canReviewData] = await Promise.all([
           api.getProvider(id),
           api.getProviderReviews(id),
           api.checkFollowStatus(id),
           api.getProviderServices(id),
-          api.getProviderPortfolio(id),
+          api.getPortfolio(id),
           currentUser.role === 'user' ? api.getCompletedBookings() : Promise.resolve([]),
+          currentUser.role === 'user' ? api.checkCanReview(id) : Promise.resolve({ canReview: false, reason: 'Only clients can leave reviews' }),
         ]);
 
         console.log('[ProviderProfileScreen] Provider data received:', providerData);
@@ -260,6 +263,10 @@ const [providerData, reviewsData, followStatusData, servicesData, portfolioData,
 
         // Set follow status from API
         setFollowing(followStatusData?.following || false);
+        
+        // Set canReview status from API
+        setCanReview(canReviewData?.canReview || false);
+        setReviewCheckMessage(canReviewData?.reason || '');
       } catch (err) {
         console.error('[ProviderProfileScreen] Unexpected error:', err);
         setError('Failed to load provider. Please try again.');
@@ -373,7 +380,7 @@ const [providerData, reviewsData, followStatusData, servicesData, portfolioData,
     setShowRatingModal(true);
   };
 
-  const handleReviewSubmitted = (result) => {
+  const handleReviewSubmitted = (result, serviceRequestId) => {
     // Remove the booking from the list of completed bookings
     if (selectedBooking) {
       setCompletedBookings(prev => prev.filter(b => 
@@ -391,6 +398,14 @@ const [providerData, reviewsData, followStatusData, servicesData, portfolioData,
           r => String(r.clientId) === String(currentUserId)
         );
         setUserReview(existingUserReview || null);
+      }
+      
+      // Update canReview status after submission
+      if (currentUserId && currentUser.role === 'user') {
+        api.checkCanReview(id).then(canReviewData => {
+          setCanReview(canReviewData?.canReview || false);
+          setReviewCheckMessage(canReviewData?.reason || '');
+        });
       }
     });
     // Update provider rating in local state
@@ -629,7 +644,7 @@ const [providerData, reviewsData, followStatusData, servicesData, portfolioData,
                     </span>
                   ))}
                   {services.length === 0 && (
-                    <span className="text-slate-400 text-sm">Aucun service proposé</span>
+                    <span className="text-slate-400 text-sm">No services yet</span>
                   )}
                 </div>
               </div>
@@ -650,16 +665,16 @@ const [providerData, reviewsData, followStatusData, servicesData, portfolioData,
                           alt={item.caption || item.title || 'Portfolio item'} 
                           className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105" 
                         />
-                        {item.caption && (
+                        {item.title && (
                           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <p className="text-white text-xs truncate">{item.caption}</p>
+                            <p className="text-white text-xs truncate">{item.title}</p>
                           </div>
                         )}
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-center text-slate-500 py-8">Aucun élément dans le portfolio pour le moment.</p>
+                  <p className="text-center text-slate-500 py-8">No portfolio items yet.</p>
                 )}
                 <PortfolioLightbox 
                   items={portfolio}
@@ -673,23 +688,29 @@ const [providerData, reviewsData, followStatusData, servicesData, portfolioData,
 
             {activeTab === 'reviews' && (
               <div className="space-y-4">
-                {/* Write a Review button for clients who have completed bookings */}
-                {!isOwnProfile && currentUser.role === 'user' && (completedBookings.length > 0 || userReview) && (
+                {/* Write a Review button for clients only */}
+                {!isOwnProfile && currentUser.role === 'user' && (
                   <div className="bg-gradient-to-r from-primary/10 to-blue-50 dark:from-primary/5 dark:to-blue-900/20 p-4 rounded-xl border border-primary/20">
                     <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
                       {userReview 
-                        ? 'Vous avez déjà noté ce professionnel. Modifiez votre avis !'
-                        : completedBookings.length > 0
-                          ? `Vous avez utilisé les services de ${provider.name} ? Partagez votre expérience !`
-                          : 'Partagez votre expérience avec ce professionnel.'
+                        ? 'You\'ve already reviewed this provider.'
+                        : canReview
+                          ? `Share your experience with ${provider.name}!`
+                          : reviewCheckMessage || 'You cannot review this provider.'
                       }
                     </p>
-                    <button
-                      onClick={handleOpenReviewModal}
-                      className="w-full py-3 bg-primary text-white font-bold rounded-xl hover:bg-blue-600 transition-colors"
-                    >
-                      {userReview ? 'Modifier mon avis' : 'Laisser un avis'}
-                    </button>
+                    {canReview ? (
+                      <button
+                        onClick={handleOpenReviewModal}
+                        className="w-full py-3 bg-primary text-white font-bold rounded-xl hover:bg-blue-600 transition-colors"
+                      >
+                        {userReview ? 'Edit Your Review' : 'Leave a Review'}
+                      </button>
+                    ) : (
+                      <div className="w-full py-3 bg-slate-200 text-slate-500 font-bold rounded-xl text-center">
+                        Cannot Review
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -744,8 +765,8 @@ const [providerData, reviewsData, followStatusData, servicesData, portfolioData,
                 )) : (
                   <div className="text-center py-8">
                     <span className="text-5xl">⭐</span>
-                    <p className="text-slate-500 mt-2">Aucun avis pour le moment</p>
-                    <small className="text-slate-400">Soyez le premier à noter ce professionnel</small>
+                    <p className="text-slate-500 mt-2">No reviews yet</p>
+                    <small className="text-slate-400">Be the first to review this professional</small>
                   </div>
                 )}
               </div>
@@ -1088,8 +1109,8 @@ const [providerData, reviewsData, followStatusData, servicesData, portfolioData,
                 )) : (
                   <div className="text-center py-8">
                     <span className="text-5xl">⭐</span>
-                    <p className="text-slate-500 mt-2">Aucun avis pour le moment</p>
-                    <small className="text-slate-400">Soyez le premier à noter ce professionnel</small>
+                    <p className="text-slate-500 mt-2">No reviews yet</p>
+                    <small className="text-slate-400">Be the first to review this professional</small>
                   </div>
                 )}
               </div>

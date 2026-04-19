@@ -10,9 +10,15 @@ const portfolioSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Image URL is required'],
   },
-  caption: {
+  title: {
     type: String,
-    default: '',
+    required: [true, 'Title is required'],
+    trim: true,
+  },
+  description: {
+    type: String,
+    required: [true, 'Description is required'],
+    trim: true,
   },
   createdAt: {
     type: Date,

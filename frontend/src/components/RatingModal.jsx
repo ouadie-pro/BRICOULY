@@ -89,7 +89,7 @@ export default function RatingModal({
       };
       
       if (booking) {
-        reviewData.bookingId = booking.id || booking._id;
+        reviewData.serviceRequestId = booking.id || booking._id;
       }
       
       if (existingReview) {

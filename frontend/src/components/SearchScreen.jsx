@@ -37,7 +37,7 @@ const formatPhone = (phone) => {
 };
 
 const getResponseTimeDisplay = (responseTime) => {
-  if (responseTime) return responseTime;
+  if (responseTime && responseTime !== '< 1h') return responseTime;
   return '< 1h';
 };
 

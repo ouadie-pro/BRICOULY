@@ -82,6 +82,7 @@ exports.getProviders = async (req, res) => {
         profession: p.profession,
         bio: p.bio,
         hourlyRate: p.hourlyRate,
+        responseTime: p.responseTime,
         distance: p.distance || 1.0,
         experience: p.experience,
         verified: p.verified,

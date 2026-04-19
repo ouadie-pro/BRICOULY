@@ -8,7 +8,7 @@ const {
   uploadPortfolio 
 } = require('../controllers/portfolioController');
 
-router.get('/providers/:id/portfolio', getProviderPortfolio);
+router.get('/:providerId', getProviderPortfolio);
 router.post('/', createPortfolio);
 router.delete('/:id', deletePortfolio);
 router.post('/upload', upload.single('image'), uploadPortfolio);

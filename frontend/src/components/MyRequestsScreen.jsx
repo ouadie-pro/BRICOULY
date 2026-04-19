@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { FiInbox, FiPlus, FiClock, FiCheckCircle, FiXCircle, FiTool, FiFileText, FiX, FiMapPin, FiCalendar, FiDollarSign, FiAlertCircle } from 'react-icons/fi';
+import RatingModal from './RatingModal';
 
 const SERVICE_TYPES = [
   { value: 'plumber', label: 'Plumber' },
@@ -258,12 +259,40 @@ export default function MyRequestsScreen({ isDesktop }) {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showNewRequestModal, setShowNewRequestModal] = useState(false);
+  const [canReviewMap, setCanReviewMap] = useState({});
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState(null);
+  const [selectedRequest, setSelectedRequest] = useState(null);
   const navigate = useNavigate();
+
+  const checkCanReviewForProvider = async (providerId, requestId) => {
+    try {
+      const result = await api.checkCanReview(providerId);
+      setCanReviewMap(prev => ({
+        ...prev,
+        [requestId]: result
+      }));
+    } catch (error) {
+      console.error('Error checking can review:', error);
+    }
+  };
 
   const fetchRequests = async () => {
     setLoading(true);
     const result = await api.getClientServiceRequests();
-    setRequests(result?.requests || result || []);
+    const requestsData = result?.requests || result || [];
+    setRequests(requestsData);
+    
+    // Check can review for completed requests
+    requestsData.forEach(request => {
+      if (request.status === 'completed' && request.acceptedProviderId) {
+        checkCanReviewForProvider(
+          request.acceptedProviderId._id || request.acceptedProviderId, 
+          request._id || request.id
+        );
+      }
+    });
+    
     setLoading(false);
   };
 
@@ -273,6 +302,19 @@ export default function MyRequestsScreen({ isDesktop }) {
 
   const handleRequestSuccess = () => {
     fetchRequests();
+  };
+
+  const handleReviewClick = async (request) => {
+    const requestId = request._id || request.id;
+    const canReviewData = canReviewMap[requestId];
+    
+    if (canReviewData?.canReview) {
+      setSelectedProvider(request.acceptedProviderId);
+      setSelectedRequest(request);
+      setShowRatingModal(true);
+    } else {
+      alert(canReviewData?.reason || 'You cannot review this provider.');
+    }
   };
 
   const getStatusColor = (status) => {
@@ -402,8 +444,13 @@ export default function MyRequestsScreen({ isDesktop }) {
                     <p className="text-xs text-slate-400">
                       {new Date(request.createdAt).toLocaleDateString()}
                     </p>
-                    {request.status === 'completed' && (
-                      <span className="text-xs text-primary font-medium">Leave a review</span>
+                    {request.status === 'completed' && request.acceptedProviderId && (
+                      <button 
+                        onClick={() => handleReviewClick(request)}
+                        className="text-xs text-primary font-medium hover:underline"
+                      >
+                        Rate Provider
+                      </button>
                     )}
                   </div>
                 </div>
@@ -417,6 +464,25 @@ export default function MyRequestsScreen({ isDesktop }) {
           onClose={() => setShowNewRequestModal(false)}
           onSuccess={handleRequestSuccess}
         />
+
+        {showRatingModal && selectedProvider && (
+          <RatingModal
+            isOpen={showRatingModal}
+            onClose={() => {
+              setShowRatingModal(false);
+              setSelectedProvider(null);
+              setSelectedRequest(null);
+            }}
+            provider={selectedProvider}
+            booking={selectedRequest}
+            onReviewSubmitted={() => {
+              fetchRequests();
+              setShowRatingModal(false);
+              setSelectedProvider(null);
+              setSelectedRequest(null);
+            }}
+          />
+        )}
       </div>
     );
   }
@@ -517,9 +583,12 @@ export default function MyRequestsScreen({ isDesktop }) {
                     </button>
                   )}
                 </div>
-                {request.status === 'completed' && (
-                  <button className="w-full mt-3 py-2 text-sm text-primary font-medium hover:bg-blue-50 rounded-lg transition-colors">
-                    Leave a Review
+                {request.status === 'completed' && request.acceptedProviderId && (
+                  <button 
+                    onClick={() => handleReviewClick(request)}
+                    className="w-full mt-3 py-2 text-sm text-primary font-medium hover:bg-blue-50 rounded-lg transition-colors"
+                  >
+                    Rate Provider
                   </button>
                 )}
               </div>
@@ -533,6 +602,25 @@ export default function MyRequestsScreen({ isDesktop }) {
         onClose={() => setShowNewRequestModal(false)}
         onSuccess={handleRequestSuccess}
       />
+
+      {showRatingModal && selectedProvider && (
+        <RatingModal
+          isOpen={showRatingModal}
+          onClose={() => {
+            setShowRatingModal(false);
+            setSelectedProvider(null);
+            setSelectedRequest(null);
+          }}
+          provider={selectedProvider}
+          booking={selectedRequest}
+          onReviewSubmitted={() => {
+            fetchRequests();
+            setShowRatingModal(false);
+            setSelectedProvider(null);
+            setSelectedRequest(null);
+          }}
+        />
+      )}
     </div>
   );
 }

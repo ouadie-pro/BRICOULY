@@ -8,11 +8,14 @@ export default function ProviderDashboard({ isDesktop }) {
   const [user, setUser] = useState(null);
   const [services, setServices] = useState([]);
   const [requests, setRequests] = useState([]);
-  const [stats, setStats] = useState({ jobsDone: 0, profileViews: 0, rating: 0, unreadMessages: 0 });
+  const [stats, setStats] = useState({ jobsDone: 0, profileViews: 0, rating: 0, unreadMessages: 0, activeJobs: 0 });
   const [weeklyActivity, setWeeklyActivity] = useState([]);
+  const [portfolio, setPortfolio] = useState([]);
   const [showAddService, setShowAddService] = useState(false);
+  const [showAddPortfolio, setShowAddPortfolio] = useState(false);
   const [editingService, setEditingService] = useState(null);
   const [newService, setNewService] = useState({ name: '', description: '', price: '', category: 'other' });
+  const [newPortfolioItem, setNewPortfolioItem] = useState({ title: '', description: '', image: null });
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -34,12 +37,13 @@ export default function ProviderDashboard({ isDesktop }) {
     if (!userId) return;
     setLoading(true);
     try {
-      const [servicesData, requestsResult, statsData, activityData, userData] = await Promise.all([
+      const [servicesData, requestsResult, statsData, activityData, userData, portfolioData] = await Promise.all([
         api.getProviderServices(userId),
         api.getProviderServiceRequests(),
         api.getProviderStats(userId),
         api.getWeeklyActivity(userId),
         api.getUser(userId),
+        api.getPortfolio(userId),
       ]);
       
       // Normalize services to use _id
@@ -57,10 +61,13 @@ export default function ProviderDashboard({ isDesktop }) {
       setRequests(normalizedRequests);
       
       // Set stats (default to 0 if missing)
-      setStats(statsData || { jobsDone: 0, profileViews: 0, rating: 0, unreadMessages: 0 });
+      setStats(statsData || { jobsDone: 0, profileViews: 0, rating: 0, unreadMessages: 0, activeJobs: 0 });
       
       // Set weekly activity
       setWeeklyActivity(activityData || generateEmptyWeek());
+      
+      // Set portfolio
+      setPortfolio(portfolioData || []);
       
       // Update user data if received
       if (userData) {
@@ -70,7 +77,8 @@ export default function ProviderDashboard({ isDesktop }) {
       console.error('Error loading data:', error);
       setServices([]);
       setRequests([]);
-      setStats({ jobsDone: 0, profileViews: 0, rating: 0, unreadMessages: 0 });
+      setPortfolio([]);
+      setStats({ jobsDone: 0, profileViews: 0, rating: 0, unreadMessages: 0, activeJobs: 0 });
       setWeeklyActivity(generateEmptyWeek());
     } finally {
       setLoading(false);
@@ -92,6 +100,23 @@ export default function ProviderDashboard({ isDesktop }) {
       setLoading(false);
     }
   }, []);
+
+  // Auto-refresh every 60 seconds
+  useEffect(() => {
+    if (!user || user.role !== 'provider') return;
+    
+    const interval = setInterval(() => {
+      loadData(user.id);
+    }, 60000); // 60 seconds
+
+    return () => clearInterval(interval);
+  }, [user]);
+
+  const handleRefresh = () => {
+    if (user && user.id) {
+      loadData(user.id);
+    }
+  };
 
   const handleAddService = async (e) => {
     e.preventDefault();
@@ -142,6 +167,32 @@ export default function ProviderDashboard({ isDesktop }) {
     }
   };
 
+  const handleAddPortfolioItem = async (e) => {
+    e.preventDefault();
+    if (!newPortfolioItem.title || !newPortfolioItem.description || !newPortfolioItem.image) {
+      return;
+    }
+    
+    const formData = new FormData();
+    formData.append('image', newPortfolioItem.image);
+    formData.append('title', newPortfolioItem.title);
+    formData.append('description', newPortfolioItem.description);
+    
+    const res = await api.addPortfolioItem(formData);
+    if (res.success) {
+      setPortfolio([...portfolio, res.portfolio]);
+      setShowAddPortfolio(false);
+      setNewPortfolioItem({ title: '', description: '', image: null });
+    }
+  };
+
+  const handleDeletePortfolioItem = async (itemId) => {
+    const res = await api.deletePortfolioItem(itemId);
+    if (res.success) {
+      setPortfolio(portfolio.filter(item => (item._id !== itemId && item.id !== itemId)));
+    }
+  };
+
   const formatPrice = (price) => {
     const numPrice = parseFloat(price);
     return isNaN(numPrice) ? '0' : numPrice.toFixed(0);
@@ -160,6 +211,7 @@ export default function ProviderDashboard({ isDesktop }) {
 
   const statCards = [
     { icon: FiBriefcase, label: 'Travaux effectués', value: stats.jobsDone || 0, color: '#3b82f6', bgColor: '#eff6ff' },
+    { icon: FiTool, label: 'Travaux actifs', value: stats.activeJobs || 0, color: '#22c55e', bgColor: '#f0fdf4' },
     { icon: FiEye, label: 'Vues du profil', value: stats.profileViews || 0, color: '#8b5cf6', bgColor: '#f5f3ff' },
     { icon: FiStar, label: 'Note moyenne', value: stats.rating ? stats.rating.toFixed(1) : '—', color: '#f59e0b', bgColor: '#fffbeb' },
     { icon: FiMessageCircle, label: 'Messages', value: stats.unreadMessages || 0, color: '#10b981', bgColor: '#ecfdf5' },
@@ -273,6 +325,59 @@ export default function ProviderDashboard({ isDesktop }) {
           )}
         </div>
 
+        <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+              <FiFileText /> Portfolio / Livre
+            </h3>
+            <button 
+              onClick={() => setShowAddPortfolio(!showAddPortfolio)}
+              className="add-btn"
+            >
+              + Ajouter
+            </button>
+          </div>
+          
+          {portfolio.length === 0 ? (
+            <div className="empty-state">
+              <span style={{fontSize: '40px'}}>📸</span>
+              <p>Aucun élément dans le portfolio</p>
+              <small>Ajoutez des photos de vos réalisations</small>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {portfolio.map((item, index) => (
+                <div key={item._id || item.id || `portfolio-${index}`} className="p-3 bg-slate-50 rounded-lg">
+                  <div className="flex gap-3">
+                    {item.imageUrl && (
+                      <img src={item.imageUrl} alt={item.title} className="w-16 h-16 object-cover rounded-lg" />
+                    )}
+                    <div className="flex-1">
+                      <p className="font-medium text-slate-900">{item.title}</p>
+                      <p className="text-xs text-slate-500">{item.description?.substring(0, 60)}{item.description?.length > 60 ? '...' : ''}</p>
+                    </div>
+                    <button onClick={() => handleDeletePortfolioItem(item._id || item.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg self-start">
+                      <FiTrash2 />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {showAddPortfolio && (
+            <form onSubmit={handleAddPortfolioItem} className="mt-4 p-3 bg-slate-50 rounded-lg space-y-2">
+              <input type="text" placeholder="Titre" value={newPortfolioItem.title} onChange={(e) => setNewPortfolioItem({...newPortfolioItem, title: e.target.value})} className="w-full p-2 border rounded-lg text-sm" required />
+              <textarea placeholder="Description" value={newPortfolioItem.description} onChange={(e) => setNewPortfolioItem({...newPortfolioItem, description: e.target.value})} className="w-full p-2 border rounded-lg text-sm resize-none" rows={2} required />
+              <input type="file" accept="image/*" onChange={(e) => setNewPortfolioItem({...newPortfolioItem, image: e.target.files[0]})} className="w-full p-2 border rounded-lg text-sm" required />
+              <div className="flex gap-2">
+                <button type="button" onClick={() => { setShowAddPortfolio(false); setNewPortfolioItem({ title: '', description: '', image: null }); }} className="flex-1 py-2 text-slate-600 bg-white border rounded-lg text-sm">Annuler</button>
+                <button type="submit" className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm">Ajouter</button>
+              </div>
+            </form>
+          )}
+        </div>
+
         <div className="bg-white rounded-xl border border-slate-200 p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold text-slate-900 flex items-center gap-2">
@@ -312,9 +417,14 @@ export default function ProviderDashboard({ isDesktop }) {
     <div className="dashboard-container">
       <div className="dashboard-header">
         <h1 className="dashboard-title">Tableau de bord</h1>
-        <button onClick={() => navigate('/provider/edit')} className="edit-profile-btn">
-          ✏ Modifier le profil
-        </button>
+        <div className="header-buttons">
+          <button onClick={handleRefresh} className="refresh-btn">
+            🔄 Actualiser
+          </button>
+          <button onClick={() => navigate('/provider/edit')} className="edit-profile-btn">
+            ✏ Modifier le profil
+          </button>
+        </div>
       </div>
 
       <div className="profile-banner">
@@ -432,7 +542,59 @@ export default function ProviderDashboard({ isDesktop }) {
             </form>
           )}
         </div>
+      </div>
 
+      <div className="portfolio-section">
+        <div className="portfolio-card">
+          <div className="card-header">
+            <h3>📸 Portfolio / Livre</h3>
+            <button onClick={() => setShowAddPortfolio(true)} className="add-btn">
+              + Ajouter
+            </button>
+          </div>
+          
+          {portfolio.length === 0 ? (
+            <div className="empty-state">
+              <span style={{fontSize: '48px'}}>📸</span>
+              <p>Aucun élément dans le portfolio</p>
+              <small>Ajoutez des photos de vos réalisations pour attirer des clients</small>
+              <button onClick={() => setShowAddPortfolio(true)}>+ Ajouter un élément</button>
+            </div>
+          ) : (
+            <div className="portfolio-grid">
+              {portfolio.map((item, index) => (
+                <div key={item._id || item.id || `portfolio-${index}`} className="portfolio-item">
+                  {item.imageUrl && (
+                    <img src={item.imageUrl} alt={item.title} className="portfolio-image" />
+                  )}
+                  <div className="portfolio-content">
+                    <h4 className="portfolio-title">{item.title}</h4>
+                    <p className="portfolio-description">{item.description?.substring(0, 80)}{item.description?.length > 80 ? '...' : ''}</p>
+                    <button onClick={() => handleDeletePortfolioItem(item._id || item.id)} className="portfolio-delete-btn">
+                      <FiTrash2 />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {showAddPortfolio && (
+            <form onSubmit={handleAddPortfolioItem} className="add-portfolio-form">
+              <h4>Ajouter un élément au portfolio</h4>
+              <input type="text" placeholder="Titre" value={newPortfolioItem.title} onChange={(e) => setNewPortfolioItem({...newPortfolioItem, title: e.target.value})} className="form-input" required />
+              <textarea placeholder="Description" value={newPortfolioItem.description} onChange={(e) => setNewPortfolioItem({...newPortfolioItem, description: e.target.value})} className="form-input" rows={3} required />
+              <input type="file" accept="image/*" onChange={(e) => setNewPortfolioItem({...newPortfolioItem, image: e.target.files[0]})} className="form-input" required />
+              <div className="form-actions">
+                <button type="button" onClick={() => { setShowAddPortfolio(false); setNewPortfolioItem({ title: '', description: '', image: null }); }} className="cancel-btn">Annuler</button>
+                <button type="submit" className="save-btn">Ajouter</button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+
+      <div className="main-grid">
         <div className="requests-card">
           <div className="card-header">
             <h3>📋 Demandes de Service</h3>
@@ -516,6 +678,31 @@ export default function ProviderDashboard({ isDesktop }) {
           display: flex;
           justify-content: space-between;
           align-items: center;
+        }
+
+        .header-buttons {
+          display: flex;
+          gap: 12px;
+          align-items: center;
+        }
+
+        .refresh-btn {
+          background: #10b981;
+          color: white;
+          border: none;
+          border-radius: 10px;
+          padding: 10px 18px;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .refresh-btn:hover {
+          background: #059669;
         }
 
         .dashboard-title {
@@ -687,7 +874,7 @@ export default function ProviderDashboard({ isDesktop }) {
 
         .stats-row {
           display: grid;
-          grid-template-columns: repeat(5, 1fr);
+          grid-template-columns: repeat(6, 1fr);
           gap: 16px;
         }
 
@@ -757,9 +944,14 @@ export default function ProviderDashboard({ isDesktop }) {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 20px;
+          margin-bottom: 20px;
         }
 
-        .services-card, .requests-card {
+        .portfolio-section {
+          grid-column: 1 / -1;
+        }
+
+        .services-card, .requests-card, .portfolio-card {
           background: white;
           border-radius: 12px;
           padding: 20px;
@@ -1162,6 +1354,90 @@ export default function ProviderDashboard({ isDesktop }) {
           background: #059669;
         }
 
+        .portfolio-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+          gap: 16px;
+          margin-top: 16px;
+        }
+
+        .portfolio-item {
+          background: #f9fafb;
+          border-radius: 10px;
+          overflow: hidden;
+          transition: transform 0.2s, box-shadow 0.2s;
+          position: relative;
+        }
+
+        .portfolio-item:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .portfolio-image {
+          width: 100%;
+          height: 150px;
+          object-fit: cover;
+        }
+
+        .portfolio-content {
+          padding: 12px;
+        }
+
+        .portfolio-title {
+          font-size: 14px;
+          font-weight: 600;
+          color: #1f2937;
+          margin: 0 0 6px 0;
+        }
+
+        .portfolio-description {
+          font-size: 12px;
+          color: #6b7280;
+          margin: 0;
+          line-height: 1.4;
+        }
+
+        .portfolio-delete-btn {
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          background: rgba(239, 68, 68, 0.9);
+          color: white;
+          border: none;
+          border-radius: 6px;
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          opacity: 0;
+          transition: opacity 0.2s;
+        }
+
+        .portfolio-item:hover .portfolio-delete-btn {
+          opacity: 1;
+        }
+
+        .portfolio-delete-btn:hover {
+          background: #dc2626;
+        }
+
+        .add-portfolio-form {
+          margin-top: 16px;
+          padding: 16px;
+          background: #f9fafb;
+          border-radius: 10px;
+        }
+
+        .add-portfolio-form h4 {
+          margin: 0 0 12px 0;
+          font-size: 14px;
+          font-weight: 600;
+          color: #1f2937;
+        }
+
         @media (max-width: 1024px) {
           .stats-row {
             grid-template-columns: repeat(3, 1fr);
@@ -1178,7 +1454,7 @@ export default function ProviderDashboard({ isDesktop }) {
           }
           
           .stats-row {
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(3, 1fr);
           }
           
           .profile-left {

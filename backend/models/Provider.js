@@ -20,6 +20,10 @@ const providerSchema = new mongoose.Schema({
     required: [true, 'Hourly rate is required'],
     min: 0,
   },
+  responseTime: {
+    type: String,
+    default: '< 1h',
+  },
   rating: {
     type: Number,
     default: 0,
