@@ -91,15 +91,16 @@ export default function AuthScreen({ onAuth }) {
       if (mode === 'login') {
         const res = await api.login(email, password);
         if (res.success) {
-          console.log('[Auth] Login successful, user:', res.user);
-          localStorage.setItem('user', JSON.stringify(res.user));
-          if (res.token) {
-            console.log('[Auth] Token stored:', res.token);
-            localStorage.setItem('token', res.token);
+          const { user, accessToken } = res.data;
+          console.log('[Auth] Login successful, user:', user);
+          localStorage.setItem('user', JSON.stringify(user));
+          if (accessToken) {
+            console.log('[Auth] Token stored:', accessToken);
+            localStorage.setItem('token', accessToken);
           }
           if (onAuth) {
-            console.log('[Auth] Calling onAuth with user:', res.user);
-            onAuth(res.user);
+            console.log('[Auth] Calling onAuth with user:', user);
+            onAuth(user);
           }
           console.log('[Auth] Navigating to /home');
           navigate('/home');
@@ -126,11 +127,12 @@ export default function AuthScreen({ onAuth }) {
         console.log('[Auth] Signup response:', res);
         
         if (res.success) {
-          localStorage.setItem('user', JSON.stringify(res.user));
-          if (res.accessToken) {
-            localStorage.setItem('token', res.accessToken);
+          const { user, accessToken } = res.data;
+          localStorage.setItem('user', JSON.stringify(user));
+          if (accessToken) {
+            localStorage.setItem('token', accessToken);
           }
-          if (onAuth) onAuth(res.user);
+          if (onAuth) onAuth(user);
           navigate('/home');
         } else {
           setError(res.error || 'Signup failed. Please try again.');
