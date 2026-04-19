@@ -13,6 +13,7 @@ import ProviderDashboard from './components/ProviderDashboard';
 import MyRequestsScreen from './components/MyRequestsScreen';
 import ProfileScreen from './components/ProfileScreen';
 import VideosScreen from './components/VideosScreen';
+import BookingScreen from './components/BookingScreen';
 
 function ProtectedRoute({ user, loading, children }) {
   const logout = () => {
@@ -79,6 +80,7 @@ function App() {
       <Route path="/messages" element={<ProtectedRoute user={user} loading={loading}><MessagesScreen isDesktop /></ProtectedRoute>} />
       <Route path="/messages/:providerId" element={<ProtectedRoute user={user} loading={loading}><MessagesScreen isDesktop /></ProtectedRoute>} />
       <Route path="/review/:providerId" element={<ProtectedRoute user={user} loading={loading}><ReviewScreen isDesktop /></ProtectedRoute>} />
+      <Route path="/book/:providerId" element={<ProtectedRoute user={user} loading={loading}><BookingScreen isDesktop /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { FiSearch, FiShield, FiDollarSign, FiHeadphones, FiStar, FiTool, FiMapPin, FiCheckCircle } from 'react-icons/fi';
 
 const features = [
@@ -43,6 +44,18 @@ const howItWorks = [
 ];
 
 export default function WelcomeScreen() {
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const user = localStorage.getItem('user');
+    if (token && user) {
+      navigate('/home', { replace: true });
+    } else {
+      navigate('/auth', { replace: true });
+    }
+  }, [navigate]);
+  
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">

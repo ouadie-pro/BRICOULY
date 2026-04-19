@@ -1,4 +1,4 @@
-const API_BASE = '/api';
+const API_BASE = (import.meta.env.VITE_API_URL || '') + '/api';
 
 function getStoredUser() {
   try {
@@ -393,7 +393,7 @@ export const api = {
 
   // Reviews
   getProviderReviews: async (providerId) => {
-    return safeFetch(`${API_BASE}/reviews/provider/${providerId}`);
+    return safeFetch(`${API_BASE}/providers/${providerId}/reviews`);
   },
 
   submitReview: async (reviewData) => {
@@ -544,6 +544,34 @@ export const api = {
   incrementProfileView: async (targetUserId) => {
     return safeFetch(`${API_BASE}/auth/users/${targetUserId}/view`, {
       method: 'PATCH',
+    });
+  },
+
+  // Bookings
+  getBookings: async (params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.status) queryParams.append('status', params.status);
+    if (params.role) queryParams.append('role', params.role);
+    return safeFetch(`${API_BASE}/bookings?${queryParams}`);
+  },
+
+  createBooking: async (bookingData) => {
+    return safeFetch(`${API_BASE}/bookings`, {
+      method: 'POST',
+      body: JSON.stringify(bookingData),
+    });
+  },
+
+  updateBookingStatus: async (bookingId, status) => {
+    return safeFetch(`${API_BASE}/bookings/${bookingId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    });
+  },
+
+  cancelBooking: async (bookingId) => {
+    return safeFetch(`${API_BASE}/bookings/${bookingId}`, {
+      method: 'DELETE',
     });
   },
 };

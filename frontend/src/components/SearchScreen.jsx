@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { 
@@ -43,19 +43,29 @@ const getResponseTimeDisplay = (responseTime) => {
 
 export default function SearchScreen({ isDesktop }) {
   const { q } = useParams();
+  const navigate = useNavigate();
   const [providers, setProviders] = useState([]);
   const [professions, setProfessions] = useState([]);
   const [searchQuery, setSearchQuery] = useState(q || '');
   const [selectedProfession, setSelectedProfession] = useState('');
   const [sortBy, setSortBy] = useState('rating');
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
 
   const filters = [
     { value: 'rating', label: 'Top Rated' },
     { value: 'price_low', label: 'Price: Low to High' },
     { value: 'price_high', label: 'Price: High to Low' },
   ];
+
+  // Debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -71,13 +81,13 @@ export default function SearchScreen({ isDesktop }) {
       try {
         console.log('[SearchScreen] Fetching providers with filters:', {
           profession: selectedProfession,
-          search: searchQuery,
+          search: debouncedSearchQuery,
           sort: sortBy
         });
         
         const data = await api.getProviders({
           profession: selectedProfession,
-          search: searchQuery,
+          search: debouncedSearchQuery,
           sort: sortBy,
         });
         
@@ -91,7 +101,7 @@ export default function SearchScreen({ isDesktop }) {
       setLoading(false);
     };
     fetchProviders();
-  }, [selectedProfession, searchQuery, sortBy]);
+  }, [selectedProfession, debouncedSearchQuery, sortBy]);
 
   const getProviderLocation = (provider) => {
     if (provider.location) {
@@ -192,12 +202,20 @@ export default function SearchScreen({ isDesktop }) {
             <span className="text-xl font-bold text-blue-600">{provider.hourlyRate || 0}</span>
             <span className="text-xs text-slate-500">MAD/hr</span>
           </div>
-          <Link 
-            to={`/provider/${provider.id}`}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors shadow-sm"
-          >
-            View Profile
-          </Link>
+          <div className="flex gap-2">
+            <button
+              onClick={() => navigate(`/messages/${provider.id}`)}
+              className="bg-white border border-blue-600 text-blue-600 hover:bg-blue-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors shadow-sm"
+            >
+              Message
+            </button>
+            <button
+              onClick={() => navigate(`/book/${provider.id}`)}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors shadow-sm"
+            >
+              Book
+            </button>
+          </div>
         </div>
       </div>
     );

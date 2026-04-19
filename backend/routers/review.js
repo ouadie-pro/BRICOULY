@@ -7,15 +7,17 @@ const {
   deleteReview,
   checkCanReview
 } = require('../controllers/reviewController');
+const { auth } = require('../middleware/authMiddleware');
 
 router.get('/provider/:providerId', getReviews);
 
 router.get('/can-review/:providerId', checkCanReview);
 
-router.post('/', createReview);
+// Protected routes - require authentication
+router.post('/', auth, createReview);
 
-router.put('/:reviewId', updateReview);
+router.put('/:reviewId', auth, updateReview);
 
-router.delete('/:reviewId', deleteReview);
+router.delete('/:reviewId', auth, deleteReview);
 
 module.exports = router;

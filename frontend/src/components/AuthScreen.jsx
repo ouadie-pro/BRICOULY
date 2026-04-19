@@ -534,6 +534,7 @@ export default function AuthScreen({ onAuth }) {
             </button>
           </form>
 
+          {/* OAuth temporarily disabled
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-slate-200"></div>
@@ -542,7 +543,9 @@ export default function AuthScreen({ onAuth }) {
               <span className="bg-white px-3 text-slate-400 font-medium">Or continue with</span>
             </div>
           </div>
+          */}
 
+          {/* OAuth buttons disabled - OAuth not configured in backend yet
           <div className="grid grid-cols-2 gap-3">
             <button 
               type="button"
@@ -568,6 +571,7 @@ export default function AuthScreen({ onAuth }) {
               <span className="text-sm font-medium text-slate-700">Facebook</span>
             </button>
           </div>
+          */}
 
           <div className="mt-6 pt-4 border-t border-slate-100">
             <p className="text-xs text-center text-slate-500 leading-relaxed">

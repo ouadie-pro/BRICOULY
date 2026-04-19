@@ -188,38 +188,36 @@ export default function ProviderProfileScreen({ isDesktop }) {
   }, [portfolioLightboxIndex]);
 
   useEffect(() => {
-    console.log('[ProviderProfileScreen] Fetching provider with ID:', id);
+    const abortController = new AbortController();
+    let isMounted = true;
+    
     const fetchData = async () => {
       setLoading(true);
       setError(null);
       try {
-        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-        console.log('[ProviderProfileScreen] Current user:', currentUser.id);
+        const userStr = localStorage.getItem('user');
+        const token = localStorage.getItem('token');
+        const currentUser = userStr ? JSON.parse(userStr) : null;
         
-const [providerData, reviewsData, followStatusData, servicesData, portfolioData, bookingsData, canReviewData] = await Promise.all([
+        const isAuthenticated = !!token && currentUser?.id;
+        const isOwnProfile = isAuthenticated && String(currentUser.id) === String(id);
+
+        const [providerData, reviewsData, followStatusData, servicesData, portfolioData, bookingsData, canReviewData] = await Promise.all([
           api.getProvider(id),
           api.getProviderReviews(id),
-          api.checkFollowStatus(id),
+          isAuthenticated && !isOwnProfile ? api.checkFollowStatus(id) : Promise.resolve({ following: false }),
           api.getProviderServices(id),
           api.getPortfolio(id),
-          currentUser.role === 'user' ? api.getCompletedBookings() : Promise.resolve([]),
-          currentUser.role === 'user' ? api.checkCanReview(id) : Promise.resolve({ canReview: false, reason: 'Only clients can leave reviews' }),
+          isAuthenticated && currentUser.role === 'user' ? api.getCompletedBookings() : Promise.resolve([]),
+          isAuthenticated && currentUser.role === 'user' ? api.checkCanReview(id) : Promise.resolve({ canReview: false, reason: 'Only clients can leave reviews' }),
         ]);
 
-        console.log('[ProviderProfileScreen] Provider data received:', providerData);
-        console.log('[ProviderProfileScreen] Reviews data:', reviewsData?.length);
-        console.log('[ProviderProfileScreen] Follow status:', followStatusData);
+        if (!isMounted) return;
 
-        // Compute isOwnProfile using fetched data
-        const isOwnProfile = String(currentUser.id) === String(providerData?.id);
-
-        // Increment profile view (don't await, fire and forget)
-        // Only call if id looks like a valid MongoDB ObjectId (24 hex chars)
         if (!isOwnProfile && id && /^[a-f0-9]{24}$/i.test(id)) {
           api.incrementProfileView(id).catch(() => {});
         }
 
-        // Filter completed bookings for this provider
         if (bookingsData?.bookings) {
           const providerBookings = bookingsData.bookings.filter(
             b => b.provider?.user?._id === id || b.provider?.user === id
@@ -232,49 +230,53 @@ const [providerData, reviewsData, followStatusData, servicesData, portfolioData,
           setCompletedBookings(providerBookings);
         }
 
-        // Check for provider data validity
         if (providerData && !providerData.error && providerData.name) {
           setProvider(providerData);
           if (providerData.services?.length > 0) {
             setSelectedService(providerData.services[0].name);
           }
         } else if (providerData?.success === false || providerData?.error) {
-          console.error('[ProviderProfileScreen] Provider API error:', providerData.error);
           setError(providerData?.error || 'Failed to load provider');
         } else if (!providerData?.name) {
-          console.error('[ProviderProfileScreen] Provider data missing or invalid:', providerData);
           setError('Provider not found');
         } else {
           setError('Failed to load provider');
         }
 
-        setReviews(reviewsData || []);
+        const reviewsArray = Array.isArray(reviewsData) ? reviewsData : (reviewsData?.reviews || []);
+        setReviews(reviewsArray);
         setServices(servicesData || []);
         setPortfolio(portfolioData || []);
 
-        // Check if current user has already reviewed this provider
-        const currentUserId = currentUser?.id;
-        if (currentUserId && Array.isArray(reviewsData)) {
-          const existingUserReview = reviewsData.find(
-            r => String(r.clientId) === String(currentUserId)
+        if (isAuthenticated && Array.isArray(reviewsArray)) {
+          const existingUserReview = reviewsArray.find(
+            r => String(r.clientId) === String(currentUser.id)
           );
           setUserReview(existingUserReview || null);
         }
 
-        // Set follow status from API
         setFollowing(followStatusData?.following || false);
-        
-        // Set canReview status from API
         setCanReview(canReviewData?.canReview || false);
         setReviewCheckMessage(canReviewData?.reason || '');
       } catch (err) {
-        console.error('[ProviderProfileScreen] Unexpected error:', err);
+        if (!isMounted) return;
+        console.error('[ProviderProfileScreen] Fetch error:', err);
         setError('Failed to load provider. Please try again.');
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
-    fetchData();
+    
+    if (id) {
+      fetchData();
+    }
+    
+    return () => {
+      isMounted = false;
+      abortController.abort();
+    };
   }, [id]);
 
   // Service CRUD handlers
@@ -369,9 +371,24 @@ const [providerData, reviewsData, followStatusData, servicesData, portfolioData,
   };
 
   const handleFollow = async () => {
+    const userStr = localStorage.getItem('user');
+    const currentUser = userStr ? JSON.parse(userStr) : null;
+    
+    if (!currentUser?.id) {
+      alert('Please login to follow this provider');
+      return;
+    }
+    
+    if (currentUser.id === id) {
+      alert('You cannot follow yourself');
+      return;
+    }
+    
     const res = await api.followUser(id);
     if (res.success) {
       setFollowing(res.following);
+    } else if (res.error) {
+      console.error('Follow error:', res.error);
     }
   };
 
@@ -389,19 +406,19 @@ const [providerData, reviewsData, followStatusData, servicesData, portfolioData,
     }
     // Refresh reviews
     api.getProviderReviews(id).then(reviewsData => {
-      const reviews = reviewsData || [];
+      const reviews = Array.isArray(reviewsData) ? reviewsData : (reviewsData?.reviews || []);
       setReviews(reviews);
-      // Update userReview state
-      const currentUserId = currentUser?.id;
-      if (currentUserId) {
+      const userStr = localStorage.getItem('user');
+      const currentUser = userStr ? JSON.parse(userStr) : null;
+      if (currentUser?.id) {
         const existingUserReview = reviews.find(
-          r => String(r.clientId) === String(currentUserId)
+          r => String(r.clientId) === String(currentUser.id)
         );
         setUserReview(existingUserReview || null);
       }
       
       // Update canReview status after submission
-      if (currentUserId && currentUser.role === 'user') {
+      if (currentUser?.id && currentUser.role === 'user') {
         api.checkCanReview(id).then(canReviewData => {
           setCanReview(canReviewData?.canReview || false);
           setReviewCheckMessage(canReviewData?.reason || '');
@@ -462,7 +479,7 @@ const [providerData, reviewsData, followStatusData, servicesData, portfolioData,
     );
   }
 
-  const isOwnProfile = String(currentUser.id) === String(provider.id);
+  const isOwnProfile = currentUser?.id ? String(currentUser.id) === String(provider?.id) : false;
 
   const handleShare = async () => {
     const url = window.location.href;
@@ -1133,13 +1150,22 @@ const [providerData, reviewsData, followStatusData, servicesData, portfolioData,
           {!isOwnProfile && (
             <div className="flex flex-col gap-3">
               {currentUser.role === 'user' && (
-                <button
-                  onClick={() => setShowRequestModal(true)}
-                  className="flex items-center justify-center gap-2 w-full h-12 bg-primary hover:bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/30 transition-all"
-                >
-                  <FiCalendar style={{ fontSize: '18px' }} />
-                  Request Service
-                </button>
+                <>
+                  <Link
+                    to={`/book/${provider.id}`}
+                    className="flex items-center justify-center gap-2 w-full h-12 bg-primary hover:bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/30 transition-all"
+                  >
+                    <FiCalendar style={{ fontSize: '18px' }} />
+                    Réserver maintenant
+                  </Link>
+                  <button
+                    onClick={() => setShowRequestModal(true)}
+                    className="flex items-center justify-center gap-2 w-full h-12 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-colors"
+                  >
+                    <FiCalendar style={{ fontSize: '18px' }} />
+                    Demander un devis
+                  </button>
+                </>
               )}
               <Link
                 to={`/messages/${provider.id}`}

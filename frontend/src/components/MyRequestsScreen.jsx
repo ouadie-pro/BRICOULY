@@ -264,6 +264,9 @@ export default function MyRequestsScreen({ isDesktop }) {
   const [selectedProvider, setSelectedProvider] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const navigate = useNavigate();
+  
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const isProvider = currentUser.role === 'provider';
 
   const checkCanReviewForProvider = async (providerId, requestId) => {
     try {
@@ -279,21 +282,39 @@ export default function MyRequestsScreen({ isDesktop }) {
 
   const fetchRequests = async () => {
     setLoading(true);
-    const result = await api.getClientServiceRequests();
-    const requestsData = result?.requests || result || [];
-    setRequests(requestsData);
-    
-    // Check can review for completed requests
-    requestsData.forEach(request => {
-      if (request.status === 'completed' && request.acceptedProviderId) {
-        checkCanReviewForProvider(
-          request.acceptedProviderId._id || request.acceptedProviderId, 
-          request._id || request.id
-        );
+    try {
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      let result;
+      
+      if (currentUser.role === 'provider') {
+        // For providers: fetch available jobs they can apply to
+        result = await api.getProviderServiceRequests();
+      } else {
+        // For clients: fetch their own service requests
+        result = await api.getClientServiceRequests();
       }
-    });
-    
-    setLoading(false);
+      
+      const requestsData = result?.requests || result || [];
+      setRequests(requestsData);
+      
+      // Check can review for completed requests (only for clients)
+      if (currentUser.role === 'client') {
+        requestsData.forEach(request => {
+          if (request.status === 'completed' && request.acceptedProviderId) {
+            checkCanReviewForProvider(
+              request.acceptedProviderId._id || request.acceptedProviderId, 
+              request._id || request.id
+            );
+          }
+        });
+      }
+      
+    } catch (error) {
+      console.error('Error fetching requests:', error);
+      setRequests([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -302,6 +323,20 @@ export default function MyRequestsScreen({ isDesktop }) {
 
   const handleRequestSuccess = () => {
     fetchRequests();
+  };
+
+  const handleApply = async (requestId) => {
+    try {
+      const result = await api.applyForServiceRequest(requestId);
+      if (result.success) {
+        fetchRequests(); // Refresh the list
+      } else {
+        alert(result.error || 'Failed to apply for this request');
+      }
+    } catch (error) {
+      console.error('Error applying for request:', error);
+      alert('Failed to apply for this request');
+    }
   };
 
   const handleReviewClick = async (request) => {
@@ -361,15 +396,19 @@ export default function MyRequestsScreen({ isDesktop }) {
   if (!isDesktop) {
     return (
       <div className="p-4 pb-24 max-w-md mx-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-slate-900">My Service Requests</h2>
-          <button 
-            onClick={() => setShowNewRequestModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white rounded-lg text-sm font-medium"
-          >
-            <FiPlus style={{ fontSize: '16px' }} />
-            New Request
-          </button>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-slate-900">
+            {isProvider ? 'Available Jobs' : 'My Service Requests'}
+          </h1>
+          {!isProvider && (
+            <button 
+              onClick={() => setShowNewRequestModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white rounded-lg text-sm font-medium"
+            >
+              <FiPlus style={{ fontSize: '16px' }} />
+              New Request
+            </button>
+          )}
         </div>
         
         {loading ? (
@@ -381,14 +420,20 @@ export default function MyRequestsScreen({ isDesktop }) {
             <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto">
               <FiInbox style={{ fontSize: '32px' }} className="text-slate-300" />
             </div>
-            <p className="text-slate-500 mt-3 font-medium">No service requests yet</p>
-            <p className="text-slate-400 text-sm mt-1">Create a new request to find a provider</p>
-            <button 
-              onClick={() => setShowNewRequestModal(true)}
-              className="mt-4 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium"
-            >
-              + New Request
-            </button>
+            <p className="text-slate-500 mt-3 font-medium">
+              {isProvider ? 'No available jobs yet' : 'No service requests yet'}
+            </p>
+            <p className="text-slate-400 text-sm mt-1">
+              {isProvider ? 'Check back later for new job opportunities' : 'Create a new request to find a provider'}
+            </p>
+            {!isProvider && (
+              <button 
+                onClick={() => setShowNewRequestModal(true)}
+                className="mt-4 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium"
+              >
+                + New Request
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
@@ -444,14 +489,24 @@ export default function MyRequestsScreen({ isDesktop }) {
                     <p className="text-xs text-slate-400">
                       {new Date(request.createdAt).toLocaleDateString()}
                     </p>
-                    {request.status === 'completed' && request.acceptedProviderId && (
-                      <button 
-                        onClick={() => handleReviewClick(request)}
-                        className="text-xs text-primary font-medium hover:underline"
-                      >
-                        Rate Provider
-                      </button>
-                    )}
+                    <div className="flex gap-2">
+                      {isProvider && request.status === 'pending' && (
+                        <button 
+                          onClick={() => handleApply(request._id || request.id)}
+                          className="text-xs bg-primary text-white px-3 py-1 rounded-lg font-medium hover:bg-primary/90"
+                        >
+                          Apply
+                        </button>
+                      )}
+                      {!isProvider && request.status === 'completed' && request.acceptedProviderId && (
+                        <button 
+                          onClick={() => handleReviewClick(request)}
+                          className="text-xs text-primary font-medium hover:underline"
+                        >
+                          Rate Provider
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -490,14 +545,18 @@ export default function MyRequestsScreen({ isDesktop }) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-slate-900">My Service Requests</h2>
-        <button 
-          onClick={() => setShowNewRequestModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium"
-        >
-          <FiPlus />
-          New Request
-        </button>
+        <h2 className="text-2xl font-bold text-slate-900">
+          {isProvider ? 'Available Jobs' : 'My Service Requests'}
+        </h2>
+        {!isProvider && (
+          <button 
+            onClick={() => setShowNewRequestModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium"
+          >
+            <FiPlus />
+            New Request
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -509,14 +568,20 @@ export default function MyRequestsScreen({ isDesktop }) {
           <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center mx-auto">
             <FiInbox style={{ fontSize: '40px' }} className="text-slate-300" />
           </div>
-          <p className="text-slate-500 mt-4 text-lg font-medium">No service requests yet</p>
-          <p className="text-slate-400 text-sm mt-2">Create a new request to find a service provider.</p>
-          <button 
-            onClick={() => setShowNewRequestModal(true)}
-            className="mt-6 px-6 py-3 bg-primary text-white rounded-lg text-sm font-medium"
-          >
-            + New Request
-          </button>
+          <p className="text-slate-500 mt-4 text-lg font-medium">
+            {isProvider ? 'No available jobs yet' : 'No service requests yet'}
+          </p>
+          <p className="text-slate-400 text-sm mt-2">
+            {isProvider ? 'Check back later for new job opportunities' : 'Create a new request to find a service provider.'}
+          </p>
+          {!isProvider && (
+            <button 
+              onClick={() => setShowNewRequestModal(true)}
+              className="mt-6 px-6 py-3 bg-primary text-white rounded-lg text-sm font-medium"
+            >
+              + New Request
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -574,16 +639,26 @@ export default function MyRequestsScreen({ isDesktop }) {
                   <span className="text-xs text-slate-400">
                     {new Date(request.createdAt).toLocaleDateString()}
                   </span>
-                  {request.acceptedProviderId && request.status !== 'completed' && (
-                    <button 
-                      onClick={() => navigate(`/messages/${request.acceptedProviderId._id || request.acceptedProviderId}`)}
-                      className="text-primary text-sm font-medium hover:underline"
-                    >
-                      Message
-                    </button>
-                  )}
+                  <div className="flex gap-2">
+                    {isProvider && request.status === 'pending' && (
+                      <button 
+                        onClick={() => handleApply(request._id || request.id)}
+                        className="text-xs bg-primary text-white px-3 py-1 rounded-lg font-medium hover:bg-primary/90"
+                      >
+                        Apply
+                      </button>
+                    )}
+                    {!isProvider && request.acceptedProviderId && request.status !== 'completed' && (
+                      <button 
+                        onClick={() => navigate(`/messages/${request.acceptedProviderId._id || request.acceptedProviderId}`)}
+                        className="text-primary text-sm font-medium hover:underline"
+                      >
+                        Message
+                      </button>
+                    )}
+                  </div>
                 </div>
-                {request.status === 'completed' && request.acceptedProviderId && (
+                {request.status === 'completed' && request.acceptedProviderId && !isProvider && (
                   <button 
                     onClick={() => handleReviewClick(request)}
                     className="w-full mt-3 py-2 text-sm text-primary font-medium hover:bg-blue-50 rounded-lg transition-colors"

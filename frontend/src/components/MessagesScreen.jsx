@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../services/api';
+import { io } from 'socket.io-client';
 import { 
   FiX, FiImage, FiVideo, FiMic, FiSend, FiPhone, FiInfo, FiMessageCircle,
   FiArrowLeft, FiVolume2, FiSearch
@@ -42,6 +43,7 @@ export default function MessagesScreen({ isDesktop }) {
   const [recordingTime, setRecordingTime] = useState(0);
   const [mediaPreview, setMediaPreview] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [socket, setSocket] = useState(null);
   const imageInputRef = useRef(null);
   const videoInputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -49,6 +51,61 @@ export default function MessagesScreen({ isDesktop }) {
   const messagesEndRef = useRef(null);
   const navigate = useNavigate();
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+
+  useEffect(() => {
+    // Initialize Socket.IO connection
+    const token = localStorage.getItem('token');
+    if (token) {
+      const newSocket = io('http://localhost:3001', {
+        auth: { token }
+      });
+      
+      newSocket.on('connect', () => {
+        console.log('Connected to Socket.IO server');
+      });
+      
+      newSocket.on('new_message', (message) => {
+        // Update messages if we're in the right conversation
+        if (providerId && (
+          (message.senderId === providerId && message.receiverId === currentUser.id) ||
+          (message.senderId === currentUser.id && message.receiverId === providerId)
+        )) {
+          setMessages(prev => [...prev, message]);
+        }
+        
+        // Update conversations list
+        setConversations(prev => {
+          const updatedConversations = prev.map(conv => {
+            if (conv.userId === message.senderId || conv.userId === message.receiverId) {
+              return {
+                ...conv,
+                lastMessage: message.content || message.text,
+                lastMessageTime: message.createdAt,
+                unreadCount: message.senderId !== currentUser.id ? (conv.unreadCount || 0) + 1 : conv.unreadCount
+              };
+            }
+            return conv;
+          });
+          
+          // Move the updated conversation to the top
+          const updatedConv = updatedConversations.find(conv => 
+            conv.userId === message.senderId || conv.userId === message.receiverId
+          );
+          if (updatedConv) {
+            return [updatedConv, ...updatedConversations.filter(conv => conv !== updatedConv)];
+          }
+          
+          return updatedConversations;
+        });
+      });
+      
+      setSocket(newSocket);
+      
+      return () => {
+        newSocket.close();
+      };
+    }
+  }, [currentUser.id, providerId]);
 
   useEffect(() => {
     const fetchConversations = async () => {
@@ -121,20 +178,32 @@ export default function MessagesScreen({ isDesktop }) {
 
     if (mediaPreview) {
       try {
-        const uploadResult = await api.uploadMedia(mediaPreview.file);
-        console.log('Upload result:', uploadResult);
+        const uploadResult = await api.uploadMessageMedia(mediaPreview.file);
         if (uploadResult.success) {
-          const type = mediaPreview.type.startsWith('video') ? 'video' : 
-                       mediaPreview.type.startsWith('audio') ? 'voice' : 'image';
-          const sent = await api.sendMediaMessage(
-            providerId, 
-            uploadResult.filePath, 
-            type, 
-            newMessage
-          );
-          console.log('Sent message:', sent);
-          if (sent && !sent.error) {
-            setMessages(prev => [...prev, { ...sent, senderId: currentUser.id, receiverId: providerId, type, mediaUrl: uploadResult.filePath }]);
+          // Send media message via Socket.IO
+          if (socket) {
+            const messageData = {
+              receiverId: providerId,
+              content: '',
+              type: mediaPreview.type.startsWith('image/') ? 'image' : 'video',
+              mediaUrl: uploadResult.filePath
+            };
+            socket.emit('send_message', messageData);
+            
+            // Add message to local state immediately
+            setMessages(prev => [...prev, { 
+              ...messageData, 
+              senderId: currentUser.id, 
+              receiverId: providerId,
+              createdAt: new Date().toISOString(),
+              _id: Date.now().toString()
+            }]);
+          } else {
+            // Fallback to API
+            const sent = await api.sendMessage(providerId, '', 'image', uploadResult.filePath);
+            if (sent && !sent.error) {
+              setMessages(prev => [...prev, { ...sent, senderId: currentUser.id, receiverId: providerId, type, mediaUrl: uploadResult.filePath }]);
+            }
           }
         } else {
           console.error('Upload failed:', uploadResult.error);
@@ -144,9 +213,29 @@ export default function MessagesScreen({ isDesktop }) {
       }
       setMediaPreview(null);
     } else {
-      const sent = await api.sendMessage(providerId, newMessage);
-      if (sent && !sent.error) {
-        setMessages(prev => [...prev, { ...sent, senderId: currentUser.id, receiverId: providerId }]);
+      // Send message via Socket.IO for real-time delivery
+      if (socket) {
+        const messageData = {
+          receiverId: providerId,
+          content: newMessage,
+          type: 'text'
+        };
+        socket.emit('send_message', messageData);
+        
+        // Add message to local state immediately for better UX
+        setMessages(prev => [...prev, { 
+          ...messageData, 
+          senderId: currentUser.id, 
+          receiverId: providerId,
+          createdAt: new Date().toISOString(),
+          _id: Date.now().toString() // temporary ID
+        }]);
+      } else {
+        // Fallback to API if socket is not connected
+        const sent = await api.sendMessage(providerId, newMessage);
+        if (sent && !sent.error) {
+          setMessages(prev => [...prev, { ...sent, senderId: currentUser.id, receiverId: providerId }]);
+        }
       }
     }
     setNewMessage('');
