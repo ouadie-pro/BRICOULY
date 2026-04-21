@@ -43,7 +43,17 @@ const ImageGrid = ({ images, compact = false, title = '', video = null }) => {
 
   if (count === 0 && !video) return null;
 
-  const imgClass = "w-full h-full object-cover transition-all duration-300 hover:brightness-90 cursor-pointer";
+  const imgClass = "w-full h-full object-cover transition-all duration-300 hover:brightness-95 cursor-pointer";
+  const imgStyle = {
+    imageRendering: 'auto',
+    WebkitImageRendering: 'auto',
+    imageOrientation: 'from-image',
+    objectFit: 'cover',
+    width: '100%',
+    height: '100%',
+    maxWidth: '100%',
+    maxHeight: '100%'
+  };
 
   const renderVideo = () => (
     <div className="w-full rounded-xl overflow-hidden border border-gray-100">
@@ -58,28 +68,58 @@ const ImageGrid = ({ images, compact = false, title = '', video = null }) => {
   );
 
   const renderSingle = () => (
-    <img 
-      src={images[0]} 
-      alt={title || 'Post image'}
-      className="w-full max-h-[500px] object-cover rounded-xl"
-      loading="lazy"
-      onClick={() => openLightbox(0)}
-    />
+    <div className="w-full rounded-xl overflow-hidden bg-slate-100">
+      <img 
+        src={images[0]} 
+        alt={title || 'Post image'}
+        className="w-full h-[400px] object-cover"
+        style={imgStyle}
+        loading="lazy"
+        onClick={() => openLightbox(0)}
+        onError={(e) => {
+          e.target.style.display = 'none';
+          e.target.parentElement.innerHTML = `
+            <div class="w-full h-[400px] flex items-center justify-center bg-slate-200 rounded-xl">
+              <div class="text-center">
+                <svg class="w-12 h-12 text-slate-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                <p class="text-slate-500 text-sm">Image not available</p>
+              </div>
+            </div>
+          `;
+        }}
+      />
+    </div>
   );
 
   const renderTwo = () => (
-    <div className="grid grid-cols-2 gap-1 h-[300px]">
+    <div className="grid grid-cols-2 gap-2 h-[300px]">
       {images.map((img, idx) => (
         <div 
           key={idx} 
-          className="relative overflow-hidden rounded-lg"
+          className="relative overflow-hidden rounded-lg bg-slate-100"
         >
           <img 
             src={img} 
             alt={`Image ${idx + 1}`} 
-            className={imgClass}
+            className="w-full h-full object-cover"
+            style={imgStyle}
             loading="lazy"
             onClick={() => openLightbox(idx)}
+            onError={(e) => {
+              e.target.style.display = 'none';
+              e.target.parentElement.innerHTML = `
+                <div class="w-full h-full flex items-center justify-center bg-slate-200 rounded-lg">
+                  <div class="text-center">
+                    <svg class="w-8 h-8 text-slate-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    <p class="text-slate-500 text-xs">Image not available</p>
+                  </div>
+                </div>
+              `;
+            }}
           />
         </div>
       ))}
@@ -87,30 +127,58 @@ const ImageGrid = ({ images, compact = false, title = '', video = null }) => {
   );
 
   const renderThree = () => (
-    <div className="grid grid-cols-3 gap-1 h-[400px]">
+    <div className="grid grid-cols-3 gap-2 h-[350px]">
       <div 
-        className="col-span-2 row-span-2 overflow-hidden rounded-lg"
+        className="col-span-2 row-span-2 overflow-hidden rounded-lg bg-slate-100"
         onClick={() => openLightbox(0)}
       >
         <img 
           src={images[0]} 
           alt="Image 1" 
-          className={imgClass}
+          className="w-full h-full object-cover"
+          style={imgStyle}
           loading="lazy"
+          onError={(e) => {
+            e.target.style.display = 'none';
+            e.target.parentElement.innerHTML = `
+              <div class="w-full h-full flex items-center justify-center bg-slate-200 rounded-lg">
+                <div class="text-center">
+                  <svg class="w-8 h-8 text-slate-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                  </svg>
+                  <p class="text-slate-500 text-xs">Image not available</p>
+                </div>
+              </div>
+            `;
+          }}
         />
       </div>
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-2">
         {[1, 2].map((idx) => (
           <div 
             key={idx} 
-            className="relative overflow-hidden rounded-lg flex-1"
+            className="relative overflow-hidden rounded-lg flex-1 bg-slate-100"
             onClick={() => openLightbox(idx)}
           >
             <img 
               src={images[idx]} 
               alt={`Image ${idx + 1}`} 
-              className={imgClass}
+              className="w-full h-full object-cover"
+              style={imgStyle}
               loading="lazy"
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.parentElement.innerHTML = `
+                  <div class="w-full h-full flex items-center justify-center bg-slate-200 rounded-lg">
+                    <div class="text-center">
+                      <svg class="w-6 h-6 text-slate-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                      </svg>
+                      <p class="text-slate-500 text-xs">Image not available</p>
+                    </div>
+                  </div>
+                `;
+              }}
             />
           </div>
         ))}
@@ -123,25 +191,39 @@ const ImageGrid = ({ images, compact = false, title = '', video = null }) => {
     const remaining = images.length - 4;
     
     return (
-      <div className="grid grid-cols-2 gap-1 h-[400px]">
+      <div className="grid grid-cols-2 gap-2 h-[350px]">
         {visible.map((img, idx) => (
           <div 
             key={idx} 
-            className="relative overflow-hidden rounded-lg"
+            className="relative overflow-hidden rounded-lg bg-slate-100"
           >
             <img 
               src={img} 
               alt={`Image ${idx + 1}`} 
-              className={`${imgClass} ${idx === 3 && remaining > 0 ? 'brightness-50' : ''}`}
+              className={`w-full h-full object-cover ${idx === 3 && remaining > 0 ? 'brightness-50' : ''}`}
+              style={imgStyle}
               loading="lazy"
               onClick={() => openLightbox(idx)}
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.parentElement.innerHTML = `
+                  <div class="w-full h-full flex items-center justify-center bg-slate-200 rounded-lg">
+                    <div class="text-center">
+                      <svg class="w-8 h-8 text-slate-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                      </svg>
+                      <p class="text-slate-500 text-xs">Image not available</p>
+                    </div>
+                  </div>
+                `;
+              }}
             />
             {idx === 3 && remaining > 0 && (
               <div 
-                className="absolute inset-0 flex items-center justify-center cursor-pointer"
+                className="absolute inset-0 flex items-center justify-center cursor-pointer bg-black/40 rounded-lg"
                 onClick={() => openLightbox(idx)}
               >
-                <span className="text-white font-bold text-3xl">+{remaining}</span>
+                <span className="text-white font-bold text-2xl drop-shadow-lg">+{remaining}</span>
               </div>
             )}
           </div>
@@ -1041,7 +1123,7 @@ export default function HomeScreen({ isDesktop }) {
                 <button
                   key={cat._id || cat.id}
                   className="flex flex-col items-center gap-2 group"
-                  onClick={() => navigate(`/search?q=${cat.name}`)}
+onClick={() => navigate(`/search?category=${encodeURIComponent(cat.name)}`)}
                 >
                   <div
                     className={`size-14 rounded-2xl flex items-center justify-center shadow-sm transition-colors ${cat.color} group-hover:bg-primary group-hover:text-white`}
@@ -1345,7 +1427,7 @@ export default function HomeScreen({ isDesktop }) {
             <button
               key={cat._id || cat.id}
               className="flex flex-col items-center gap-3 group p-4 rounded-xl hover:bg-slate-50 transition-colors"
-              onClick={() => navigate(`/search?q=${cat.name}`)}
+              onClick={() => navigate(`/search?category=${encodeURIComponent(cat.name)}`)}
             >
                   <div
                     className={`size-16 rounded-2xl flex items-center justify-center shadow-sm transition-colors ${cat.color} group-hover:bg-primary group-hover:text-white`}

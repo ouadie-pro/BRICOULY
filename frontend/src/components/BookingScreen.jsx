@@ -13,6 +13,10 @@ const timeSlots = [
 export default function BookingScreen({ isDesktop }) {
   const { providerId } = useParams();
   const navigate = useNavigate();
+  
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const isClient = currentUser.role === 'client';
+
   const [provider, setProvider] = useState(null);
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,6 +30,13 @@ export default function BookingScreen({ isDesktop }) {
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  // Redirect non-clients away from booking page
+  useEffect(() => {
+    if (!isClient) {
+      navigate('/home');
+    }
+  }, [isClient, navigate]);
 
   useEffect(() => {
     const fetchProvider = async () => {
@@ -58,6 +69,12 @@ export default function BookingScreen({ isDesktop }) {
 
   const handleSubmit = async () => {
     if (!selectedService || !selectedDate || !selectedTime) {
+      return;
+    }
+    
+    // Double-check user is client (should be already handled by redirect)
+    if (!isClient) {
+      setError('Only clients can make bookings');
       return;
     }
     

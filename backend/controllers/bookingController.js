@@ -13,17 +13,29 @@ const updateProviderJobsDone = async (providerId) => {
 exports.getBookings = async (req, res) => {
   try {
     const userId = req.headers['x-user-id'];
-    const { status, role } = req.query;
+    const { status } = req.query;
+    const userRole = req.user.role; // Get role from authenticated user
     
     let query = {};
     
-    if (role === 'provider') {
+    if (userRole === 'provider') {
+      // Providers can only see bookings assigned to them
       const provider = await Provider.findOne({ user: userId });
-      if (provider) {
-        query.provider = provider._id;
+      if (!provider) {
+        return res.status(404).json({
+          success: false,
+          error: 'Provider profile not found',
+        });
       }
-    } else {
+      query.provider = provider._id;
+    } else if (userRole === 'client') {
+      // Clients can only see their own bookings
       query.user = userId;
+    } else {
+      return res.status(403).json({
+        success: false,
+        error: 'Invalid role for accessing bookings',
+      });
     }
 
     if (status) {
@@ -31,17 +43,20 @@ exports.getBookings = async (req, res) => {
     }
 
     const bookings = await Booking.find(query)
-      .populate('user', 'name avatar email phone')
+      .populate('user', 'name avatar email phone') // Client information - always included for providers
       .populate({
         path: 'provider',
         populate: { path: 'user', select: 'name avatar' },
       })
       .sort({ date: -1 });
 
+    console.log(`[getBookings] ${userRole} ${userId} fetched ${bookings.length} bookings`);
+
     res.json({
       success: true,
       count: bookings.length,
       bookings,
+      role: userRole, // Include role in response for frontend handling
     });
   } catch (error) {
     console.error('[getBookings] Error:', error.message, error.stack);
@@ -54,27 +69,44 @@ exports.getBookings = async (req, res) => {
 
 exports.createBooking = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id']; // FIXED: #1 - Use x-user-id header
+    // Ensure only clients can create bookings (middleware already enforces this)
+    const userId = req.headers['x-user-id'];
+    const userRole = req.user.role; // Get role from authenticated user
+    
+    if (userRole !== 'client') {
+      return res.status(403).json({
+        success: false,
+        error: 'Only clients can create bookings',
+      });
+    }
+
     const bookingData = {
       ...req.body,
       user: userId,
+      status: 'pending', // Always start as pending
     };
+
+    console.log(`[createBooking] Client ${userId} creating booking for provider ${bookingData.provider}`);
 
     const booking = await Booking.create(bookingData);
 
+    // Populate with full client information for provider visibility
     const populatedBooking = await Booking.findById(booking._id)
-      .populate('user', 'name avatar email phone')
+      .populate('user', 'name avatar email phone') // Full client info for provider
       .populate({
         path: 'provider',
         populate: { path: 'user', select: 'name avatar' },
       });
 
+    console.log(`[createBooking] Booking ${booking._id} created successfully with client info`);
+
     res.status(201).json({
       success: true,
       booking: populatedBooking,
+      message: 'Booking created successfully. The provider will be notified.',
     });
   } catch (error) {
-    console.error('[getBookings] Error:', error.message, error.stack);
+    console.error('[createBooking] Error:', error.message, error.stack);
     res.status(500).json({
       success: false,
       error: error.message,

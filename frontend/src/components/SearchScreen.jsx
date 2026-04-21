@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../services/api';
 import { 
   FiArrowLeft, FiSearch, FiX, FiStar, FiMapPin, FiCheck, FiCheckCircle,
@@ -43,11 +43,15 @@ const getResponseTimeDisplay = (responseTime) => {
 
 export default function SearchScreen({ isDesktop }) {
   const { q } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [providers, setProviders] = useState([]);
   const [professions, setProfessions] = useState([]);
   const [searchQuery, setSearchQuery] = useState(q || '');
-  const [selectedProfession, setSelectedProfession] = useState('');
+  const [selectedProfession, setSelectedProfession] = useState(() => {
+    const category = searchParams.get('category');
+    return category || '';
+  });
   const [sortBy, setSortBy] = useState('rating');
   const [loading, setLoading] = useState(true);
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
@@ -68,6 +72,19 @@ export default function SearchScreen({ isDesktop }) {
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    if (selectedProfession) {
+      params.set('category', selectedProfession);
+    } else {
+      params.delete('category');
+    }
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    if (window.location.search !== params.toString()) {
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [selectedProfession, searchParams]);
 
   useEffect(() => {
     const loadData = async () => {

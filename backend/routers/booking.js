@@ -1,11 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const { auth } = require('../middleware/authMiddleware');
+const { auth, requireClient, requireProvider } = require('../middleware/authMiddleware');
 const { getBookings, createBooking, updateBookingStatus, cancelBooking } = require('../controllers/bookingController');
 
+// Both clients and providers can view bookings (with different data based on role)
 router.get('/', auth, getBookings);
-router.post('/', auth, createBooking);
+// Only clients can create bookings
+router.post('/', auth, requireClient, createBooking);
+// Both can update booking status (providers can confirm/complete, clients can cancel)
 router.put('/:id', auth, updateBookingStatus);
-router.delete('/:id', auth, cancelBooking);
+// Only clients can cancel their own bookings
+router.delete('/:id', auth, requireClient, cancelBooking);
 
 module.exports = router;
