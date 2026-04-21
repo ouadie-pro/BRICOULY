@@ -45,6 +45,9 @@ export default function SearchScreen({ isDesktop }) {
   const { q } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const isClient = currentUser.role === 'client';
+  
   const [providers, setProviders] = useState([]);
   const [professions, setProfessions] = useState([]);
   const [searchQuery, setSearchQuery] = useState(q || '');
@@ -235,12 +238,14 @@ export default function SearchScreen({ isDesktop }) {
             >
               Message
             </button>
-            <button
-              onClick={() => navigate(`/book/${provider.id}`)}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors shadow-sm"
-            >
-              Book
-            </button>
+            {isClient && (
+              <button
+                onClick={() => navigate(`/book/${provider.id}`)}
+                className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors shadow-sm"
+              >
+                Book
+              </button>
+            )}
           </div>
         </div>
       </div>

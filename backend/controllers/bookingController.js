@@ -43,12 +43,9 @@ exports.getBookings = async (req, res) => {
     }
 
     const bookings = await Booking.find(query)
-      .populate('user', 'name avatar email phone') // Client information - always included for providers
-      .populate({
-        path: 'provider',
-        populate: { path: 'user', select: 'name avatar' },
-      })
-      .sort({ date: -1 });
+      .populate('provider', 'name avatar profession')
+      .populate('user', 'name avatar email phone location') // Populate full client info for providers
+      .sort({ createdAt: -1 });
 
     console.log(`[getBookings] ${userRole} ${userId} fetched ${bookings.length} bookings`);
 
