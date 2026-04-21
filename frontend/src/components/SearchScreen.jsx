@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { 
@@ -52,6 +52,8 @@ export default function SearchScreen({ isDesktop }) {
   const [loading, setLoading] = useState(true);
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
 
+  const prevFiltersRef = useRef({ profession: '', search: '', sort: 'rating' });
+
   const filters = [
     { value: 'rating', label: 'Top Rated' },
     { value: 'price_low', label: 'Price: Low to High' },
@@ -76,15 +78,22 @@ export default function SearchScreen({ isDesktop }) {
   }, []);
 
   useEffect(() => {
+    const currentFilters = { profession: selectedProfession, search: debouncedSearchQuery, sort: sortBy };
+    const prevFilters = prevFiltersRef.current;
+    
+    if (
+      prevFilters.profession === currentFilters.profession &&
+      prevFilters.search === currentFilters.search &&
+      prevFilters.sort === currentFilters.sort
+    ) {
+      return;
+    }
+    
+    prevFiltersRef.current = currentFilters;
+    
     const fetchProviders = async () => {
       setLoading(true);
       try {
-        console.log('[SearchScreen] Fetching providers with filters:', {
-          profession: selectedProfession,
-          search: debouncedSearchQuery,
-          sort: sortBy
-        });
-        
         const data = await api.getProviders({
           profession: selectedProfession,
           search: debouncedSearchQuery,
@@ -93,13 +102,13 @@ export default function SearchScreen({ isDesktop }) {
         
         const providersList = Array.isArray(data) ? data : (data?.data || []);
         setProviders(providersList);
-        console.log('[SearchScreen] Providers fetched:', providersList.length);
       } catch (error) {
         console.error('Error fetching providers:', error);
         setProviders([]);
       }
       setLoading(false);
     };
+    
     fetchProviders();
   }, [selectedProfession, debouncedSearchQuery, sortBy]);
 

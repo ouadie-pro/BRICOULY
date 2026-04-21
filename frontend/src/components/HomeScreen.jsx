@@ -225,6 +225,7 @@ const banner = {
 };
 
 export default function HomeScreen({ isDesktop }) {
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [categories, setCategories] = useState([]);
   const [providers, setProviders] = useState([]);
@@ -437,7 +438,6 @@ export default function HomeScreen({ isDesktop }) {
         // Backend returns { data: [...], pagination: {...} }
         const providersList = Array.isArray(provs) ? provs : (provs?.data || []);
         setProviders(providersList.slice(0, 6));
-        console.log('[HomeScreen] Providers fetched:', providersList.length);
       } catch (error) {
         console.error('Error fetching home data:', error);
         setCategories(defaultCategories);

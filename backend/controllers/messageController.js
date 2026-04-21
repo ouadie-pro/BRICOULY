@@ -12,20 +12,15 @@ const isValidObjectId = (id) => {
 
 exports.getConversations = async (req, res) => {
   try {
-    console.log('[getConversations] Request received', { headers: req.headers });
     const userId = req.headers['x-user-id'];
-    console.log('[getConversations] userId:', userId);
 
     if (!userId || !isValidObjectId(userId)) {
-      console.log('[getConversations] Invalid userId, returning empty array');
       return res.json([]);
     }
 
-    console.log('[getConversations] Fetching conversations for user:', userId);
     const conversations = await Conversation.find({
       participants: new mongoose.Types.ObjectId(userId)
     }).sort({ lastMessageAt: -1 });
-    console.log('[getConversations] Found conversations:', conversations.length);
 
     const conversationData = await Promise.all(conversations.map(async (conv) => {
       try {
@@ -57,51 +52,41 @@ exports.getConversations = async (req, res) => {
           unread: unreadCount,
         };
       } catch (convError) {
-        console.error('[getConversations] Error processing conversation:', convError.message);
         return null;
       }
     }));
 
     res.json(conversationData.filter(Boolean));
   } catch (error) {
-    console.error('[getConversations] Error:', error.message, error.stack);
     res.status(500).json({ error: error.message });
   }
 };
 
 exports.getMessages = async (req, res) => {
   try {
-    console.log('[getMessages] Request received', { params: req.params, headers: req.headers });
     const currentUserId = req.headers['x-user-id'];
     const otherUserId = req.params.userId;
     const { page = 1, limit = 50 } = req.query;
-    
-    console.log('[getMessages] currentUserId:', currentUserId, 'otherUserId:', otherUserId);
     
     const pageNum = parseInt(page) || 1;
     const limitNum = parseInt(limit) || 50;
     const skip = (pageNum - 1) * limitNum;
 
     if (!currentUserId || !isValidObjectId(currentUserId) || !isValidObjectId(otherUserId)) {
-      console.log('[getMessages] Invalid IDs, returning empty');
       return res.json({ data: [], pagination: { total: 0, page: 1, limit: 50, pages: 0 } });
     }
 
-    console.log('[getMessages] Finding conversation...');
     let conversation = await Conversation.findOne({
       participants: { $all: [new mongoose.Types.ObjectId(currentUserId), new mongoose.Types.ObjectId(otherUserId)] }
     });
 
     if (!conversation) {
-      console.log('[getMessages] No conversation found, creating new one...');
       conversation = await Conversation.create({
         participants: [new mongoose.Types.ObjectId(currentUserId), new mongoose.Types.ObjectId(otherUserId)],
       });
     }
-    console.log('[getMessages] Conversation:', conversation._id);
 
     const total = await Message.countDocuments({ conversationId: conversation._id });
-    console.log('[getMessages] Total messages:', total);
     
     const messages = await Message.find({
       conversationId: conversation._id
@@ -144,7 +129,6 @@ exports.getMessages = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[getMessages] Error:', error.message, error.stack);
     res.status(500).json({ error: error.message });
   }
 };

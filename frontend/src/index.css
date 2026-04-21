@@ -523,18 +523,6 @@ body.dark {
   }
 }
 
-@media (max-width: 768px) {
-  .hide-tablet-up {
-    display: none !important;
-  }
-}
-
-@media (min-width: 769px) {
-  .show-tablet-up-only {
-    display: none !important;
-  }
-}
-
 @media (max-width: 480px) {
   .hide-small-mobile {
     display: none !important;

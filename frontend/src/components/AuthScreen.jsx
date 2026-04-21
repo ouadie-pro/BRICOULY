@@ -2,12 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { 
-  FiTool, FiUser, FiMail, FiLock, FiPhone, FiEye, FiEyeOff, FiAlertCircle, FiPlus, FiAlertTriangle,
-  FiZap, FiDroplet, FiBox, FiTruck, FiWind, FiFeather, FiHome, FiShoppingBag, FiCheckCircle
+  FiTool, FiUser, FiPhone, FiEye, FiEyeOff, FiAlertCircle, FiPlus,
+  FiZap, FiDroplet, FiTruck, FiWind, FiFeather, FiHome, FiCheckCircle,
+  FiBox, FiShoppingBag
 } from 'react-icons/fi';
 import { getCategoryIcon } from '../utils/categoryIcons.jsx';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function AuthScreen({ onAuth }) {
   const [searchParams] = useSearchParams();
@@ -101,7 +100,6 @@ export default function AuthScreen({ onAuth }) {
           setError(res.error || 'Login failed');
         }
       } else {
-        console.log('[Auth] Signing up with:', { name, email, role });
         const res = await api.signup({ 
           name, 
           email, 
@@ -113,7 +111,6 @@ export default function AuthScreen({ onAuth }) {
           bio: role === 'provider' ? bio : '',
           hourlyRate: role === 'provider' ? parseFloat(hourlyRate) || 0 : undefined,
         });
-        console.log('[Auth] Signup response:', res);
         
         if (res.success) {
           localStorage.setItem('user', JSON.stringify(res.user));
@@ -150,14 +147,6 @@ export default function AuthScreen({ onAuth }) {
     } catch (_err) {
       setError('Failed to add specialization');
     }
-  };
-
-  const handleGoogleLogin = () => {
-    window.location.href = `${API_URL}/api/auth/google`;
-  };
-
-  const handleFacebookLogin = () => {
-    window.location.href = `${API_URL}/api/auth/facebook`;
   };
 
   return (

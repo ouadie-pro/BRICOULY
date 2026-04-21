@@ -3,7 +3,6 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import WelcomeScreen from './components/WelcomeScreen';
 import AuthScreen from './components/AuthScreen';
-import AuthCallback from './components/AuthCallback';
 import HomeScreen from './components/HomeScreen';
 import SearchScreen from './components/SearchScreen';
 import ProviderProfileScreen from './components/ProviderProfileScreen';
@@ -67,7 +66,6 @@ function App() {
         setUser(userData);
         localStorage.setItem('user', JSON.stringify(userData));
       }} />} />
-      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/home" element={<ProtectedRoute user={user} loading={loading}><HomeScreen isDesktop /></ProtectedRoute>} />
       <Route path="/search" element={<ProtectedRoute user={user} loading={loading}><SearchScreen isDesktop /></ProtectedRoute>} />
       <Route path="/search/:q" element={<ProtectedRoute user={user} loading={loading}><SearchScreen isDesktop /></ProtectedRoute>} />

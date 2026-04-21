@@ -12,9 +12,7 @@ const updateProviderJobsDone = async (providerId) => {
 
 exports.getBookings = async (req, res) => {
   try {
-    console.log('[getBookings] Request received', { headers: req.headers });
     const userId = req.headers['x-user-id'];
-    console.log('[getBookings] userId:', userId);
     const { status, role } = req.query;
     
     let query = {};
