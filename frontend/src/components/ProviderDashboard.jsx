@@ -254,7 +254,7 @@ export default function ProviderDashboard({ isDesktop }) {
             </div>
           </div>
           <button
-            onClick={() => navigate('/provider/edit')}
+            onClick={() => navigate('/profile')}
             className="edit-profile-btn-mobile"
           >
             ✏ Modifier
@@ -349,9 +349,9 @@ export default function ProviderDashboard({ isDesktop }) {
               {portfolio.map((item, index) => (
                 <div key={item._id || item.id || `portfolio-${index}`} className="p-3 bg-slate-50 rounded-lg">
                   <div className="flex gap-3">
-                    {item.imageUrl && (
-                      <img src={item.imageUrl} alt={item.title} className="w-16 h-16 object-cover rounded-lg" />
-                    )}
+                    {item.images && item.images.length > 0 ? (
+                      <img src={item.images[0]} alt={item.title} className="w-16 h-16 object-cover rounded-lg" />
+                    ) : null}
                     <div className="flex-1">
                       <p className="font-medium text-slate-900">{item.title}</p>
                       <p className="text-xs text-slate-500">{item.description?.substring(0, 60)}{item.description?.length > 60 ? '...' : ''}</p>
@@ -399,7 +399,7 @@ export default function ProviderDashboard({ isDesktop }) {
                   <p className="font-medium text-slate-900">{request.title}</p>
                   <p className="text-sm text-slate-500">{request.description}</p>
                   <div className="flex items-center justify-between mt-2">
-                    <span className="text-xs text-slate-400">De: {request.clientId?.name || 'Client'}</span>
+                    <span className="text-xs text-slate-400">De: {request.clientId?.name || request.clientId || 'Client'}</span>
                     {request.status === 'open' && (
                       <button onClick={() => handleApply(request.id)} className="px-3 py-1 bg-green-600 text-white rounded text-xs">Postuler</button>
                     )}
@@ -421,7 +421,7 @@ export default function ProviderDashboard({ isDesktop }) {
           <button onClick={handleRefresh} className="refresh-btn">
             🔄 Actualiser
           </button>
-          <button onClick={() => navigate('/provider/edit')} className="edit-profile-btn">
+          <button onClick={() => navigate('/profile')} className="edit-profile-btn">
             ✏ Modifier le profil
           </button>
         </div>
@@ -451,7 +451,7 @@ export default function ProviderDashboard({ isDesktop }) {
               <div className="completion-header">
                 <span>Profil complété à <strong>{completionPercent}%</strong></span>
                 {completionPercent < 100 && (
-                  <button onClick={() => navigate('/provider/edit')} className="complete-link">
+                  <button onClick={() => navigate('/profile')} className="complete-link">
                     Compléter mon profil →
                   </button>
                 )}
@@ -564,9 +564,9 @@ export default function ProviderDashboard({ isDesktop }) {
             <div className="portfolio-grid">
               {portfolio.map((item, index) => (
                 <div key={item._id || item.id || `portfolio-${index}`} className="portfolio-item">
-                  {item.imageUrl && (
-                    <img src={item.imageUrl} alt={item.title} className="portfolio-image" />
-                  )}
+                  {item.images && item.images.length > 0 ? (
+                    <img src={item.images[0]} alt={item.title} className="portfolio-image" />
+                  ) : null}
                   <div className="portfolio-content">
                     <h4 className="portfolio-title">{item.title}</h4>
                     <p className="portfolio-description">{item.description?.substring(0, 80)}{item.description?.length > 80 ? '...' : ''}</p>

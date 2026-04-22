@@ -290,11 +290,30 @@ export default function MyRequestsScreen({ isDesktop }) {
         // For providers: fetch available jobs they can apply to
         result = await api.getProviderServiceRequests();
       } else {
-        // For clients: fetch their own service requests
-        result = await api.getClientServiceRequests();
+        // For clients: fetch their bookings
+        result = await api.getBookings();
       }
       
-      const requestsData = result?.requests || result || [];
+      const rawData = result?.bookings || result?.requests || result || [];
+      
+      const normalizeBooking = (booking) => ({
+        id: booking._id || booking.id,
+        title: booking.title || booking.service || 'Service Booking',
+        description: booking.description || booking.notes || '',
+        serviceType: booking.serviceType || booking.service?.toLowerCase().replace(' ', '_') || 'general',
+        status: booking.status,
+        location: booking.location || booking.address || '',
+        budget: booking.budget || booking.price,
+        preferredDate: booking.preferredDate || booking.date,
+        preferredTime: booking.preferredTime || booking.time || 'anytime',
+        createdAt: booking.createdAt,
+        updatedAt: booking.updatedAt,
+        acceptedProviderId: booking.acceptedProviderId || booking.provider,
+        provider: booking.provider,
+        user: booking.user,
+      });
+      
+      const requestsData = rawData.map(normalizeBooking);
       setRequests(requestsData);
       
       // Check can review for completed requests (only for clients)
@@ -355,8 +374,11 @@ export default function MyRequestsScreen({ isDesktop }) {
   const getStatusColor = (status) => {
     switch (status) {
       case 'open': return 'bg-yellow-100 text-yellow-700';
+      case 'pending': return 'bg-yellow-100 text-yellow-700';
+      case 'confirmed': return 'bg-blue-100 text-blue-700';
       case 'in_progress': return 'bg-blue-100 text-blue-700';
       case 'completed': return 'bg-purple-100 text-purple-700';
+      case 'cancelled': return 'bg-red-100 text-red-700';
       default: return 'bg-slate-100 text-slate-700';
     }
   };
@@ -364,6 +386,7 @@ export default function MyRequestsScreen({ isDesktop }) {
   const getStatusIcon = (status) => {
     switch (status) {
       case 'open': return FiClock;
+      case 'pending': return FiClock;
       case 'in_progress': return FiTool;
       case 'completed': return FiCheckCircle;
       default: return FiClock;
@@ -373,8 +396,11 @@ export default function MyRequestsScreen({ isDesktop }) {
   const getStatusLabel = (status) => {
     switch (status) {
       case 'open': return 'Open';
+      case 'pending': return 'Pending';
+      case 'confirmed': return 'Confirmed';
       case 'in_progress': return 'In Progress';
       case 'completed': return 'Completed';
+      case 'cancelled': return 'Cancelled';
       default: return status;
     }
   };

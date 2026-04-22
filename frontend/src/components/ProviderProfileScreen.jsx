@@ -5,7 +5,7 @@ import RatingModal from './RatingModal';
 import { 
   FiArrowLeft, FiShare2, FiCheckCircle, FiStar, FiMessageCircle, FiCalendar, FiCheck, FiX,
   FiMapPin, FiPhone, FiMail, FiUserPlus, FiUserMinus, FiUsers, FiAlertCircle, FiPlay,
-  FiPlus, FiEdit2, FiTrash2, FiLoader, FiChevronLeft, FiChevronRight
+  FiPlus, FiEdit2, FiTrash2, FiLoader, FiChevronLeft, FiChevronRight, FiClock
 } from 'react-icons/fi';
 
 const formatCurrency = (amount) => `${amount} MAD`;
@@ -633,23 +633,34 @@ export default function ProviderProfileScreen({ isDesktop }) {
                 <h3 className="text-text-light dark:text-text-dark text-lg font-bold mb-3">
                   À propos de {provider.name?.split(' ')[0] || 'ce prestataire'}
                 </h3>
-                <p className="text-secondary-text-light dark:text-secondary-text-dark text-sm leading-relaxed">
-                  {provider.bio || 'Aucune description disponible.'}
+                <p className="text-secondary-text-light dark:text-secondary-text-dark leading-relaxed">
+                  {provider.bio || `${provider.experience || 'Expérience non spécifiée'} - ${provider.profession || 'Prestataire de services'}`}
                 </p>
                 <div className="flex flex-wrap gap-4 mt-3">
                   <div className="flex items-center gap-2 text-secondary-text-light dark:text-secondary-text-dark text-sm">
                     <FiMapPin style={{ fontSize: '16px' }} />
-                    {provider.location || 'Localisation non renseignée'}
+                    {provider.location || provider.city ? `${provider.location || provider.city}, Maroc` : 'Localisation non renseignée'}
                   </div>
                   {provider.phone && (
                     <div className="flex items-center gap-2 text-secondary-text-light dark:text-secondary-text-dark text-sm">
                       <FiPhone style={{ fontSize: '16px' }} />
-                      {provider.phone}
+                      <button 
+                        onClick={handleCall}
+                        className="text-primary hover:underline"
+                      >
+                        {formatPhone(provider.phone)}
+                      </button>
+                    </div>
+                  )}
+                  {provider.responseTime && (
+                    <div className="flex items-center gap-2 text-secondary-text-light dark:text-secondary-text-dark text-sm">
+                      <FiClock style={{ fontSize: '16px' }} />
+                      <span>Temps de réponse: {getResponseTimeDisplay(provider.responseTime)}</span>
                     </div>
                   )}
                 </div>
                 <p className="text-secondary-text-light dark:text-secondary-text-dark text-sm mt-2">
-                  {provider.serviceArea || 'Rayon de service non renseigné'}
+                  {provider.serviceArea || `${provider.distance || 1}km radius`}
                 </p>
                 <div className="flex flex-wrap gap-2 mt-4">
                   {services.map((service, idx) => (
@@ -987,17 +998,28 @@ export default function ProviderProfileScreen({ isDesktop }) {
               <>
                 <div className="mb-6">
                   <h3 className="text-lg font-bold text-slate-900 mb-3">À propos de {provider.name?.split(' ')[0] || 'ce prestataire'}</h3>
-                  <p className="text-slate-600 leading-relaxed">{provider.bio || 'Aucune description disponible.'}</p>
+                  <p className="text-slate-600 leading-relaxed">{provider.bio || `${provider.experience || 'Expérience non spécifiée'} - ${provider.profession || 'Prestataire de services'}`}</p>
                   <div className="flex flex-wrap gap-4 mt-3">
-                    <div className="flex items-center gap-2 text-slate-500 text-sm">
-                      <FiMapPin style={{ fontSize: '18px' }} />
-                      {provider.location || provider.city ? `${provider.location || provider.city}, Maroc` : 'Localisation non renseignée'}
-                    </div>
-                    <div className="flex items-center gap-2 text-slate-500 text-sm">
-                      <FiPhone style={{ fontSize: '18px' }} />
-                      {formatPhone(provider.phone)}
-                    </div>
+                  <div className="flex items-center gap-2 text-slate-500 text-sm">
+                    <FiMapPin style={{ fontSize: '18px' }} />
+                    {provider.location || provider.city ? `${provider.location || provider.city}, Maroc` : 'Localisation non renseignée'}
                   </div>
+                  <div className="flex items-center gap-2 text-slate-500 text-sm">
+                    <FiPhone style={{ fontSize: '18px' }} />
+                    <button 
+                      onClick={handleCall}
+                      className="text-primary hover:underline"
+                    >
+                      {formatPhone(provider.phone)}
+                    </button>
+                  </div>
+                  {provider.responseTime && (
+                    <div className="flex items-center gap-2 text-slate-500 text-sm">
+                      <FiClock style={{ fontSize: '18px' }} />
+                      <span>Temps de réponse: {getResponseTimeDisplay(provider.responseTime)}</span>
+                    </div>
+                  )}
+                </div>
                   {provider.serviceArea && (
                     <p className="text-slate-400 text-sm mt-2">
                       {provider.serviceArea.includes('km') ? `Rayon de service: ${provider.serviceArea}` : provider.serviceArea}

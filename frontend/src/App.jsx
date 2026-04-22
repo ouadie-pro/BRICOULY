@@ -73,6 +73,7 @@ function App() {
       <Route path="/videos" element={<ProtectedRoute user={user} loading={loading}><VideosScreen isDesktop /></ProtectedRoute>} />
       <Route path="/user/:id" element={<ProtectedRoute user={user} loading={loading}><ProfileScreen isDesktop isViewingOther /></ProtectedRoute>} />
       <Route path="/provider/:id" element={<ProtectedRoute user={user} loading={loading}><ProviderProfileScreen isDesktop /></ProtectedRoute>} />
+      <Route path="/provider/edit" element={<Navigate to="/profile" replace />} />
       <Route path="/dashboard" element={<ProtectedRoute user={user} loading={loading}><ProviderDashboard isDesktop /></ProtectedRoute>} />
       <Route path="/requests" element={<ProtectedRoute user={user} loading={loading}><MyRequestsScreen isDesktop /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute user={user} loading={loading}><ProfileScreen isDesktop onUserUpdate={handleUserUpdate} /></ProtectedRoute>} />

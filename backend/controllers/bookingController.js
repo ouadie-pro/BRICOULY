@@ -12,7 +12,7 @@ const updateProviderJobsDone = async (providerId) => {
 
 exports.getBookings = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    const userId = req.user.id; // Use authenticated user's ID from token
     const { status } = req.query;
     const userRole = req.user.role; // Get role from authenticated user
     
@@ -67,7 +67,7 @@ exports.getBookings = async (req, res) => {
 exports.createBooking = async (req, res) => {
   try {
     // Ensure only clients can create bookings (middleware already enforces this)
-    const userId = req.headers['x-user-id'];
+    const userId = req.user.id; // Use authenticated user's ID from token
     const userRole = req.user.role; // Get role from authenticated user
     
     if (userRole !== 'client') {
@@ -150,7 +150,7 @@ exports.updateBookingStatus = async (req, res) => {
 
 exports.cancelBooking = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id']; // FIXED: #1 - Use x-user-id header
+    const userId = req.user.id; // Use authenticated user's ID from token
     const booking = await Booking.findById(req.params.id);
 
     if (!booking) {
@@ -160,7 +160,7 @@ exports.cancelBooking = async (req, res) => {
       });
     }
 
-    if (booking.user.toString() !== userId) {
+    if (booking.user.toString() !== userId.toString()) {
       return res.status(403).json({
         success: false,
         error: 'Not authorized to cancel this booking',

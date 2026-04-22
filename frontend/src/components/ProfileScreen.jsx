@@ -91,7 +91,7 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
 
         // Fetch portfolio if user is a provider
         if (userData?.role === 'provider' || currentUser.role === 'provider') {
-          const portfolioData = await api.getProviderPortfolio(targetUserId);
+          const portfolioData = await api.getPortfolio(targetUserId);
           setPortfolio(portfolioData || []);
         }
 
