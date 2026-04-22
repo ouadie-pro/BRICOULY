@@ -43,8 +43,8 @@ exports.getBookings = async (req, res) => {
     }
 
     const bookings = await Booking.find(query)
-      .populate('provider', 'name avatar profession')
-      .populate('user', 'name avatar email phone location') // Populate full client info for providers
+      .populate({ path: 'provider', populate: { path: 'user', select: 'name avatar email phone' } })
+      .populate('user', 'name avatar email phone location')
       .sort({ createdAt: -1 });
 
     console.log(`[getBookings] ${userRole} ${userId} fetched ${bookings.length} bookings`);
@@ -77,13 +77,22 @@ exports.createBooking = async (req, res) => {
       });
     }
 
+    const providerDoc = await Provider.findOne({ user: req.body.provider });
+    if (!providerDoc) return res.status(404).json({ success: false, error: 'Provider not found' });
+
     const bookingData = {
-      ...req.body,
+      service: req.body.service,
+      date: req.body.date,
+      time: req.body.time,
+      address: req.body.address || '',
+      notes: req.body.notes || '',
+      price: req.body.price,
       user: userId,
-      status: 'pending', // Always start as pending
+      provider: providerDoc._id,
+      status: 'pending',
     };
 
-    console.log(`[createBooking] Client ${userId} creating booking for provider ${bookingData.provider}`);
+    console.log(`[createBooking] Client ${userId} creating booking for provider ${providerDoc._id}`);
 
     const booking = await Booking.create(bookingData);
 

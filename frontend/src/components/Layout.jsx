@@ -4,7 +4,7 @@ import { api } from '../services/api';
 import { 
   FiHome, FiSearch, FiPlayCircle, FiMessageCircle, FiUser, 
   FiBell, FiBellOff, FiUserPlus, FiUsers, FiCheckCircle, FiMenu, FiX,
-  FiChevronRight, FiLogOut, FiMapPin, FiChevronDown, FiTool
+  FiChevronRight, FiLogOut, FiMapPin, FiChevronDown, FiTool, FiCalendar
 } from 'react-icons/fi';
 import { GoTasklist } from 'react-icons/go';
 
@@ -161,6 +161,7 @@ export default function Layout({ children, user, onLogout }) {
     { path: '/search', icon: FiSearch, label: 'Find Work' },
     { path: '/videos', icon: FiPlayCircle, label: 'Videos' },
     { path: '/dashboard', icon: GoTasklist, label: 'Dashboard' },
+    { path: '/provider-bookings', icon: FiCalendar, label: 'Bookings' },
     { path: '/messages', icon: FiMessageCircle, label: 'Messages' },
     { path: '/profile', icon: FiUser, label: 'Profile' },
   ];

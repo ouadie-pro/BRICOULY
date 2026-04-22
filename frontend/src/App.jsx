@@ -14,6 +14,7 @@ import ProfileScreen from './components/ProfileScreen';
 import VideosScreen from './components/VideosScreen';
 import BookingScreen from './components/BookingScreen';
 import BookingsScreen from './components/BookingsScreen';
+import ProviderBookingsScreen from './components/ProviderBookingsScreen';
 
 function ProtectedRoute({ user, loading, children }) {
   const logout = () => {
@@ -82,6 +83,7 @@ function App() {
       <Route path="/review/:providerId" element={<ProtectedRoute user={user} loading={loading}><ReviewScreen isDesktop /></ProtectedRoute>} />
       <Route path="/book/:providerId" element={<ProtectedRoute user={user} loading={loading}><BookingScreen isDesktop /></ProtectedRoute>} />
       <Route path="/bookings" element={<ProtectedRoute user={user} loading={loading}><BookingsScreen isDesktop /></ProtectedRoute>} />
+      <Route path="/provider-bookings" element={<ProtectedRoute user={user} loading={loading}><ProviderBookingsScreen isDesktop /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
