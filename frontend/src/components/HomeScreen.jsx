@@ -768,52 +768,28 @@ export default function HomeScreen({ isDesktop }) {
     const comments = itemComments[feedId] || [];
     const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
     const isOwnPost = storedUser?.name === authorName || storedUser?.id === authorId;
+    const hasImage = item.images && item.images.length > 0;
 
     return (
-      <div
-        className={`bg-white rounded-xl border border-slate-200 shadow-soft transition-all hover:shadow-medium flex flex-col h-72 overflow-hidden ${
-          compact ? 'p-4' : 'p-5'
-        }`}
-      >
+      <div className={`bg-white rounded-3xl shadow-md border border-slate-100 p-6 w-full`}>
         {/* Header */}
-        <div className="flex items-center gap-3 mb-3">
+        <div className="flex items-center gap-3">
           <div
-            className={`rounded-xl bg-cover bg-center bg-slate-100 shrink-0 ${
-              compact ? 'w-10 h-10' : 'w-12 h-12'
-            }`}
-            style={{
-              backgroundImage: item.authorAvatar
-                ? `url("${item.authorAvatar}")`
-                : undefined,
-            }}
+            className="w-12 h-12 rounded-full bg-slate-100 bg-cover bg-center flex items-center justify-center flex-shrink-0"
+            style={{ backgroundImage: item.authorAvatar ? `url("${item.authorAvatar}")` : undefined }}
           >
             {!item.authorAvatar && (
-              <div className="w-full h-full rounded-xl flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
-                <span
-                  className={`font-bold text-slate-500 ${
-                    compact ? 'text-sm' : 'text-sm'
-                  }`}
-                >
-                  {item.authorName?.charAt(0) || '?'}
-                </span>
-              </div>
+              <span className="font-bold text-slate-500 text-sm">
+                {item.authorName?.charAt(0) || '?'}
+              </span>
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <p
-              className={`font-semibold text-slate-900 truncate ${
-                compact ? 'text-sm' : 'text-[15px]'
-              }`}
-            >
-              {item.authorName}
-            </p>
+            <p className="font-semibold text-base text-slate-800 truncate">{item.authorName}</p>
             <div className="flex items-center gap-2 mt-0.5">
-              <p className="text-xs text-slate-500">{formatDate(item.createdAt)}</p>
-              {item.authorRole === 'provider' && (
-                <>
-                  <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                  <span className="text-xs text-primary font-medium">{item.authorProfession}</span>
-                </>
+              <span className="text-sm text-slate-400">{formatDate(item.createdAt)}</span>
+              {item.authorProfession && (
+                <span className="text-xs font-medium px-3 py-1 rounded-full bg-blue-50 text-blue-600 ml-2">{item.authorProfession}</span>
               )}
               {item.serviceCategory && (
                 <>
@@ -823,32 +799,17 @@ export default function HomeScreen({ isDesktop }) {
               )}
             </div>
           </div>
-          {/* Badge: article vs post */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            {type === 'article' && (
-              <span className="hidden px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
-                Article
-              </span>
-            )}
-            {item.authorRole === 'provider' && item.isVerified && (
-              <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {type === 'article' && item.isVerified && (
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
                 Verified Pro
               </span>
             )}
-            {type === 'post' && isOwnPost && (
+            {isOwnPost && (
               <button
                 onClick={() => handleDeletePost(feedId, type)}
                 className="p-1.5 hover:bg-red-50 rounded-full transition-colors text-slate-400 hover:text-red-500"
-                title="Delete post"
-              >
-                <FiTrash2 style={{ fontSize: '16px' }} />
-              </button>
-            )}
-            {type === 'article' && isOwnPost && (
-              <button
-                onClick={() => handleDeletePost(feedId, type)}
-                className="p-1.5 hover:bg-red-50 rounded-full transition-colors text-slate-400 hover:text-red-500"
-                title="Delete article"
+                title={`Delete ${type}`}
               >
                 <FiTrash2 style={{ fontSize: '16px' }} />
               </button>
@@ -856,155 +817,93 @@ export default function HomeScreen({ isDesktop }) {
           </div>
         </div>
 
-        {/* Body: Text content and image in horizontal layout */}
-        <div className="flex flex-row gap-4 items-start flex-1 min-h-0 overflow-hidden">
-          {/* Text content on the left */}
-          <div className="flex-1">
-            {/* Article title */}
-            {item.title && (
-              <h4
-                className={`font-bold text-slate-900 mb-2 ${
-                  compact ? 'text-sm' : 'text-lg'
-                }`}
-              >
-                {item.title}
-              </h4>
-            )}
-
-            {/* Content */}
-            <p
-              className={`text-sm text-slate-500 line-clamp-3 overflow-hidden ${
-                compact ? '' : 'text-[15px] leading-relaxed'
-              }`}
-            >
-              {item.content}
-            </p>
-          </div>
-
-          {/* Image on the right */}
-          {item.images && item.images.length > 0 && (
-            <div className="w-36 h-36 flex-shrink-0 rounded-xl overflow-hidden">
-              <img
-                src={item.images[0]}
-                alt={item.title || ''}
-                className="w-full h-full object-cover"
-              />
+        {/* Body */}
+        {hasImage ? (
+          <div className="flex flex-col sm:flex-row gap-6 mt-4 items-start">
+            <div className="flex-1 min-w-0">
+              {item.title && (
+                <h4 className="text-xl font-bold text-slate-800 mt-4 mb-2 leading-snug">{item.title}</h4>
+              )}
+              <p className="text-sm text-slate-500 leading-relaxed line-clamp-4">{item.content}</p>
             </div>
-          )}
-        </div>
+            <img
+              src={item.images[0]}
+              alt={item.title || 'Post image'}
+              className="w-80 h-60 rounded-2xl object-cover flex-shrink-0 sm:mt-0"
+              loading="lazy"
+            />
+          </div>
+        ) : (
+          <div className="bg-slate-50 rounded-2xl px-4 py-3 mt-4">
+            {item.title && (
+              <h4 className="text-xl font-bold text-slate-800 mt-2 mb-2 leading-snug">{item.title}</h4>
+            )}
+            <p className="text-sm text-slate-700 leading-relaxed">{item.content}</p>
+          </div>
+        )}
 
-        {/* Actions */}
-        <div
-          className={`flex items-center gap-1 ${
-            compact ? '' : 'pt-3 border-t border-slate-100'
-          }`}
-        >
+        {/* Footer */}
+        <div className="flex items-center gap-5 border-t border-slate-100 mt-5 pt-4">
           <button
             onClick={() => handleLikeItem(item)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+            className={`flex items-center gap-1.5 transition-all ${
               isLiked
-                ? 'text-red-500 bg-red-50'
-                : 'text-slate-500 hover:text-red-500 hover:bg-red-50'
+                ? 'text-red-500'
+                : 'text-slate-600 hover:text-red-500'
             }`}
           >
-            <FiHeart 
-              style={{ 
-                fontSize: compact ? '18px' : '20px',
-                fill: isLiked ? 'currentColor' : 'none'
-              }} 
-            />
-            <span className="text-sm font-medium">{item.likesCount || 0}</span>
+            <FiHeart style={{ fontSize: '18px', fill: isLiked ? 'currentColor' : 'none' }} />
+            <span className="text-sm font-medium text-slate-600">{item.likesCount || 0}</span>
           </button>
           <button
             onClick={() => handleToggleComments(item)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-500 hover:text-primary hover:bg-blue-50 transition-all"
+            className="flex items-center gap-1.5 text-slate-500 hover:text-primary transition-all"
           >
-            <FiMessageCircle style={{ fontSize: compact ? '18px' : '20px' }} />
-            <span className="text-sm font-medium">{item.commentsCount || 0}</span>
+            <FiMessageCircle style={{ fontSize: '18px' }} />
+            <span className="text-sm text-slate-500">{item.commentsCount || 0}</span>
           </button>
-          {!compact && (
-            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-500 hover:text-primary hover:bg-blue-50 transition-all ml-auto">
-              <FiShare2 style={{ fontSize: '20px' }} />
-            </button>
-          )}
+          <button className="flex items-center gap-1.5 text-slate-400 hover:text-slate-600 transition-all ml-auto">
+            <FiShare2 style={{ fontSize: '18px' }} />
+          </button>
         </div>
 
         {/* Comments section */}
         {isExpanded && (
-          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+          <div className="mt-3 pt-3 border-t border-slate-100">
             {comments.length > 0 ? (
-              <div
-                className={`space-y-2 mb-3 ${
-                  !compact ? 'max-h-48 overflow-y-auto space-y-3' : ''
-                }`}
-              >
+              <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
                 {(compact ? comments.slice(-2) : comments).map((c) => (
                   <div key={c.id} className="flex gap-2">
                     <div
-                      className={`rounded-full bg-slate-200 bg-cover bg-center shrink-0 ${
-                        compact ? 'w-6 h-6' : 'w-8 h-8'
-                      }`}
-                      style={{
-                        backgroundImage: c.authorAvatar
-                          ? `url("${c.authorAvatar}")`
-                          : undefined,
-                      }}
+                      className="w-8 h-8 rounded-full bg-slate-100 bg-cover bg-center flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundImage: c.authorAvatar ? `url("${c.authorAvatar}")` : undefined }}
                     >
                       {!c.authorAvatar && (
-                        <div className="w-full h-full rounded-full flex items-center justify-center">
-                          <span
-                            className={`font-bold text-slate-500 ${
-                              compact ? 'text-[10px]' : 'text-xs'
-                            }`}
-                          >
-                            {c.authorName?.charAt(0)}
-                          </span>
-                        </div>
+                        <span className="font-bold text-slate-500 text-xs">
+                          {c.authorName?.charAt(0)}
+                        </span>
                       )}
                     </div>
-                    <div className="flex-1 bg-slate-100 dark:bg-slate-700 rounded-lg px-3 py-1.5">
-                      <p
-                        className={`font-medium text-slate-900 dark:text-white ${
-                          compact ? 'text-xs' : 'text-sm'
-                        }`}
-                      >
-                        {c.authorName}
-                      </p>
-                      <p
-                        className={`text-slate-600 dark:text-slate-300 ${
-                          compact ? 'text-xs' : 'text-sm'
-                        }`}
-                      >
-                        {c.content}
-                      </p>
+                    <div className="flex-1 bg-slate-50 rounded-lg px-3 py-1.5">
+                      <p className="font-medium text-sm text-slate-900">{c.authorName}</p>
+                      <p className="text-sm text-slate-600">{c.content}</p>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p
-                className={`text-slate-400 mb-3 ${compact ? 'text-xs' : 'text-sm'}`}
-              >
-                No comments yet
-              </p>
+              <p className="text-sm text-slate-400 mb-3">No comments yet</p>
             )}
             <div className="flex gap-2">
               <input
                 type="text"
                 value={commentInputs[feedId] || ''}
                 onChange={(e) =>
-                  setCommentInputs((prev) => ({
-                    ...prev,
-                    [feedId]: e.target.value,
-                  }))
+                  setCommentInputs((prev) => ({ ...prev, [feedId]: e.target.value }))
                 }
                 placeholder="Add a comment..."
-                className={`flex-1 px-3 py-1.5 bg-slate-100 dark:bg-slate-700 rounded-full border-none focus:outline-none focus:ring-2 focus:ring-primary/30 text-slate-900 dark:text-white ${
-                  compact ? 'text-sm' : 'text-sm px-4 py-2'
-                }`}
-                onKeyDown={(e) =>
-                  e.key === 'Enter' && handleSubmitComment(item)
-                }
+                className="flex-1 px-3 py-1.5 bg-slate-50 rounded-full border-none focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm text-slate-900"
+                onKeyDown={(e) => e.key === 'Enter' && handleSubmitComment(item)}
               />
               <button
                 onClick={() => handleSubmitComment(item)}
