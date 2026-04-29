@@ -50,7 +50,6 @@ const ImageGrid = ({ images, compact = false, title = '', video = null }) => {
     imageOrientation: 'from-image',
     objectFit: 'cover',
     width: '100%',
-    height: '100%',
     maxWidth: '100%',
     maxHeight: '100%'
   };
@@ -72,7 +71,7 @@ const ImageGrid = ({ images, compact = false, title = '', video = null }) => {
       <img 
         src={images[0]} 
         alt={title || 'Post image'}
-        className="w-full h-[400px] object-cover"
+        className="w-full max-h-64 object-contain rounded-xl bg-slate-50"
         style={imgStyle}
         loading="lazy"
         onClick={() => openLightbox(0)}
@@ -772,7 +771,7 @@ export default function HomeScreen({ isDesktop }) {
 
     return (
       <div
-        className={`bg-white rounded-xl border border-slate-200 shadow-soft transition-all hover:shadow-medium ${
+        className={`bg-white rounded-xl border border-slate-200 shadow-soft transition-all hover:shadow-medium flex flex-col h-72 overflow-hidden ${
           compact ? 'p-4' : 'p-5'
         }`}
       >
@@ -857,39 +856,42 @@ export default function HomeScreen({ isDesktop }) {
           </div>
         </div>
 
-        {/* Article title */}
-        {item.title && (
-          <h4
-            className={`font-bold text-slate-900 mb-2 ${
-              compact ? 'text-sm' : 'text-lg'
-            }`}
-          >
-            {item.title}
-          </h4>
-        )}
-
-        {/* Content */}
-        <p
-          className={`text-slate-600 mb-3 ${
-            compact ? 'text-sm line-clamp-3' : 'text-[15px] leading-relaxed'
-          }`}
-        >
-          {item.content}
-        </p>
-
-        {/* Multi-Image Display - Facebook Style */}
-        {item.images && item.images.length > 0 && (
-          <>
-            <ImageGrid images={item.images} compact={compact} title={item.title} video={item.video} />
-            {type === 'article' && (
-              <div className="absolute top-3 left-3">
-                <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-white/95 backdrop-blur-sm text-purple-700 shadow-lg">
-                  Article
-                </span>
-              </div>
+        {/* Body: Text content and image in horizontal layout */}
+        <div className="flex flex-row gap-4 items-start flex-1 min-h-0 overflow-hidden">
+          {/* Text content on the left */}
+          <div className="flex-1">
+            {/* Article title */}
+            {item.title && (
+              <h4
+                className={`font-bold text-slate-900 mb-2 ${
+                  compact ? 'text-sm' : 'text-lg'
+                }`}
+              >
+                {item.title}
+              </h4>
             )}
-          </>
-        )}
+
+            {/* Content */}
+            <p
+              className={`text-sm text-slate-500 line-clamp-3 overflow-hidden ${
+                compact ? '' : 'text-[15px] leading-relaxed'
+              }`}
+            >
+              {item.content}
+            </p>
+          </div>
+
+          {/* Image on the right */}
+          {item.images && item.images.length > 0 && (
+            <div className="w-36 h-36 flex-shrink-0 rounded-xl overflow-hidden">
+              <img
+                src={item.images[0]}
+                alt={item.title || ''}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
+        </div>
 
         {/* Actions */}
         <div
@@ -1261,7 +1263,7 @@ onClick={() => navigate(`/search?category=${encodeURIComponent(cat.name)}`)}
               </div>
             )}
 
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {feed.slice(0, 5).map((item) => (
                 <FeedCard key={item.feedId} item={item} compact />
               ))}
