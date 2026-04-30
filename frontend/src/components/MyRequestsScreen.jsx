@@ -263,6 +263,10 @@ export default function MyRequestsScreen({ isDesktop }) {
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [cityFilter, setCityFilter] = useState('');
+  const [minBudget, setMinBudget] = useState('');
+  const [maxBudget, setMaxBudget] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
   const navigate = useNavigate();
   
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -287,10 +291,12 @@ export default function MyRequestsScreen({ isDesktop }) {
       let result;
       
       if (currentUser.role === 'provider') {
-        // For providers: fetch available jobs they can apply to
-        result = await api.getProviderServiceRequests();
+        const filterParams = {};
+        if (cityFilter) filterParams.city = cityFilter;
+        if (minBudget) filterParams.minBudget = minBudget;
+        if (maxBudget) filterParams.maxBudget = maxBudget;
+        result = await api.getProviderServiceRequests(filterParams);
       } else {
-        // For clients: fetch their bookings
         result = await api.getBookings();
       }
       
@@ -339,6 +345,17 @@ export default function MyRequestsScreen({ isDesktop }) {
   useEffect(() => {
     fetchRequests();
   }, []);
+
+  const applyFilters = () => {
+    fetchRequests();
+  };
+
+  const clearFilters = () => {
+    setCityFilter('');
+    setMinBudget('');
+    setMaxBudget('');
+    fetchRequests();
+  };
 
   const handleRequestSuccess = () => {
     fetchRequests();
@@ -437,6 +454,53 @@ export default function MyRequestsScreen({ isDesktop }) {
           )}
         </div>
         
+        {isProvider && (
+          <>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="w-full mb-3 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              {showFilters ? 'Hide Filters' : 'Show Filters'}
+            </button>
+            {showFilters && (
+              <div className="bg-white border border-slate-200 rounded-xl p-4 mb-4">
+                <h3 className="text-sm font-semibold text-slate-700 mb-3">Filter Requests</h3>
+                <div className="flex flex-wrap gap-3">
+                  <input
+                    type="text"
+                    placeholder="City..."
+                    value={cityFilter}
+                    onChange={(e) => setCityFilter(e.target.value)}
+                    className="flex-1 min-w-[140px] px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-primary"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Min budget (MAD)"
+                    value={minBudget}
+                    onChange={(e) => setMinBudget(e.target.value)}
+                    className="w-36 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-primary"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Max budget (MAD)"
+                    value={maxBudget}
+                    onChange={(e) => setMaxBudget(e.target.value)}
+                    className="w-36 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-primary"
+                  />
+                  <button onClick={applyFilters}
+                    className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors">
+                    Apply
+                  </button>
+                  <button onClick={clearFilters}
+                    className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-50 transition-colors">
+                    Clear
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+        
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -473,10 +537,17 @@ export default function MyRequestsScreen({ isDesktop }) {
                       <h3 className="font-semibold text-slate-900">{request.title}</h3>
                       <p className="text-sm text-slate-500 line-clamp-2">{request.description}</p>
                     </div>
-                    <span className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${getStatusColor(request.status)}`}>
+                    <div className="flex flex-col items-end gap-1">
+                      {request._matchScore != null && (
+                        <span className="text-xs bg-amber-50 text-amber-700 px-2 py-1 rounded-full font-medium">
+                          ⭐ {request._matchScore} match
+                        </span>
+                      )}
+                      <span className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${getStatusColor(request.status)}`}>
                       <StatusIcon style={{ fontSize: '12px' }} />
                       {getStatusLabel(request.status)}
                     </span>
+                    </div>
                   </div>
                   {(request.preferredDate || request.location || request.budget) && (
                     <div className="flex flex-wrap gap-2 mt-2 text-xs text-slate-500">
@@ -524,15 +595,25 @@ export default function MyRequestsScreen({ isDesktop }) {
                           Apply
                         </button>
                       )}
-                      {!isProvider && request.status === 'completed' && request.acceptedProviderId && (
-                        <button 
-                          onClick={() => handleReviewClick(request)}
-                          className="text-xs text-primary font-medium hover:underline"
-                        >
-                          Rate Provider
-                        </button>
-                      )}
                     </div>
+                  </div>
+                  <div className="flex gap-2 mt-3">
+                    {!isProvider && request.status === 'in_progress' && request.acceptedProviderId && (
+                      <button
+                        onClick={() => navigate(`/messages/${request.acceptedProviderId._id || request.acceptedProviderId}`)}
+                        className="text-xs font-medium px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 hover:border-primary hover:text-primary transition-colors"
+                      >
+                        Message Provider
+                      </button>
+                    )}
+                    {!isProvider && request.status === 'completed' && request.acceptedProviderId && (
+                      <button
+                        onClick={() => handleReviewClick(request)}
+                        className="text-xs font-medium px-3 py-1.5 rounded-full bg-primary text-white hover:bg-blue-600 transition-colors"
+                      >
+                        Leave Review
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -585,6 +666,53 @@ export default function MyRequestsScreen({ isDesktop }) {
         )}
       </div>
 
+      {isProvider && (
+        <>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50"
+          >
+            {showFilters ? 'Hide Filters' : 'Show Filters'}
+          </button>
+          {showFilters && (
+            <div className="bg-white border border-slate-200 rounded-xl p-4">
+              <h3 className="text-sm font-semibold text-slate-700 mb-3">Filter Requests</h3>
+              <div className="flex flex-wrap gap-3">
+                <input
+                  type="text"
+                  placeholder="City..."
+                  value={cityFilter}
+                  onChange={(e) => setCityFilter(e.target.value)}
+                  className="flex-1 min-w-[140px] px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-primary"
+                />
+                <input
+                  type="number"
+                  placeholder="Min budget (MAD)"
+                  value={minBudget}
+                  onChange={(e) => setMinBudget(e.target.value)}
+                  className="w-36 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-primary"
+                />
+                <input
+                  type="number"
+                  placeholder="Max budget (MAD)"
+                  value={maxBudget}
+                  onChange={(e) => setMaxBudget(e.target.value)}
+                  className="w-36 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-primary"
+                />
+                <button onClick={applyFilters}
+                  className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors">
+                  Apply
+                </button>
+                <button onClick={clearFilters}
+                  className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-50 transition-colors">
+                  Clear
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -620,10 +748,17 @@ export default function MyRequestsScreen({ isDesktop }) {
                     <span className="text-xs text-primary font-medium">{getServiceTypeLabel(request.serviceType)}</span>
                     <h3 className="font-semibold text-slate-900">{request.title}</h3>
                   </div>
-                  <span className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${getStatusColor(request.status)}`}>
+                  <div className="flex flex-col items-end gap-1">
+                    {request._matchScore != null && (
+                      <span className="text-xs bg-amber-50 text-amber-700 px-2 py-1 rounded-full font-medium">
+                        ⭐ {request._matchScore} match
+                      </span>
+                    )}
+                    <span className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${getStatusColor(request.status)}`}>
                     <StatusIcon style={{ fontSize: '12px' }} />
                     {getStatusLabel(request.status)}
                   </span>
+                  </div>
                 </div>
                 <p className="text-slate-500 text-sm mb-3 line-clamp-2">{request.description}</p>
                 
@@ -669,29 +804,31 @@ export default function MyRequestsScreen({ isDesktop }) {
                     {isProvider && request.status === 'pending' && (
                       <button 
                         onClick={() => handleApply(request._id || request.id)}
-                        className="text-xs bg-primary text-white px-3 py-1 rounded-lg font-medium hover:bg-primary/90"
+                        className="text-xs bg-primary text-white px-3 py-1.5 rounded-lg font-medium hover:bg-primary/90"
                       >
                         Apply
                       </button>
                     )}
-                    {!isProvider && request.acceptedProviderId && request.status !== 'completed' && (
-                      <button 
-                        onClick={() => navigate(`/messages/${request.acceptedProviderId._id || request.acceptedProviderId}`)}
-                        className="text-primary text-sm font-medium hover:underline"
-                      >
-                        Message
-                      </button>
-                    )}
                   </div>
                 </div>
-                {request.status === 'completed' && request.acceptedProviderId && !isProvider && (
-                  <button 
-                    onClick={() => handleReviewClick(request)}
-                    className="w-full mt-3 py-2 text-sm text-primary font-medium hover:bg-blue-50 rounded-lg transition-colors"
-                  >
-                    Rate Provider
-                  </button>
-                )}
+                <div className="flex gap-2 mt-3">
+                  {!isProvider && request.status === 'in_progress' && request.acceptedProviderId && (
+                    <button 
+                      onClick={() => navigate(`/messages/${request.acceptedProviderId._id || request.acceptedProviderId}`)}
+                      className="text-xs font-medium px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 hover:border-primary hover:text-primary transition-colors"
+                    >
+                      Message Provider
+                    </button>
+                  )}
+                  {!isProvider && request.status === 'completed' && request.acceptedProviderId && (
+                    <button 
+                      onClick={() => handleReviewClick(request)}
+                      className="text-xs font-medium px-3 py-1.5 rounded-full bg-primary text-white hover:bg-blue-600 transition-colors"
+                    >
+                      Leave Review
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}

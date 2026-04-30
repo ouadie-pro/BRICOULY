@@ -950,6 +950,13 @@ export default function ProviderProfileScreen({ isDesktop }) {
               >
                 {followLabel}
               </button>
+              <button
+                onClick={() => navigate(`/book/${provider.id}`)}
+                className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-xl hover:bg-blue-600 transition-colors"
+              >
+                <FiCalendar style={{ fontSize: '18px' }} />
+                Book Now
+              </button>
               <Link
                 to={`/messages/${provider.id}`}
                 className="flex items-center gap-2 px-6 py-2.5 border border-primary text-primary rounded-xl hover:bg-blue-50 transition-colors"

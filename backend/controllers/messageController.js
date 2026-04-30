@@ -12,7 +12,8 @@ const isValidObjectId = (id) => {
 
 exports.getConversations = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user.id.toString();
 
     if (!userId || !isValidObjectId(userId)) {
       return res.json([]);
@@ -64,7 +65,8 @@ exports.getConversations = async (req, res) => {
 
 exports.getMessages = async (req, res) => {
   try {
-    const currentUserId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const currentUserId = req.user.id.toString();
     const otherUserId = req.params.userId;
     const { page = 1, limit = 50 } = req.query;
     
@@ -135,7 +137,8 @@ exports.getMessages = async (req, res) => {
 
 exports.sendMessage = async (req, res) => {
   try {
-    const senderId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const senderId = req.user.id.toString();
     const { receiverId, content, mediaUrl, audioUrl, type } = req.body;
 
     if (!receiverId) {
@@ -179,7 +182,6 @@ exports.sendMessage = async (req, res) => {
       .populate('sender', 'name avatar')
       .populate('receiver', 'name avatar');
 
-    // FIXED: #15 - Emit new message event to recipient's socket room
     const io = req.app.get('io');
     if (io) {
       io.to(`user:${receiverId}`).emit('newMessage', {
@@ -188,13 +190,26 @@ exports.sendMessage = async (req, res) => {
         senderId: populatedMessage.sender._id.toString(),
         senderName: populatedMessage.sender.name,
         senderAvatar: populatedMessage.sender.avatar,
-        receiverId: populatedMessage.receiver._id.toString(),
-        receiverName: populatedMessage.receiver.name,
-        content: populatedMessage.content,
+        receiverId: receiverId,
+        content: populatedMessage.content || '',
         mediaUrl: populatedMessage.mediaUrl,
         audioUrl: populatedMessage.audioUrl,
         type: populatedMessage.type,
+        read: false,
         createdAt: populatedMessage.createdAt,
+      });
+
+      await Notification.create({
+        user: new mongoose.Types.ObjectId(receiverId),
+        type: 'message',
+        title: 'New Message',
+        text: `${populatedMessage.sender.name}: ${(populatedMessage.content || '').substring(0, 50)}`,
+        fromUser: populatedMessage.sender._id,
+      });
+      io.to(`user:${receiverId}`).emit('notification', {
+        type: 'message',
+        title: 'New Message',
+        text: `${populatedMessage.sender.name} sent you a message`,
       });
     }
 
@@ -232,7 +247,8 @@ exports.uploadMedia = async (req, res) => {
 
 exports.markAsRead = async (req, res) => {
   try {
-    const currentUserId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const currentUserId = req.user.id.toString();
     const otherUserId = req.params.providerId;
 
     if (!currentUserId || !isValidObjectId(currentUserId) || !isValidObjectId(otherUserId)) {
@@ -245,8 +261,16 @@ exports.markAsRead = async (req, res) => {
         receiver: new mongoose.Types.ObjectId(currentUserId),
         read: false
       },
-      { read: true }
+      { read: true, readAt: new Date() }
     );
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user:${otherUserId}`).emit('messagesRead', {
+        by: currentUserId,
+        conversationWith: currentUserId,
+      });
+    }
 
     res.json({ success: true });
   } catch (error) {

@@ -12,7 +12,8 @@ const isValidObjectId = (id) => {
 
 exports.followUser = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const targetUserId = req.params.userId;
     
     if (!userId || !targetUserId) {
@@ -74,7 +75,8 @@ exports.followUser = async (req, res) => {
 
 exports.respondFollowRequest = async (req, res) => {
   try {
-    let userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    let userId = req.user.id.toString();
     let { requestId, action, userId: bodyUserId } = req.body;
     
     console.log('respondFollowRequest - header userId:', userId, 'body userId:', bodyUserId, 'requestId:', requestId);
@@ -183,7 +185,8 @@ exports.respondFollowRequest = async (req, res) => {
 exports.getFollowRequests = async (req, res) => {
   try {
     console.log('[getFollowRequests] Request received', { headers: req.headers });
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     console.log('[getFollowRequests] userId:', userId);
     
     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
@@ -217,7 +220,8 @@ exports.getFollowRequests = async (req, res) => {
 
 exports.getFollowing = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     
     if (!userId || !isValidObjectId(userId)) {
       return res.json([]);
@@ -304,7 +308,7 @@ exports.getFollowingByUserId = async (req, res) => {
 
 exports.checkFollowStatus = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    const userId = req.user?.id?.toString() || req.headers['x-user-id'];
     const targetUserId = req.params.userId;
     
     if (!userId || !targetUserId) {

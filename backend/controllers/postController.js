@@ -5,7 +5,7 @@ const Comment = require('../models/Comment');
 
 exports.getPosts = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    const userId = req.user?.id?.toString() || req.headers['x-user-id'];
     
     let currentUser = null;
     let providerProfession = null;
@@ -76,7 +76,8 @@ exports.getPosts = async (req, res) => {
 
 exports.createPost = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const user = await User.findById(userId);
     
     if (!user) {
@@ -138,7 +139,8 @@ exports.createPost = async (req, res) => {
 
 exports.likePost = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const mongoose = require('mongoose');
     const post = await Post.findById(req.params.id);
     
@@ -191,7 +193,8 @@ exports.getComments = async (req, res) => {
 
 exports.createComment = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const user = await User.findById(userId);
     
     if (!user) {
@@ -239,7 +242,8 @@ exports.createComment = async (req, res) => {
 
 exports.deletePost = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     
     const post = await Post.findById(req.params.id);
     

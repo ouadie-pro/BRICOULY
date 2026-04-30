@@ -6,41 +6,92 @@ import { FiX, FiCheck, FiStar } from 'react-icons/fi';
 export default function ReviewScreen({ isDesktop }) {
   const { providerId } = useParams();
   const [provider, setProvider] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [punctuality, setPunctuality] = useState(5);
   const [professionalism, setProfessionalism] = useState(4);
   const [comment, setComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (rating === 0) {
+      setError('Please select a rating before submitting');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const canReview = await api.checkCanReview(providerId);
+      if (!canReview?.canReview) {
+        setError(canReview?.reason || 'You cannot review this provider');
+        setSubmitting(false);
+        return;
+      }
+      const result = await api.submitReview({
+        providerId,
+        serviceRequestId: canReview.serviceRequestId,
+        rating,
+        punctuality,
+        professionalism,
+        comment,
+      });
+      if (result.success) {
+        navigate(-1);
+      } else {
+        setError(result.error || 'Failed to submit review');
+      }
+    } catch (err) {
+      setError('Failed to submit review');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   useEffect(() => {
+    if (!providerId || providerId === 'undefined') {
+      setError('Invalid provider link. Please navigate from a booking or service request.');
+      setLoading(false);
+      return;
+    }
     const fetchProvider = async () => {
-      const data = await api.getProvider(providerId);
-      setProvider(data);
+      try {
+        const data = await api.getProvider(providerId);
+        if (data && data.name) {
+          setProvider(data);
+        } else {
+          setError(data?.error || 'Provider not found');
+        }
+      } catch (err) {
+        setError('Failed to load provider information');
+      } finally {
+        setLoading(false);
+      }
     };
     fetchProvider();
   }, [providerId]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    // Pass a single object — matches the fixed api.submitReview signature
-    await api.submitReview({
-      providerId,
-      rating,
-      comment,
-      punctuality,
-      professionalism,
-    });
-    navigate('/home');
-  };
-
-  if (!provider) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background-light dark:bg-background-dark">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
+
+  if (error || !provider) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background-light dark:bg-background-dark p-4">
+        <p className="text-slate-500 text-lg mb-4 text-center">{error || 'Provider not found'}</p>
+        <button onClick={() => navigate('/home')} className="px-6 py-3 bg-primary text-white rounded-xl font-medium hover:bg-primary/90">
+          Go Home
+        </button>
+      </div>
+    );
+  }
+
 
   const StarRating = ({ value, onChange, onHover, hoverVal, interactive = true }) => (
     <div className="flex gap-1">
@@ -171,7 +222,7 @@ export default function ReviewScreen({ isDesktop }) {
               type="submit"
               className="flex w-full items-center justify-center rounded-xl bg-primary px-6 py-3.5 text-base font-bold leading-normal text-white shadow-lg shadow-primary/20 hover:bg-primary/90 active:scale-[0.98] transition-all"
             >
-              Submit Review
+              Submit Review {submitting && '...'}
             </button>
             <button
               type="button"
@@ -269,7 +320,7 @@ export default function ReviewScreen({ isDesktop }) {
               type="submit"
               className="flex-1 flex items-center justify-center rounded-xl bg-primary px-6 py-3 text-base font-bold text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
             >
-              Submit Review
+              Submit Review {submitting && '...'}
             </button>
           </div>
         </form>

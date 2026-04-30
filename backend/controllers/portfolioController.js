@@ -17,7 +17,8 @@ exports.getProviderPortfolio = async (req, res) => {
 
 exports.createPortfolio = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const user = await User.findById(userId);
     
     if (!user) {
@@ -50,7 +51,8 @@ exports.createPortfolio = async (req, res) => {
 
 exports.deletePortfolio = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const provider = await Provider.findOne({ user: userId });
     
     if (!provider) {
@@ -71,7 +73,8 @@ exports.deletePortfolio = async (req, res) => {
 
 exports.uploadPortfolio = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const user = await User.findById(userId);
     
     if (!user) {

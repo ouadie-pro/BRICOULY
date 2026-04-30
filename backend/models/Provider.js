@@ -80,6 +80,17 @@ const providerSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  workingHours: {
+    monday:    { open: { type: String, default: '08:00' }, close: { type: String, default: '18:00' }, active: { type: Boolean, default: true } },
+    tuesday:   { open: { type: String, default: '08:00' }, close: { type: String, default: '18:00' }, active: { type: Boolean, default: true } },
+    wednesday: { open: { type: String, default: '08:00' }, close: { type: String, default: '18:00' }, active: { type: Boolean, default: true } },
+    thursday:  { open: { type: String, default: '08:00' }, close: { type: String, default: '18:00' }, active: { type: Boolean, default: true } },
+    friday:    { open: { type: String, default: '08:00' }, close: { type: String, default: '18:00' }, active: { type: Boolean, default: true } },
+    saturday:  { open: { type: String, default: '09:00' }, close: { type: String, default: '14:00' }, active: { type: Boolean, default: false } },
+    sunday:    { open: { type: String, default: '09:00' }, close: { type: String, default: '14:00' }, active: { type: Boolean, default: false } },
+  },
+  unavailableUntil: { type: Date, default: null },
+  lastActive: { type: Date, default: Date.now },
   createdAt: {
     type: Date,
     default: Date.now,

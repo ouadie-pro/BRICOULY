@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
+const { auth } = require('../middleware/authMiddleware');
 const { uploadMedia } = require('../middleware/upload');
 const { 
   getConversations, 
@@ -10,9 +11,10 @@ const {
   markAsRead 
 } = require('../controllers/messageController');
 
-router.get('/conversations', getConversations);
+router.get('/conversations', auth, getConversations);
 
 const handleUpload = [
+  auth,
   uploadMedia.single('file'),
   (err, req, res, next) => {
     if (err instanceof multer.MulterError) {
@@ -39,8 +41,20 @@ router.post('/media', ...handleUpload, (req, res) => {
   });
 });
 
-router.get('/:userId', getMessages);
-router.post('/', sendMessage);
-router.put('/:providerId/read', markAsRead);
+router.get('/:userId', auth, getMessages);
+router.post('/', auth, sendMessage);
+router.put('/:providerId/read', auth, markAsRead);
+
+router.post('/typing', auth, (req, res) => {
+  const { toUserId, isTyping } = req.body;
+  const io = req.app.get('io');
+  if (io && toUserId) {
+    io.to(`user:${toUserId}`).emit(
+      isTyping ? 'userTyping' : 'userStoppedTyping',
+      { fromUserId: req.user.id.toString() }
+    );
+  }
+  res.json({ success: true });
+});
 
 module.exports = router;

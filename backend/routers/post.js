@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { uploadMultiple } = require('../middleware/upload');
+const { auth } = require('../middleware/authMiddleware');
 const { 
   getPosts, 
   createPost, 
@@ -11,10 +12,10 @@ const {
 } = require('../controllers/postController');
 
 router.get('/', getPosts);
-router.post('/', uploadMultiple, createPost);
-router.delete('/:id', deletePost);
-router.post('/:id/like', likePost);
+router.post('/', auth, uploadMultiple, createPost);
+router.delete('/:id', auth, deletePost);
+router.post('/:id/like', auth, likePost);
 router.get('/:id/comments', getComments);
-router.post('/:id/comments', createComment);
+router.post('/:id/comments', auth, createComment);
 
 module.exports = router;

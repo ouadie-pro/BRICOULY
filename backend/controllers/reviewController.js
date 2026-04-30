@@ -3,30 +3,6 @@ const Provider = require('../models/Provider');
 const Review = require('../models/Review');
 const ServiceRequest = require('../models/ServiceRequest');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-
-const getUserFromRequest = async (req) => {
-  const authHeader = req.headers.authorization;
-  const userIdHeader = req.headers['x-user-id'];
-  
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    try {
-      const jwt = require('jsonwebtoken');
-      const token = authHeader.split(' ')[1];
-      const decoded = jwt.verify(token, JWT_SECRET);
-      return await User.findById(decoded.id);
-    } catch (e) {
-      return null;
-    }
-  }
-  
-  if (userIdHeader) {
-    return await User.findById(userIdHeader);
-  }
-  
-  return null;
-};
-
 const updateProviderStats = async (providerUserId) => {
   try {
     const provider = await Provider.findOne({ user: providerUserId });
@@ -93,7 +69,9 @@ exports.getReviews = async (req, res) => {
 
 exports.createReview = async (req, res) => {
   try {
-    const user = await getUserFromRequest(req);
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const userId = req.user.id.toString();
+    const user = await User.findById(userId);
     
     if (!user) {
       return res.status(401).json({ success: false, error: 'Unauthorized' });
@@ -204,6 +182,24 @@ exports.createReview = async (req, res) => {
     
     await updateProviderStats(providerId);
     
+    const io = req.app.get('io');
+    if (io) {
+      const Notification = require('../models/Notification');
+      await Notification.create({
+        user: providerId,
+        type: 'new_review',
+        title: 'New Review',
+        text: `You received a ${rating}-star review`,
+        fromUser: new (require('mongoose').Types.ObjectId)(userId),
+      });
+      io.to(`user:${providerId.toString()}`).emit('notification', {
+        type: 'new_review',
+        title: 'New Review',
+        text: `You received a ${rating}-star review`,
+        fromUserId: userId.toString(),
+      });
+    }
+    
     const updatedProvider = await Provider.findOne({ user: providerId });
     
     res.status(201).json({ 
@@ -236,7 +232,9 @@ exports.createReview = async (req, res) => {
 
 exports.updateReview = async (req, res) => {
   try {
-    const user = await getUserFromRequest(req);
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const userId = req.user.id.toString();
+    const user = await User.findById(userId);
     
     if (!user) {
       return res.status(401).json({ success: false, error: 'Unauthorized' });
@@ -299,7 +297,9 @@ exports.updateReview = async (req, res) => {
 
 exports.deleteReview = async (req, res) => {
   try {
-    const user = await getUserFromRequest(req);
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const userId = req.user.id.toString();
+    const user = await User.findById(userId);
     
     if (!user) {
       return res.status(401).json({ success: false, error: 'Unauthorized' });
@@ -339,7 +339,9 @@ exports.deleteReview = async (req, res) => {
 
 exports.checkCanReview = async (req, res) => {
   try {
-    const user = await getUserFromRequest(req);
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const userId = req.user.id.toString();
+    const user = await User.findById(userId);
     
     if (!user) {
       return res.status(401).json({ success: false, error: 'Unauthorized' });

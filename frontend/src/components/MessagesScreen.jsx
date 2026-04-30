@@ -44,6 +44,9 @@ export default function MessagesScreen({ isDesktop }) {
   const [mediaPreview, setMediaPreview] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [socket, setSocket] = useState(null);
+  const [isOtherTyping, setIsOtherTyping] = useState(false);
+  const [isOnline, setIsOnline] = useState(false);
+  const typingTimeoutRef = useRef(null);
   const imageInputRef = useRef(null);
   const videoInputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -53,7 +56,6 @@ export default function MessagesScreen({ isDesktop }) {
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
   useEffect(() => {
-    // Initialize Socket.IO connection
     const token = localStorage.getItem('token');
     if (token) {
       const newSocket = io('http://localhost:3001', {
@@ -62,10 +64,13 @@ export default function MessagesScreen({ isDesktop }) {
       
       newSocket.on('connect', () => {
         console.log('Connected to Socket.IO server');
+        const userId = currentUser.id;
+        if (userId) {
+          newSocket.emit('join', userId);
+        }
       });
       
-      newSocket.on('new_message', (message) => {
-        // Update messages if we're in the right conversation
+      newSocket.on('newMessage', (message) => {
         if (providerId && (
           (message.senderId === providerId && message.receiverId === currentUser.id) ||
           (message.senderId === currentUser.id && message.receiverId === providerId)
@@ -73,7 +78,6 @@ export default function MessagesScreen({ isDesktop }) {
           setMessages(prev => [...prev, message]);
         }
         
-        // Update conversations list
         setConversations(prev => {
           const updatedConversations = prev.map(conv => {
             if (conv.userId === message.senderId || conv.userId === message.receiverId) {
@@ -87,7 +91,6 @@ export default function MessagesScreen({ isDesktop }) {
             return conv;
           });
           
-          // Move the updated conversation to the top
           const updatedConv = updatedConversations.find(conv => 
             conv.userId === message.senderId || conv.userId === message.receiverId
           );
@@ -97,6 +100,23 @@ export default function MessagesScreen({ isDesktop }) {
           
           return updatedConversations;
         });
+      });
+
+      newSocket.on('userTyping', ({ fromUserId }) => {
+        if (String(fromUserId) === String(providerId)) {
+          setIsOtherTyping(true);
+        }
+      });
+      newSocket.on('userStoppedTyping', ({ fromUserId }) => {
+        if (String(fromUserId) === String(providerId)) {
+          setIsOtherTyping(false);
+        }
+      });
+      newSocket.on('messagesRead', () => {
+        setMessages(prev => prev.map(m => ({ ...m, read: true })));
+      });
+      newSocket.on('onlineUsers', (users) => {
+        setIsOnline(users.includes(String(providerId)));
       });
       
       setSocket(newSocket);
@@ -126,9 +146,10 @@ export default function MessagesScreen({ isDesktop }) {
       const loadChat = async () => {
         try {
           const msgs = await api.getMessages(providerId);
-          // Handle both array (old format) and object with data (new format)
           const messagesArray = Array.isArray(msgs) ? msgs : (msgs?.data || []);
           setMessages(messagesArray || []);
+          
+          api.markMessagesAsRead(providerId).catch(() => {});
           
           let providerData = await api.getProvider(providerId).catch(() => null);
           if (!providerData || providerData.error) {
@@ -175,6 +196,9 @@ export default function MessagesScreen({ isDesktop }) {
   const handleSend = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() && !mediaPreview) return;
+
+    clearTimeout(typingTimeoutRef.current);
+    api.sendTypingIndicator(providerId, false).catch(() => {});
 
     if (mediaPreview) {
       try {
@@ -431,7 +455,16 @@ export default function MessagesScreen({ isDesktop }) {
               <h2 className="text-slate-900 dark:text-white text-base font-bold leading-tight truncate">
                 {provider?.name || 'Messages'}
               </h2>
-              <p className="text-primary text-xs font-medium truncate">{provider?.profession || ''}</p>
+              <div className="flex items-center gap-1">
+                {isOnline ? (
+                  <>
+                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                    <span className="text-xs text-green-500">Online</span>
+                  </>
+                ) : (
+                  <span className="text-xs text-slate-400">Offline</span>
+                )}
+              </div>
             </div>
           </div>
         </header>
@@ -474,6 +507,11 @@ export default function MessagesScreen({ isDesktop }) {
                   : 'bg-surface-light dark:bg-surface-dark text-slate-800 dark:text-slate-200 border border-slate-100 dark:border-slate-700 rounded-tl-sm'
               }`}>
                 {renderMessageContent(msg)}
+                {isOwn && (
+                  <span className="text-[10px] text-white/60 float-right ml-2 mt-1">
+                    {msg.read ? '✓✓' : '✓'}
+                  </span>
+                )}
               </div>
             </div>
           );
@@ -482,6 +520,16 @@ export default function MessagesScreen({ isDesktop }) {
         </main>
 
         <footer className="bg-surface-light dark:bg-surface-dark px-4 py-3 border-t border-slate-200 dark:border-slate-800 shrink-0">
+          {isOtherTyping && (
+            <div className="flex items-center gap-2 px-2 py-1 mb-1 text-xs text-slate-400">
+              <div className="flex gap-1">
+                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+              <span>Typing...</span>
+            </div>
+          )}
           {mediaPreview && (
             <div className="mb-2">
               {renderMediaPreview()}
@@ -536,7 +584,14 @@ export default function MessagesScreen({ isDesktop }) {
               <input
                 type="text"
                 value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
+                onChange={(e) => {
+                  setNewMessage(e.target.value);
+                  api.sendTypingIndicator(providerId, true).catch(() => {});
+                  clearTimeout(typingTimeoutRef.current);
+                  typingTimeoutRef.current = setTimeout(() => {
+                    api.sendTypingIndicator(providerId, false).catch(() => {});
+                  }, 1500);
+                }}
                 className="w-full bg-transparent border-none p-0 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none text-[15px]"
                 placeholder="Type a message..."
               />
@@ -646,7 +701,16 @@ export default function MessagesScreen({ isDesktop }) {
                 </div>
                 <div className="flex flex-col">
                   <h2 className="text-lg font-bold text-slate-900">{provider?.name || 'Unknown User'}</h2>
-                  <p className="text-primary text-sm font-medium">{provider?.profession || provider?.role || ''}</p>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    {isOnline ? (
+                      <>
+                        <span className="w-2 h-2 bg-green-500 rounded-full" />
+                        <span className="text-xs text-green-500">Online</span>
+                      </>
+                    ) : (
+                      <span className="text-xs text-slate-400">Offline</span>
+                    )}
+                  </div>
                 </div>
               </div>
             </header>
@@ -684,18 +748,25 @@ export default function MessagesScreen({ isDesktop }) {
                     <div className="w-8 shrink-0" />
                   )}
         
-                  <div className={`flex flex-col gap-1 max-w-[60%] ${isOwn ? 'items-end' : 'items-start'}`}>
-                    <div className={`px-4 py-3 rounded-2xl text-[15px] ${
-                      isOwn
-                        ? 'bg-primary text-white rounded-tr-sm' 
-                        : 'bg-slate-100 text-slate-800 rounded-tl-sm'
-                    }`}>
-                      {renderMessageContent(msg)}
+                    <div className={`flex flex-col gap-1 max-w-[60%] ${isOwn ? 'items-end' : 'items-start'}`}>
+                      <div className={`px-4 py-3 rounded-2xl text-[15px] ${
+                        isOwn
+                          ? 'bg-primary text-white rounded-tr-sm' 
+                          : 'bg-slate-100 text-slate-800 rounded-tl-sm'
+                      }`}>
+                        {renderMessageContent(msg)}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[11px] text-slate-400 px-1">
+                          {formatRelativeTime(msg.createdAt || msg.time)}
+                        </span>
+                        {isOwn && (
+                          <span className="text-[10px] text-white/60 ml-1">
+                            {msg.read ? '✓✓' : '✓'}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <span className="text-[11px] text-slate-400 px-1">
-                      {formatRelativeTime(msg.createdAt || msg.time)}
-                    </span>
-                  </div>
                 </div>
               );
               })}
@@ -703,6 +774,16 @@ export default function MessagesScreen({ isDesktop }) {
             </main>
 
             <footer className="px-6 py-4 border-t border-slate-200 flex-shrink-0 bg-white z-10">
+              {isOtherTyping && (
+                <div className="flex items-center gap-2 px-2 py-1 mb-2 text-xs text-slate-400">
+                  <div className="flex gap-1">
+                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                  <span>Typing...</span>
+                </div>
+              )}
               {mediaPreview && (
                 <div className="mb-2">
                   {renderMediaPreview()}
@@ -757,7 +838,14 @@ export default function MessagesScreen({ isDesktop }) {
                   <input
                     type="text"
                     value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
+                    onChange={(e) => {
+                      setNewMessage(e.target.value);
+                      api.sendTypingIndicator(providerId, true).catch(() => {});
+                      clearTimeout(typingTimeoutRef.current);
+                      typingTimeoutRef.current = setTimeout(() => {
+                        api.sendTypingIndicator(providerId, false).catch(() => {});
+                      }, 1500);
+                    }}
                     className="w-full bg-transparent border-none p-0 text-slate-900 placeholder-slate-400 focus:outline-none text-[15px]"
                     placeholder="Type a message..."
                   />

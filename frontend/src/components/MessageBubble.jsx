@@ -98,11 +98,13 @@ export default function MessageBubble({ message, isOwn, showAvatar }) {
         </div>
         
         <div className={`flex items-center gap-1 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-          <span className={`text-[11px] ${isOwn ? 'text-slate-400' : 'text-slate-400'}`}>
+          <span className={`text-[11px] ${isOwn ? 'text-white/60' : 'text-slate-400'}`}>
             {formatTime(message.createdAt)}
           </span>
-          {isOwn && message.read && (
-            <FiCheck style={{ fontSize: '12px' }} className="text-primary" />
+          {isOwn && (
+            <span className="text-[10px] text-white/60 ml-1">
+              {message.read ? '✓✓' : '✓'}
+            </span>
           )}
         </div>
       </div>

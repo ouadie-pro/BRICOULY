@@ -21,12 +21,51 @@ const io = new Server(server, {
 
 app.set('io', io);
 
+const onlineUsers = new Map();
+
+io.on('connection', (socket) => {
+  socket.on('join', (userId) => {
+    if (userId) {
+      socket.join(`user:${userId}`);
+      socket.userId = userId;
+      onlineUsers.set(userId, socket.id);
+      io.emit('onlineUsers', Array.from(onlineUsers.keys()));
+    }
+  });
+
+  socket.on('disconnect', () => {
+    if (socket.userId) {
+      onlineUsers.delete(socket.userId);
+      io.emit('onlineUsers', Array.from(onlineUsers.keys()));
+    }
+  });
+});
+
 const PORT = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Track lastActive for providers
+app.use(async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (token) {
+      const jwt = require('jsonwebtoken');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-in-production');
+      if (decoded?.id) {
+        const Provider = require('./models/Provider');
+        Provider.findOneAndUpdate(
+          { user: decoded.id },
+          { lastActive: new Date() }
+        ).exec().catch(() => {});
+      }
+    }
+  } catch (_) {}
+  next();
+});
 
 if (!fs.existsSync(path.join(__dirname, 'uploads'))) {
   fs.mkdirSync(path.join(__dirname, 'uploads'));

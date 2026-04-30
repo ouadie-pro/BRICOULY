@@ -187,17 +187,8 @@ exports.getMe = async (req, res) => {
 
 exports.updateProfile = async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ success: false, error: 'Unauthorized' });
-    }
-    
-    const token = authHeader.split(' ')[1];
-    const jwt = require('jsonwebtoken');
-    const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-    
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const userId = decoded.id;
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     
     const { name, phone, location, avatar, bio, city, specialization, hourlyRate } = req.body;
     
@@ -264,17 +255,8 @@ exports.updateProfile = async (req, res) => {
 
 exports.uploadAvatar = async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ success: false, error: 'Unauthorized' });
-    }
-    
-    const token = authHeader.split(' ')[1];
-    const jwt = require('jsonwebtoken');
-    const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-    
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const userId = decoded.id;
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'No file uploaded' });

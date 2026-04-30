@@ -5,7 +5,7 @@ const Provider = require('../models/Provider');
 
 exports.getArticles = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    const userId = req.user?.id?.toString() || req.headers['x-user-id'];
     const articles = await Article.find()
       .populate('user', 'name avatar role')
       .sort({ createdAt: -1 });
@@ -69,7 +69,8 @@ exports.getUserArticles = async (req, res) => {
 
 exports.createArticle = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const user = await User.findById(userId);
     
     if (!user) {
@@ -127,7 +128,8 @@ exports.createArticle = async (req, res) => {
 
 exports.likeArticle = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const mongoose = require('mongoose');
     const article = await Article.findById(req.params.id);
     
@@ -158,7 +160,8 @@ exports.likeArticle = async (req, res) => {
 
 exports.deleteArticle = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const article = await Article.findOneAndDelete({ _id: req.params.id, user: userId });
     
     if (!article) {
@@ -206,7 +209,8 @@ exports.getArticleComments = async (req, res) => {
 
 exports.createArticleComment = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const user = await User.findById(userId);
     
     if (!user) {

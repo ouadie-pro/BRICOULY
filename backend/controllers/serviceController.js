@@ -17,13 +17,8 @@ exports.getProviderServices = async (req, res) => {
 
 exports.createService = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
-    const user = await User.findById(userId);
-    
-    if (!user) {
-      return res.status(403).json({ error: 'User not found' });
-    }
-    
+    if (!req.user) return res.status(401).json({ error: 'User not found' });
+    const userId = req.user.id.toString();
     const provider = await Provider.findOne({ user: userId });
     if (!provider) {
       return res.status(403).json({ error: 'Only providers can add services' });
@@ -47,7 +42,8 @@ exports.createService = async (req, res) => {
 
 exports.updateService = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const provider = await Provider.findOne({ user: userId });
     
     if (!provider) {
@@ -72,7 +68,8 @@ exports.updateService = async (req, res) => {
 
 exports.deleteService = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const provider = await Provider.findOne({ user: userId });
     
     if (!provider) {

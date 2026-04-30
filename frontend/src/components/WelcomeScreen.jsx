@@ -52,7 +52,7 @@ export default function WelcomeScreen() {
     if (token && user) {
       navigate('/home', { replace: true });
     } else {
-      navigate('/auth', { replace: true });
+      navigate('/auth?mode=signup', { replace: true });
     }
   }, [navigate]);
   
@@ -142,7 +142,7 @@ export default function WelcomeScreen() {
 
           <div className="space-y-4 mb-8">
             <Link
-              to="/auth"
+              to="/auth?mode=signup"
               className="group relative flex h-14 w-full cursor-pointer items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-r from-primary to-primary-dark px-6 text-white shadow-lg shadow-primary/30 transition-all hover:shadow-xl hover:shadow-primary/40 hover:-translate-y-0.5"
             >
               <span className="absolute right-0 -mt-12 -mr-12 h-32 w-32 translate-x-12 rotate-45 bg-white opacity-10 transition-all duration-1000 group-hover:-translate-x-40"></span>

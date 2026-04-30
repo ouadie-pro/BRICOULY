@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { auth } = require('../middleware/authMiddleware');
 const { upload } = require('../middleware/upload');
 const { 
   getProviderPortfolio, 
@@ -9,8 +10,8 @@ const {
 } = require('../controllers/portfolioController');
 
 router.get('/:providerId', getProviderPortfolio);
-router.post('/', createPortfolio);
-router.delete('/:id', deletePortfolio);
-router.post('/upload', upload.single('image'), uploadPortfolio);
+router.post('/', auth, createPortfolio);
+router.delete('/:id', auth, deletePortfolio);
+router.post('/upload', auth, upload.single('image'), uploadPortfolio);
 
 module.exports = router;

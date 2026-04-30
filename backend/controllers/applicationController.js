@@ -6,7 +6,8 @@ const Notification = require('../models/Notification');
 
 exports.applyToPost = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const { postId, message, proposedPrice } = req.body;
 
     if (!postId) {
@@ -86,7 +87,8 @@ exports.applyToPost = async (req, res) => {
 
 exports.getPostApplications = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const { postId } = req.params;
 
     const post = await Post.findById(postId);
@@ -127,7 +129,8 @@ exports.getPostApplications = async (req, res) => {
 
 exports.getMyApplications = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user.id.toString();
 
     const applications = await Application.find({ user: userId })
       .populate('post', 'content serviceType')
@@ -152,7 +155,8 @@ exports.getMyApplications = async (req, res) => {
 
 exports.updateApplicationStatus = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const { applicationId, status } = req.body;
 
     if (!applicationId || !status) {
@@ -204,7 +208,8 @@ exports.updateApplicationStatus = async (req, res) => {
 
 exports.withdrawApplication = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const { applicationId } = req.params;
 
     const application = await Application.findById(applicationId);

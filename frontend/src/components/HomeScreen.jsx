@@ -299,6 +299,44 @@ const ImageGrid = ({ images, compact = false, title = '', video = null }) => {
   );
 };
 
+const rankFeedItems = (items, currentUser) => {
+  const role = currentUser?.role;
+  const specialization = (currentUser?.specialization || '').toLowerCase();
+
+  return [...items].sort((a, b) => {
+    let scoreA = 0;
+    let scoreB = 0;
+
+    const ageA = Date.now() - new Date(a.createdAt || 0).getTime();
+    const ageB = Date.now() - new Date(b.createdAt || 0).getTime();
+    const maxAge = 7 * 24 * 60 * 60 * 1000;
+    scoreA += Math.max(0, 100 - (ageA / maxAge) * 100);
+    scoreB += Math.max(0, 100 - (ageB / maxAge) * 100);
+
+    const engagementA = (a.likesCount || 0) + (a.commentsCount || 0) * 2;
+    const engagementB = (b.likesCount || 0) + (b.commentsCount || 0) * 2;
+    scoreA += Math.min(50, engagementA * 5);
+    scoreB += Math.min(50, engagementB * 5);
+
+    if (role === 'client') {
+      if (a.title) scoreA += 20;
+      if (b.title) scoreB += 20;
+    }
+
+    if (role === 'provider' && specialization) {
+      const aCategory = (a.serviceCategory || a.type || '').toLowerCase();
+      const bCategory = (b.serviceCategory || b.type || '').toLowerCase();
+      if (aCategory.includes(specialization) || specialization.includes(aCategory)) scoreA += 30;
+      if (bCategory.includes(specialization) || specialization.includes(bCategory)) scoreB += 30;
+    }
+
+    if (a.images?.length > 0) scoreA += 15;
+    if (b.images?.length > 0) scoreB += 15;
+
+    return scoreB - scoreA;
+  });
+};
+
 const banner = {
   badge: 'New Offer',
   title: '20% Off Home Cleaning',
@@ -461,14 +499,13 @@ export default function HomeScreen({ isDesktop }) {
     };
   };
 
-  const buildFeed = (posts, articles) => {
+  const buildFeed = (posts, articles, currentUser) => {
     const normalized = [
       ...posts.map(normalizePost),
       ...articles.map(normalizeArticle),
     ];
-    // Sort newest first
-    normalized.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    return normalized;
+    const ranked = rankFeedItems(normalized, currentUser);
+    return ranked;
   };
 
   const fetchFeed = async () => {
@@ -479,7 +516,8 @@ export default function HomeScreen({ isDesktop }) {
       ]);
       const posts = Array.isArray(postsData) ? postsData : [];
       const articles = Array.isArray(articlesData) ? articlesData : [];
-      const unified = buildFeed(posts, articles);
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const unified = buildFeed(posts, articles, currentUser);
       setFeed(unified);
 
       const liked = new Set();
@@ -867,6 +905,32 @@ export default function HomeScreen({ isDesktop }) {
           </button>
         </div>
 
+        {/* Contextual action buttons — only for provider authors */}
+        {item.authorRole === 'provider' && (
+          <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
+            <button
+              onClick={() => navigate(`/provider/${item.authorId}`)}
+              className="text-xs font-medium px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 hover:border-primary hover:text-primary transition-colors"
+            >
+              View Profile
+            </button>
+            {storedUser?.role === 'client' && (
+              <button
+                onClick={() => navigate(`/book/${item.authorId}`)}
+                className="text-xs font-medium px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 hover:border-primary hover:text-primary transition-colors"
+              >
+                Book Now
+              </button>
+            )}
+            <button
+              onClick={() => navigate(`/messages/${item.authorId}`)}
+              className="text-xs font-medium px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 hover:border-primary hover:text-primary transition-colors"
+            >
+              Message
+            </button>
+          </div>
+        )}
+
         {/* Comments section */}
         {isExpanded && (
           <div className="mt-3 pt-3 border-t border-slate-100">
@@ -1163,7 +1227,21 @@ onClick={() => navigate(`/search?category=${encodeURIComponent(cat.name)}`)}
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {feed.slice(0, 5).map((item) => (
+              {feed.slice(0, 3).map((item) => (
+                <FeedCard key={item.feedId} item={item} compact />
+              ))}
+            </div>
+            {feed.length > 3 && (
+              <div className="flex items-center gap-3 my-4">
+                <div className="flex-1 h-px bg-slate-200" />
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  Recommended for you
+                </span>
+                <div className="flex-1 h-px bg-slate-200" />
+              </div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {feed.slice(3).map((item) => (
                 <FeedCard key={item.feedId} item={item} compact />
               ))}
             </div>
@@ -1495,7 +1573,23 @@ onClick={() => navigate(`/search?category=${encodeURIComponent(cat.name)}`)}
 
         <div className="flex flex-col gap-4">
           {feed.length > 0
-            ? feed.map((item) => (
+            ? feed.slice(0, 3).map((item) => (
+                <FeedCard key={item.feedId} item={item} compact={false} />
+              ))
+            : null}
+        </div>
+        {feed.length > 3 && (
+          <div className="flex items-center gap-3 my-4">
+            <div className="flex-1 h-px bg-slate-200" />
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              Recommended for you
+            </span>
+            <div className="flex-1 h-px bg-slate-200" />
+          </div>
+        )}
+        <div className="flex flex-col gap-4">
+          {feed.length > 3
+            ? feed.slice(3).map((item) => (
                 <FeedCard key={item.feedId} item={item} compact={false} />
               ))
             : null}

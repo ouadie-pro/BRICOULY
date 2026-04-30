@@ -205,6 +205,9 @@ export const api = {
     if (params.status) queryParams.append('status', params.status);
     if (params.page) queryParams.append('page', params.page);
     if (params.limit) queryParams.append('limit', params.limit);
+    if (params.city) queryParams.append('city', params.city);
+    if (params.minBudget) queryParams.append('minBudget', params.minBudget);
+    if (params.maxBudget) queryParams.append('maxBudget', params.maxBudget);
     const query = queryParams.toString();
     return safeFetch(`${API_BASE}/service-requests/provider${query ? '?' + query : ''}`);
   },
@@ -572,6 +575,33 @@ export const api = {
   cancelBooking: async (bookingId) => {
     return safeFetch(`${API_BASE}/bookings/${bookingId}`, {
       method: 'DELETE',
+    });
+  },
+
+  updateProviderAvailability: async (available, unavailableUntil = null) => {
+    return safeFetch(`${API_BASE}/providers/me/availability`, {
+      method: 'PATCH',
+      body: JSON.stringify({ available, unavailableUntil }),
+    });
+  },
+
+  updateWorkingHours: async (workingHours) => {
+    return safeFetch(`${API_BASE}/providers/me/working-hours`, {
+      method: 'PATCH',
+      body: JSON.stringify({ workingHours }),
+    });
+  },
+
+  markMessagesAsRead: async (otherUserId) => {
+    return safeFetch(`${API_BASE}/messages/${otherUserId}/read`, {
+      method: 'PUT',
+    });
+  },
+
+  sendTypingIndicator: async (toUserId, isTyping) => {
+    return safeFetch(`${API_BASE}/messages/typing`, {
+      method: 'POST',
+      body: JSON.stringify({ toUserId, isTyping }),
     });
   },
 };

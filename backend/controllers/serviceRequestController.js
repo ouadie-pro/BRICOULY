@@ -1,30 +1,6 @@
 const ServiceRequest = require('../models/ServiceRequest');
 const User = require('../models/User');
 const Provider = require('../models/Provider');
-const jwt = require('jsonwebtoken');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-
-const getUserFromRequest = async (req) => {
-  const authHeader = req.headers.authorization;
-  const userIdHeader = req.headers['x-user-id'];
-  
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    try {
-      const token = authHeader.split(' ')[1];
-      const decoded = jwt.verify(token, JWT_SECRET);
-      return await User.findById(decoded.id);
-    } catch (e) {
-      return null;
-    }
-  }
-  
-  if (userIdHeader) {
-    return await User.findById(userIdHeader);
-  }
-  
-  return null;
-};
 
 const formatServiceRequest = (req, sr) => {
   return {
@@ -62,11 +38,20 @@ exports.getServiceTypes = async (req, res) => {
 
 exports.getAllRequests = async (req, res) => {
   try {
-    const { status, serviceType, page = 1, limit = 20 } = req.query;
+    const { status, serviceType, city, maxBudget, minBudget, page = 1, limit = 20 } = req.query;
     
     const query = {};
     if (status) query.status = status;
     if (serviceType) query.serviceType = serviceType;
+    if (city) {
+      query.location = { $regex: city, $options: 'i' };
+    }
+    if (minBudget || maxBudget) {
+      query.budget = {};
+      if (minBudget) query.budget.$gte = parseFloat(minBudget);
+      if (maxBudget) query.budget.$lte = parseFloat(maxBudget);
+      if (Object.keys(query.budget).length === 0) delete query.budget;
+    }
     
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
@@ -97,39 +82,68 @@ exports.getAllRequests = async (req, res) => {
 
 exports.getRequestsForProvider = async (req, res) => {
   try {
-    const user = await getUserFromRequest(req);
-    
-    if (!user) {
-      return res.status(401).json({ success: false, error: 'Unauthorized' });
-    }
-    
-    if (user.role !== 'provider') {
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    if (req.user.role !== 'provider') {
       return res.status(403).json({ success: false, error: 'Only providers can access this endpoint' });
     }
     
-    const providerSpecialization = user.specialization || 'general';
-    const { status, page = 1, limit = 20 } = req.query;
+    const providerSpecialization = req.user.specialization || 'general';
+    const { status, page = 1, limit = 20, city, minBudget, maxBudget } = req.query;
     
     const query = {
       serviceType: providerSpecialization,
       status: status || 'open'
     };
     
+    if (city) {
+      query.location = { $regex: city, $options: 'i' };
+    }
+    if (minBudget || maxBudget) {
+      query.budget = {};
+      if (minBudget) query.budget.$gte = parseFloat(minBudget);
+      if (maxBudget) query.budget.$lte = parseFloat(maxBudget);
+      if (Object.keys(query.budget).length === 0) delete query.budget;
+    }
+    
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
-    const [requests, total] = await Promise.all([
-      ServiceRequest.find(query)
-        .populate('clientId', 'name email phone avatar location')
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(parseInt(limit)),
-      ServiceRequest.countDocuments(query)
-    ]);
+    const matchingRequests = await ServiceRequest.find(query)
+      .populate('clientId', 'name email phone avatar location')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
     
-    const requestsWithApplicationStatus = requests.map(sr => {
-      const formatted = formatServiceRequest(req, sr);
-      const myApplication = sr.applications?.find(
-        app => app.providerId?.toString() === user._id.toString()
+    const total = await ServiceRequest.countDocuments(query);
+    
+    const provider = await Provider.findOne({ user: req.user.id });
+    const providerCity = (provider?.city || '').toLowerCase().trim();
+    const providerHourlyRate = provider?.hourlyRate || 0;
+    
+    const scoredRequests = matchingRequests.map(request => {
+      let score = 100;
+
+      const requestCity = (request.location || '').toLowerCase().trim();
+      if (providerCity && requestCity && (
+        requestCity.includes(providerCity) || providerCity.includes(requestCity)
+      )) {
+        score += 50;
+      }
+
+      if (!request.budget || request.budget === 0) {
+        score += 15;
+      } else if (request.budget >= providerHourlyRate) {
+        score += 30;
+      }
+
+      const ageHours = (Date.now() - new Date(request.createdAt).getTime()) / 3600000;
+      if (ageHours < 24) score += 20;
+      else if (ageHours < 72) score += 10;
+
+      const formatted = formatServiceRequest(req, request);
+      formatted._matchScore = score;
+      
+      const myApplication = request.applications?.find(
+        app => app.providerId?.toString() === req.user.id.toString()
       );
       formatted.hasApplied = !!myApplication;
       formatted.myApplication = myApplication ? {
@@ -141,9 +155,11 @@ exports.getRequestsForProvider = async (req, res) => {
       return formatted;
     });
     
+    scoredRequests.sort((a, b) => b._matchScore - a._matchScore);
+    
     res.json({
       success: true,
-      requests: requestsWithApplicationStatus,
+      requests: scoredRequests,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -158,15 +174,11 @@ exports.getRequestsForProvider = async (req, res) => {
 
 exports.getRequestsForClient = async (req, res) => {
   try {
-    const user = await getUserFromRequest(req);
-    
-    if (!user) {
-      return res.status(401).json({ success: false, error: 'Unauthorized' });
-    }
-    
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const { status, page = 1, limit = 20 } = req.query;
     
-    const query = { clientId: user._id };
+    const query = { clientId: userId };
     if (status) query.status = status;
     
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -265,12 +277,8 @@ exports.getRequestById = async (req, res) => {
 
 exports.createRequest = async (req, res) => {
   try {
-    const user = await getUserFromRequest(req);
-    
-    if (!user) {
-      return res.status(401).json({ success: false, error: 'Unauthorized' });
-    }
-    
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const { title, description, serviceType, location, budget, preferredDate, preferredTime } = req.body;
     
     if (!title || !description || !serviceType) {
@@ -289,7 +297,7 @@ exports.createRequest = async (req, res) => {
     }
     
     const request = await ServiceRequest.create({
-      clientId: user._id,
+      clientId: userId,
       title,
       description,
       serviceType,
@@ -320,12 +328,8 @@ exports.createRequest = async (req, res) => {
 
 exports.updateRequest = async (req, res) => {
   try {
-    const user = await getUserFromRequest(req);
-    
-    if (!user) {
-      return res.status(401).json({ success: false, error: 'Unauthorized' });
-    }
-    
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const { id } = req.params;
     const { title, description, serviceType, location, budget, preferredDate, preferredTime, status } = req.body;
     
@@ -335,7 +339,7 @@ exports.updateRequest = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Service request not found' });
     }
     
-    if (request.clientId.toString() !== user._id.toString()) {
+    if (request.clientId.toString() !== userId) {
       return res.status(403).json({ 
         success: false, 
         error: 'You can only update your own service requests' 
@@ -384,12 +388,8 @@ exports.updateRequest = async (req, res) => {
 
 exports.deleteRequest = async (req, res) => {
   try {
-    const user = await getUserFromRequest(req);
-    
-    if (!user) {
-      return res.status(401).json({ success: false, error: 'Unauthorized' });
-    }
-    
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const { id } = req.params;
     
     const request = await ServiceRequest.findById(id);
@@ -398,7 +398,7 @@ exports.deleteRequest = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Service request not found' });
     }
     
-    if (request.clientId.toString() !== user._id.toString()) {
+    if (request.clientId.toString() !== userId) {
       return res.status(403).json({ 
         success: false, 
         error: 'You can only delete your own service requests' 
@@ -425,12 +425,8 @@ exports.deleteRequest = async (req, res) => {
 
 exports.applyToRequest = async (req, res) => {
   try {
-    const user = await getUserFromRequest(req);
-    
-    if (!user) {
-      return res.status(401).json({ success: false, error: 'Unauthorized' });
-    }
-    
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const { id } = req.params;
     const { message, proposedPrice } = req.body;
     
@@ -448,7 +444,7 @@ exports.applyToRequest = async (req, res) => {
     }
     
     const alreadyApplied = request.applications?.some(
-      app => app.providerId?.toString() === user._id.toString()
+      app => app.providerId?.toString() === userId
     );
     
     if (alreadyApplied) {
@@ -458,7 +454,7 @@ exports.applyToRequest = async (req, res) => {
       });
     }
     
-    if (request.clientId.toString() === user._id.toString()) {
+    if (request.clientId.toString() === userId) {
       return res.status(400).json({ 
         success: false, 
         error: 'You cannot apply to your own service request' 
@@ -466,7 +462,7 @@ exports.applyToRequest = async (req, res) => {
     }
     
     request.applications.push({
-      providerId: user._id,
+      providerId: userId,
       message: message || '',
       proposedPrice: proposedPrice ? parseFloat(proposedPrice) : null,
       status: 'pending'
@@ -478,7 +474,7 @@ exports.applyToRequest = async (req, res) => {
       success: true,
       message: 'Application submitted successfully',
       application: {
-        providerId: user._id.toString(),
+        providerId: userId,
         status: 'pending',
         message: message || '',
         proposedPrice: proposedPrice ? parseFloat(proposedPrice) : null,
@@ -492,12 +488,8 @@ exports.applyToRequest = async (req, res) => {
 
 exports.updateApplicationStatus = async (req, res) => {
   try {
-    const user = await getUserFromRequest(req);
-    
-    if (!user) {
-      return res.status(401).json({ success: false, error: 'Unauthorized' });
-    }
-    
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const { id, applicationId } = req.params;
     const { status, message } = req.body;
     
@@ -514,7 +506,7 @@ exports.updateApplicationStatus = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Service request not found' });
     }
     
-    if (request.clientId.toString() !== user._id.toString()) {
+    if (request.clientId.toString() !== userId) {
       return res.status(403).json({ 
         success: false, 
         error: 'Only the client can update application status' 
@@ -551,6 +543,29 @@ exports.updateApplicationStatus = async (req, res) => {
     
     await request.save();
     
+    const io = req.app.get('io');
+    if (io) {
+      const Notification = require('../models/Notification');
+      const notifType = status === 'accepted' ? 'application_accepted' : 'application_rejected';
+      await Notification.create({
+        user: new (require('mongoose').Types.ObjectId)(application.providerId.toString()),
+        type: notifType,
+        title: status === 'accepted' ? 'Application Accepted!' : 'Application Rejected',
+        text: status === 'accepted'
+          ? 'Your application was accepted. Contact the client to get started.'
+          : 'Your application was not selected for this job.',
+        fromUser: new (require('mongoose').Types.ObjectId)(userId),
+      });
+      io.to(`user:${application.providerId.toString()}`).emit('notification', {
+        type: notifType,
+        title: status === 'accepted' ? 'Application Accepted!' : 'Application Rejected',
+        text: status === 'accepted'
+          ? 'Your application was accepted. Contact the client to get started.'
+          : 'Your application was not selected for this job.',
+        fromUserId: userId.toString(),
+      });
+    }
+    
     res.json({
       success: true,
       message: `Application ${status} successfully`,
@@ -563,12 +578,8 @@ exports.updateApplicationStatus = async (req, res) => {
 
 exports.cancelApplication = async (req, res) => {
   try {
-    const user = await getUserFromRequest(req);
-    
-    if (!user) {
-      return res.status(401).json({ success: false, error: 'Unauthorized' });
-    }
-    
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const { id } = req.params;
     
     const request = await ServiceRequest.findById(id);
@@ -578,7 +589,7 @@ exports.cancelApplication = async (req, res) => {
     }
     
     const applicationIndex = request.applications.findIndex(
-      app => app.providerId?.toString() === user._id.toString()
+      app => app.providerId?.toString() === userId
     );
     
     if (applicationIndex === -1) {
@@ -608,12 +619,8 @@ exports.cancelApplication = async (req, res) => {
 
 exports.completeRequest = async (req, res) => {
   try {
-    const user = await getUserFromRequest(req);
-    
-    if (!user) {
-      return res.status(401).json({ success: false, error: 'Unauthorized' });
-    }
-    
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const { id } = req.params;
     
     const request = await ServiceRequest.findById(id);
@@ -622,8 +629,8 @@ exports.completeRequest = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Service request not found' });
     }
     
-    const isClient = request.clientId.toString() === user._id.toString();
-    const isAcceptedProvider = request.acceptedProviderId?.toString() === user._id.toString();
+    const isClient = request.clientId.toString() === userId;
+    const isAcceptedProvider = request.acceptedProviderId?.toString() === userId;
     
     if (!isClient && !isAcceptedProvider) {
       return res.status(403).json({ 

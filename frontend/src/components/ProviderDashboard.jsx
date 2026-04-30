@@ -17,6 +17,17 @@ export default function ProviderDashboard({ isDesktop }) {
   const [newService, setNewService] = useState({ name: '', description: '', price: '', category: 'other' });
   const [newPortfolioItem, setNewPortfolioItem] = useState({ title: '', description: '', image: null });
   const [loading, setLoading] = useState(true);
+  const [isAvailable, setIsAvailable] = useState(true);
+  const [showWorkingHours, setShowWorkingHours] = useState(false);
+  const [workingHours, setWorkingHours] = useState({
+    monday:    { open: '08:00', close: '18:00', active: true },
+    tuesday:   { open: '08:00', close: '18:00', active: true },
+    wednesday: { open: '08:00', close: '18:00', active: true },
+    thursday:  { open: '08:00', close: '18:00', active: true },
+    friday:    { open: '08:00', close: '18:00', active: true },
+    saturday:  { open: '09:00', close: '14:00', active: false },
+    sunday:    { open: '09:00', close: '14:00', active: false },
+  });
   const navigate = useNavigate();
 
   const calcCompletion = (provider) => {
@@ -72,6 +83,8 @@ export default function ProviderDashboard({ isDesktop }) {
       // Update user data if received
       if (userData) {
         setUser({ ...user, ...userData });
+        if (userData.available !== undefined) setIsAvailable(userData.available);
+        if (userData.workingHours) setWorkingHours(userData.workingHours);
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -115,6 +128,19 @@ export default function ProviderDashboard({ isDesktop }) {
   const handleRefresh = () => {
     if (user && user.id) {
       loadData(user.id);
+    }
+  };
+
+  const toggleAvailability = async () => {
+    const newVal = !isAvailable;
+    setIsAvailable(newVal);
+    await api.updateProviderAvailability(newVal);
+  };
+
+  const saveWorkingHours = async () => {
+    const res = await api.updateWorkingHours(workingHours);
+    if (res.success) {
+      setShowWorkingHours(false);
     }
   };
 
@@ -250,6 +276,17 @@ export default function ProviderDashboard({ isDesktop }) {
               <div className="flex items-center gap-2 mt-1 text-white/70 text-xs">
                 <span>⭐ {user.rating || 'Nouveau'}</span>
                 <span>📍 {user.city || 'Non défini'}</span>
+              </div>
+              <div className="flex items-center gap-3 mt-2">
+                <button
+                  onClick={toggleAvailability}
+                  className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold transition-all ${isAvailable
+                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                    : 'bg-red-100 text-red-600 hover:bg-red-200'}`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${isAvailable ? 'bg-green-500' : 'bg-red-500'}`} />
+                  {isAvailable ? 'Available' : 'Unavailable'}
+                </button>
               </div>
             </div>
           </div>
@@ -447,22 +484,33 @@ export default function ProviderDashboard({ isDesktop }) {
               <span className="meta-item">📍 {user.city || 'Non défini'}</span>
               <span className="meta-item">💰 {formatPrice(user.hourlyRate)} MAD/h</span>
             </div>
-            <div className="completion-bar">
-              <div className="completion-header">
-                <span>Profil complété à <strong>{completionPercent}%</strong></span>
-                {completionPercent < 100 && (
-                  <button onClick={() => navigate('/profile')} className="complete-link">
-                    Compléter mon profil →
-                  </button>
-                )}
+              <div className="completion-bar">
+                <div className="completion-header">
+                  <span>Profil complété à <strong>{completionPercent}%</strong></span>
+                  {completionPercent < 100 && (
+                    <button onClick={() => navigate('/profile')} className="complete-link">
+                      Compléter mon profil →
+                    </button>
+                  )}
+                </div>
+                <div className="bar">
+                  <div className="fill" style={{ width: `${completionPercent}%` }}></div>
+                </div>
               </div>
-              <div className="bar">
-                <div className="fill" style={{ width: `${completionPercent}%` }}></div>
+              <div className="flex items-center gap-3 mt-3">
+                <button
+                  onClick={toggleAvailability}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all ${isAvailable
+                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                    : 'bg-red-100 text-red-600 hover:bg-red-200'}`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${isAvailable ? 'bg-green-500' : 'bg-red-500'}`} />
+                  {isAvailable ? 'Available' : 'Unavailable'}
+                </button>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
       <div className="stats-row">
         {statCards.map((stat, index) => (
@@ -475,6 +523,13 @@ export default function ProviderDashboard({ isDesktop }) {
           </div>
         ))}
       </div>
+
+      {(stats.jobsDone === 0 && stats.activeJobs === 0 && stats.profileViews === 0) && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-xl text-sm text-blue-700 flex items-center gap-2">
+          <span>📊</span>
+          <span>Your stats will update as you complete bookings and receive profile visits.</span>
+        </div>
+      )}
 
       <div className="main-grid">
         <div className="services-card">
@@ -542,6 +597,50 @@ export default function ProviderDashboard({ isDesktop }) {
             </form>
           )}
         </div>
+      </div>
+
+      <div className="working-hours-section">
+        <div className="card-header" style={{ cursor: 'pointer' }} onClick={() => setShowWorkingHours(!showWorkingHours)}>
+          <h3>🕐 Working Hours</h3>
+          <span className="text-xs text-slate-500">{showWorkingHours ? 'Hide' : 'Show'} ▾</span>
+        </div>
+        {showWorkingHours && (
+          <div className="working-hours-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Day</th>
+                  <th>Active</th>
+                  <th>Open</th>
+                  <th>Close</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(workingHours).map(([day, hours]) => (
+                  <tr key={day}>
+                    <td className="font-medium capitalize">{day}</td>
+                    <td>
+                      <input type="checkbox" checked={hours.active}
+                        onChange={(e) => setWorkingHours(prev => ({ ...prev, [day]: { ...prev[day], active: e.target.checked } }))} />
+                    </td>
+                    <td>
+                      <input type="time" value={hours.open}
+                        onChange={(e) => setWorkingHours(prev => ({ ...prev, [day]: { ...prev[day], open: e.target.value } }))} />
+                    </td>
+                    <td>
+                      <input type="time" value={hours.close}
+                        onChange={(e) => setWorkingHours(prev => ({ ...prev, [day]: { ...prev[day], close: e.target.value } }))} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="flex gap-2 mt-3 justify-end">
+              <button onClick={() => setShowWorkingHours(false)} className="cancel-btn">Cancel</button>
+              <button onClick={saveWorkingHours} className="save-btn">Save</button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="portfolio-section">
@@ -635,6 +734,13 @@ export default function ProviderDashboard({ isDesktop }) {
                   {request.status === 'open' && (
                     <div className="request-actions">
                       <button onClick={() => handleApply(request.id)} className="accept-btn">✓ Postuler</button>
+                    </div>
+                  )}
+                  {request.status === 'in_progress' && request.clientId && (
+                    <div className="request-actions">
+                      <button onClick={() => navigate(`/messages/${request.clientId._id || request.clientId}`)} className="message-btn">
+                        <FiMessageCircle className="inline mr-1" /> Message
+                      </button>
                     </div>
                   )}
                 </div>
@@ -1211,6 +1317,24 @@ export default function ProviderDashboard({ isDesktop }) {
           background: #059669;
         }
 
+        .message-btn {
+          background: #3b82f6;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          padding: 6px 12px;
+          cursor: pointer;
+          font-size: 12px;
+          font-weight: 500;
+          transition: background 0.2s;
+          display: flex;
+          align-items: center;
+        }
+
+        .message-btn:hover {
+          background: #2563eb;
+        }
+
         .decline-btn {
           background: #ef4444;
           color: white;
@@ -1436,6 +1560,48 @@ export default function ProviderDashboard({ isDesktop }) {
           font-size: 14px;
           font-weight: 600;
           color: #1f2937;
+        }
+
+        .working-hours-section {
+          background: white;
+          border-radius: 12px;
+          padding: 20px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+          border: 1px solid #f0f0f0;
+        }
+
+        .working-hours-table table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 14px;
+        }
+
+        .working-hours-table th {
+          text-align: left;
+          padding: 8px 12px;
+          border-bottom: 2px solid #e5e7eb;
+          color: #6b7280;
+          font-weight: 600;
+          font-size: 12px;
+          text-transform: uppercase;
+        }
+
+        .working-hours-table td {
+          padding: 8px 12px;
+          border-bottom: 1px solid #f3f4f6;
+        }
+
+        .working-hours-table input[type="time"] {
+          padding: 6px 8px;
+          border: 1px solid #e5e7eb;
+          border-radius: 6px;
+          font-size: 13px;
+        }
+
+        .working-hours-table input[type="checkbox"] {
+          width: 18px;
+          height: 18px;
+          cursor: pointer;
         }
 
         @media (max-width: 1024px) {

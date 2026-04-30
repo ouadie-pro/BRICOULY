@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { auth } = require('../middleware/authMiddleware');
 const { 
   followUser, 
   respondFollowRequest, 
@@ -10,16 +11,11 @@ const {
   checkFollowStatus
 } = require('../controllers/followController');
 
-// FIXED: #8 - /following route moved from inline in server.js to router
-router.get('/following', getFollowing);
-
-router.post('/respond', respondFollowRequest);
-router.get('/requests', getFollowRequests);
-
-// Check if current user is following target user
-router.get('/status/:userId', checkFollowStatus);
-
-router.post('/:userId', followUser);
+router.get('/following', auth, getFollowing);
+router.post('/respond', auth, respondFollowRequest);
+router.get('/requests', auth, getFollowRequests);
+router.get('/status/:userId', auth, checkFollowStatus);
+router.post('/:userId', auth, followUser);
 router.get('/:id/followers', getFollowers);
 router.get('/:id/following', getFollowingByUserId);
 router.get('/:id', getFollowingByUserId);

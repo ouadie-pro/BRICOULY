@@ -1,12 +1,14 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
 import { 
   FiHome, FiSearch, FiPlayCircle, FiMessageCircle, FiUser, 
   FiBell, FiBellOff, FiUserPlus, FiUsers, FiCheckCircle, FiMenu, FiX,
-  FiChevronRight, FiLogOut, FiMapPin, FiChevronDown, FiTool, FiCalendar
+  FiChevronRight, FiLogOut, FiMapPin, FiChevronDown, FiTool, FiCalendar,
+  FiStar, FiXCircle
 } from 'react-icons/fi';
 import { GoTasklist } from 'react-icons/go';
+import { FiCalendar as FiCalendarNotif } from 'react-icons/fi';
 
 export default function Layout({ children, user, onLogout }) {
   const navigate = useNavigate();
@@ -20,6 +22,7 @@ export default function Layout({ children, user, onLogout }) {
   const [isSearching, setIsSearching] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMarkingRead, setIsMarkingRead] = useState(false);
+  const wsRef = useRef(null);
 
   useEffect(() => {
     const loadNotifications = async () => {
@@ -48,10 +51,38 @@ export default function Layout({ children, user, onLogout }) {
     const userId = user?.id || user?._id;
     if (userId) {
       loadNotifications();
+
+      const wsUrl = (import.meta.env.VITE_API_URL || 'http://localhost:3001')
+        .replace('http://', 'ws://')
+        .replace('https://', 'wss://');
+      
+      let ws;
+      try {
+        ws = new WebSocket(`${wsUrl}/socket.io/?EIO=4&transport=websocket`);
+        ws.onopen = () => {
+          ws.send(`42["join","${userId}"]`);
+        };
+        ws.onmessage = (event) => {
+          const data = event.data;
+          if (data.startsWith('42')) {
+            try {
+              const [eventName, payload] = JSON.parse(data.slice(2));
+              if (eventName === 'notification') {
+                setNotifications(prev => [payload, ...prev]);
+                setUnreadCount(prev => prev + 1);
+              }
+            } catch (_) {}
+          }
+        };
+        wsRef.current = ws;
+      } catch (_) {}
     }
 
-    const interval = setInterval(loadNotifications, 30000);
-    return () => clearInterval(interval);
+    const interval = setInterval(loadNotifications, 15000);
+    return () => {
+      clearInterval(interval);
+      try { wsRef.current?.close(); } catch (_) {}
+    };
   }, [user]);
 
   const handleMarkRead = async () => {
@@ -143,6 +174,10 @@ export default function Layout({ children, user, onLogout }) {
       case 'request_update': return FiCheckCircle;
       case 'follow_request': return FiUserPlus;
       case 'follow_accepted': return FiUsers;
+      case 'new_booking': return FiCalendarNotif;
+      case 'new_review': return FiStar;
+      case 'application_accepted': return FiCheckCircle;
+      case 'application_rejected': return FiXCircle;
       default: return FiBell;
     }
   };
@@ -152,6 +187,7 @@ export default function Layout({ children, user, onLogout }) {
     { path: '/search', icon: FiSearch, label: 'Search' },
     { path: '/videos', icon: FiPlayCircle, label: 'Videos' },
     { path: '/requests', icon: GoTasklist, label: 'My Requests' },
+    { path: '/bookings', icon: FiCalendar, label: 'Bookings' },
     { path: '/messages', icon: FiMessageCircle, label: 'Messages' },
     { path: '/profile', icon: FiUser, label: 'Profile' },
   ];
@@ -442,7 +478,10 @@ export default function Layout({ children, user, onLogout }) {
       </main>
 
       <nav className="mobile-nav">
-        {navItems.slice(0, 5).map((item) => (
+        {navItems
+          .filter(item => ['/home', '/search', '/requests', '/bookings', '/messages'].includes(item.path))
+          .slice(0, 5)
+          .map((item) => (
           <NavLink
             key={item.path}
             to={item.path}

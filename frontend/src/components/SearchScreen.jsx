@@ -6,6 +6,56 @@ import {
   FiBriefcase, FiClock
 } from 'react-icons/fi';
 
+const sortProviders = (list, sortBy) => {
+  if (!list || list.length === 0) return list;
+  const sorted = [...list];
+
+  switch (sortBy) {
+    case 'rating':
+      return sorted.sort((a, b) => {
+        const ratingDiff = (b.rating || 0) - (a.rating || 0);
+        if (ratingDiff !== 0) return ratingDiff;
+        const reviewDiff = (b.reviewCount || 0) - (a.reviewCount || 0);
+        if (reviewDiff !== 0) return reviewDiff;
+        return (b.verified ? 1 : 0) - (a.verified ? 1 : 0);
+      });
+
+    case 'jobs':
+      return sorted.sort((a, b) => {
+        const jobsDiff = (b.jobsDone || 0) - (a.jobsDone || 0);
+        if (jobsDiff !== 0) return jobsDiff;
+        return (b.rating || 0) - (a.rating || 0);
+      });
+
+    case 'price_low':
+      return sorted.sort((a, b) => {
+        const aRate = a.hourlyRate || 999999;
+        const bRate = b.hourlyRate || 999999;
+        return aRate - bRate;
+      });
+
+    case 'price_high':
+      return sorted.sort((a, b) => {
+        const aRate = a.hourlyRate || 0;
+        const bRate = b.hourlyRate || 0;
+        return bRate - aRate;
+      });
+
+    default:
+      return sorted.sort((a, b) => {
+        const scoreA = (a.rating || 0) * 20 +
+                       (a.reviewCount || 0) * 2 +
+                       (a.jobsDone || 0) * 3 +
+                       (a.verified ? 15 : 0);
+        const scoreB = (b.rating || 0) * 20 +
+                       (b.reviewCount || 0) * 2 +
+                       (b.jobsDone || 0) * 3 +
+                       (b.verified ? 15 : 0);
+        return scoreB - scoreA;
+      });
+  }
+};
+
 const StarRating = ({ rating, count }) => {
   const roundedRating = Math.round(rating || 0);
   return (
@@ -58,13 +108,15 @@ export default function SearchScreen({ isDesktop }) {
   const [sortBy, setSortBy] = useState('rating');
   const [loading, setLoading] = useState(true);
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
+  const rawProvidersRef = useRef([]);
 
-  const prevFiltersRef = useRef({ profession: '', search: '', sort: 'rating' });
+  const prevFiltersRef = useRef({ profession: '', search: '' });
 
   const filters = [
-    { value: 'rating', label: 'Top Rated' },
-    { value: 'price_low', label: 'Price: Low to High' },
-    { value: 'price_high', label: 'Price: High to Low' },
+    { value: 'rating', label: '⭐ Top Rated' },
+    { value: 'jobs', label: '🔨 Most Experienced' },
+    { value: 'price_low', label: '💰 Lowest Price' },
+    { value: 'price_high', label: '💎 Highest Price' },
   ];
 
   // Debounced search effect
@@ -98,13 +150,12 @@ export default function SearchScreen({ isDesktop }) {
   }, []);
 
   useEffect(() => {
-    const currentFilters = { profession: selectedProfession, search: debouncedSearchQuery, sort: sortBy };
+    const currentFilters = { profession: selectedProfession, search: debouncedSearchQuery };
     const prevFilters = prevFiltersRef.current;
     
     if (
       prevFilters.profession === currentFilters.profession &&
-      prevFilters.search === currentFilters.search &&
-      prevFilters.sort === currentFilters.sort
+      prevFilters.search === currentFilters.search
     ) {
       return;
     }
@@ -121,16 +172,24 @@ export default function SearchScreen({ isDesktop }) {
         });
         
         const providersList = Array.isArray(data) ? data : (data?.data || []);
-        setProviders(providersList);
+        rawProvidersRef.current = providersList;
+        setProviders(sortProviders(providersList, sortBy));
       } catch (error) {
         console.error('Error fetching providers:', error);
+        rawProvidersRef.current = [];
         setProviders([]);
       }
       setLoading(false);
     };
     
     fetchProviders();
-  }, [selectedProfession, debouncedSearchQuery, sortBy]);
+  }, [selectedProfession, debouncedSearchQuery]);
+
+  useEffect(() => {
+    if (rawProvidersRef.current.length > 0) {
+      setProviders(sortProviders(rawProvidersRef.current, sortBy));
+    }
+  }, [sortBy]);
 
   const getProviderLocation = (provider) => {
     if (provider.location) {
@@ -194,6 +253,15 @@ export default function SearchScreen({ isDesktop }) {
                   Pro Vérifié
                 </span>
               )}
+              {provider.available === false ? (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-500 font-medium">
+                  Unavailable
+                </span>
+              ) : (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-50 text-green-600 font-medium">
+                  ● Available
+                </span>
+              )}
             </div>
             <p className="text-slate-500 text-sm mt-0.5">{provider.profession}</p>
             <div className="flex items-center gap-1 text-slate-400 text-xs mt-1">
@@ -232,6 +300,12 @@ export default function SearchScreen({ isDesktop }) {
             <span className="text-xs text-slate-500">MAD/hr</span>
           </div>
           <div className="flex gap-2">
+            <button
+              onClick={() => navigate(`/provider/${provider.id}`)}
+              className="bg-white border border-slate-200 text-slate-600 hover:border-primary hover:text-primary text-sm font-medium px-4 py-2 rounded-lg transition-colors shadow-sm"
+            >
+              View Profile
+            </button>
             <button
               onClick={() => navigate(`/messages/${provider.id}`)}
               className="bg-white border border-blue-600 text-blue-600 hover:bg-blue-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors shadow-sm"

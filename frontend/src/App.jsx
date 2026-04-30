@@ -39,6 +39,13 @@ function ProtectedRoute({ user, loading, children }) {
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -68,22 +75,22 @@ function App() {
         setUser(userData);
         localStorage.setItem('user', JSON.stringify(userData));
       }} />} />
-      <Route path="/home" element={<ProtectedRoute user={user} loading={loading}><HomeScreen isDesktop /></ProtectedRoute>} />
-      <Route path="/search" element={<ProtectedRoute user={user} loading={loading}><SearchScreen isDesktop /></ProtectedRoute>} />
-      <Route path="/search/:q" element={<ProtectedRoute user={user} loading={loading}><SearchScreen isDesktop /></ProtectedRoute>} />
-      <Route path="/videos" element={<ProtectedRoute user={user} loading={loading}><VideosScreen isDesktop /></ProtectedRoute>} />
-      <Route path="/user/:id" element={<ProtectedRoute user={user} loading={loading}><ProfileScreen isDesktop isViewingOther /></ProtectedRoute>} />
-      <Route path="/provider/:id" element={<ProtectedRoute user={user} loading={loading}><ProviderProfileScreen isDesktop /></ProtectedRoute>} />
+      <Route path="/home" element={<ProtectedRoute user={user} loading={loading}><HomeScreen isDesktop={isDesktop} /></ProtectedRoute>} />
+      <Route path="/search" element={<ProtectedRoute user={user} loading={loading}><SearchScreen isDesktop={isDesktop} /></ProtectedRoute>} />
+      <Route path="/search/:q" element={<ProtectedRoute user={user} loading={loading}><SearchScreen isDesktop={isDesktop} /></ProtectedRoute>} />
+      <Route path="/videos" element={<ProtectedRoute user={user} loading={loading}><VideosScreen isDesktop={isDesktop} /></ProtectedRoute>} />
+      <Route path="/user/:id" element={<ProtectedRoute user={user} loading={loading}><ProfileScreen isDesktop={isDesktop} isViewingOther /></ProtectedRoute>} />
+      <Route path="/provider/:id" element={<ProtectedRoute user={user} loading={loading}><ProviderProfileScreen isDesktop={isDesktop} /></ProtectedRoute>} />
       <Route path="/provider/edit" element={<Navigate to="/profile" replace />} />
-      <Route path="/dashboard" element={<ProtectedRoute user={user} loading={loading}><ProviderDashboard isDesktop /></ProtectedRoute>} />
-      <Route path="/requests" element={<ProtectedRoute user={user} loading={loading}><MyRequestsScreen isDesktop /></ProtectedRoute>} />
-      <Route path="/profile" element={<ProtectedRoute user={user} loading={loading}><ProfileScreen isDesktop onUserUpdate={handleUserUpdate} /></ProtectedRoute>} />
-      <Route path="/messages" element={<ProtectedRoute user={user} loading={loading}><MessagesScreen isDesktop /></ProtectedRoute>} />
-      <Route path="/messages/:providerId" element={<ProtectedRoute user={user} loading={loading}><MessagesScreen isDesktop /></ProtectedRoute>} />
-      <Route path="/review/:providerId" element={<ProtectedRoute user={user} loading={loading}><ReviewScreen isDesktop /></ProtectedRoute>} />
-      <Route path="/book/:providerId" element={<ProtectedRoute user={user} loading={loading}><BookingScreen isDesktop /></ProtectedRoute>} />
-      <Route path="/bookings" element={<ProtectedRoute user={user} loading={loading}><BookingsScreen isDesktop /></ProtectedRoute>} />
-      <Route path="/provider-bookings" element={<ProtectedRoute user={user} loading={loading}><ProviderBookingsScreen isDesktop /></ProtectedRoute>} />
+      <Route path="/dashboard" element={<ProtectedRoute user={user} loading={loading}><ProviderDashboard isDesktop={isDesktop} /></ProtectedRoute>} />
+      <Route path="/requests" element={<ProtectedRoute user={user} loading={loading}><MyRequestsScreen isDesktop={isDesktop} /></ProtectedRoute>} />
+      <Route path="/profile" element={<ProtectedRoute user={user} loading={loading}><ProfileScreen isDesktop={isDesktop} onUserUpdate={handleUserUpdate} /></ProtectedRoute>} />
+      <Route path="/messages" element={<ProtectedRoute user={user} loading={loading}><MessagesScreen isDesktop={isDesktop} /></ProtectedRoute>} />
+      <Route path="/messages/:providerId" element={<ProtectedRoute user={user} loading={loading}><MessagesScreen isDesktop={isDesktop} /></ProtectedRoute>} />
+      <Route path="/review/:providerId" element={<ProtectedRoute user={user} loading={loading}><ReviewScreen isDesktop={isDesktop} /></ProtectedRoute>} />
+      <Route path="/book/:providerId" element={<ProtectedRoute user={user} loading={loading}><BookingScreen isDesktop={isDesktop} /></ProtectedRoute>} />
+      <Route path="/bookings" element={<ProtectedRoute user={user} loading={loading}><BookingsScreen isDesktop={isDesktop} /></ProtectedRoute>} />
+      <Route path="/provider-bookings" element={<ProtectedRoute user={user} loading={loading}><ProviderBookingsScreen isDesktop={isDesktop} /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

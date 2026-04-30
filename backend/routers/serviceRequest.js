@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { auth } = require('../middleware/authMiddleware');
 const {
   getServiceTypes,
   getAllRequests,
@@ -19,24 +20,24 @@ router.get('/service-types', getServiceTypes);
 
 router.get('/all', getAllRequests);
 
-router.get('/provider', getRequestsForProvider);
+router.get('/provider', auth, getRequestsForProvider);
 
-router.get('/client', getRequestsForClient);
+router.get('/client', auth, getRequestsForClient);
 
 router.get('/:id', getRequestById);
 
-router.post('/', createRequest);
+router.post('/', auth, createRequest);
 
-router.put('/:id', updateRequest);
+router.put('/:id', auth, updateRequest);
 
-router.delete('/:id', deleteRequest);
+router.delete('/:id', auth, deleteRequest);
 
-router.post('/:id/apply', applyToRequest);
+router.post('/:id/apply', auth, applyToRequest);
 
-router.delete('/:id/applications/:applicationId', cancelApplication);
+router.delete('/:id/applications/:applicationId', auth, cancelApplication);
 
-router.put('/:id/applications/:applicationId/status', updateApplicationStatus);
+router.put('/:id/applications/:applicationId/status', auth, updateApplicationStatus);
 
-router.put('/:id/complete', completeRequest);
+router.put('/:id/complete', auth, completeRequest);
 
 module.exports = router;

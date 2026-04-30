@@ -122,4 +122,46 @@ router.get('/:id/activity', async (req, res) => {
 router.post('/', auth, createProvider);
 router.put('/:id', auth, updateProvider);
 
+router.patch('/me/availability', auth, async (req, res) => {
+  try {
+    const { available, unavailableUntil } = req.body;
+    const provider = await Provider.findOneAndUpdate(
+      { user: req.user.id },
+      { 
+        available: available,
+        unavailableUntil: unavailableUntil || null
+      },
+      { new: true }
+    );
+    if (!provider) return res.status(404).json({ success: false, error: 'Provider not found' });
+    
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('providerAvailabilityChanged', {
+        providerId: req.user.id,
+        available: provider.available,
+      });
+    }
+    
+    res.json({ success: true, available: provider.available, unavailableUntil: provider.unavailableUntil });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.patch('/me/working-hours', auth, async (req, res) => {
+  try {
+    const { workingHours } = req.body;
+    const provider = await Provider.findOneAndUpdate(
+      { user: req.user.id },
+      { workingHours },
+      { new: true }
+    );
+    if (!provider) return res.status(404).json({ success: false, error: 'Provider not found' });
+    res.json({ success: true, workingHours: provider.workingHours });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

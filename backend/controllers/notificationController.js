@@ -3,7 +3,8 @@ const Notification = require('../models/Notification');
 exports.getNotifications = async (req, res) => {
   try {
     console.log('[getNotifications] Request received', { headers: req.headers });
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     console.log('[getNotifications] userId:', userId);
     
     if (!userId) {
@@ -36,7 +37,8 @@ exports.getNotifications = async (req, res) => {
 exports.markAsRead = async (req, res) => {
   try {
     console.log('[markAsRead] Request received', { headers: req.headers });
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     await Notification.updateMany({ user: userId }, { read: true });
     console.log('[markAsRead] Success for user:', userId);
     res.json({ success: true });
@@ -49,7 +51,8 @@ exports.markAsRead = async (req, res) => {
 exports.getUnreadCount = async (req, res) => {
   try {
     console.log('[getUnreadCount] Request received', { headers: req.headers });
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const count = await Notification.countDocuments({ user: userId, read: false });
     console.log('[getUnreadCount] Count:', count, 'for user:', userId);
     res.json({ count });

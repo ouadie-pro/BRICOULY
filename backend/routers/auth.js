@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const { upload } = require('../middleware/upload');
+const { auth } = require('../middleware/authMiddleware');
 const { signup, login, getMe, updateProfile, uploadAvatar, incrementProfileView, getSpecializations } = require('../controllers/authController');
 const User = require('../models/User');
 
@@ -18,8 +19,8 @@ const generateToken = (user) => {
 router.post('/signup', signup);
 router.post('/login', login);
 router.get('/me', getMe);
-router.put('/profile', updateProfile);
-router.post('/avatar', upload.single('file'), uploadAvatar);
+router.put('/profile', auth, updateProfile);
+router.post('/avatar', auth, upload.single('file'), uploadAvatar);
 router.patch('/users/:id/view', incrementProfileView);
 router.get('/specializations', getSpecializations);
 

@@ -106,6 +106,24 @@ exports.createBooking = async (req, res) => {
 
     console.log(`[createBooking] Booking ${booking._id} created successfully with client info`);
 
+    const io = req.app.get('io');
+    if (io) {
+      const Notification = require('../models/Notification');
+      await Notification.create({
+        user: new (require('mongoose').Types.ObjectId)(req.body.provider),
+        type: 'new_booking',
+        title: 'New Booking Request',
+        text: `${req.user.name} has requested a booking for ${bookingData.service}`,
+        fromUser: new (require('mongoose').Types.ObjectId)(req.user.id),
+      });
+      io.to(`user:${req.body.provider.toString()}`).emit('notification', {
+        type: 'new_booking',
+        title: 'New Booking Request',
+        text: `${req.user.name} has requested a booking for ${bookingData.service}`,
+        fromUserId: req.user.id.toString(),
+      });
+    }
+
     res.status(201).json({
       success: true,
       booking: populatedBooking,

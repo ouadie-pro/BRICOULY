@@ -29,7 +29,8 @@ exports.getVideos = async (req, res) => {
 
 exports.createVideo = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const user = await User.findById(userId);
     
     if (!user) {
@@ -74,7 +75,8 @@ exports.createVideo = async (req, res) => {
 
 exports.likeVideo = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const video = await Video.findById(req.params.id);
     
     if (!video) {
@@ -104,7 +106,8 @@ exports.likeVideo = async (req, res) => {
 
 exports.deleteVideo = async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.user.id.toString();
     const video = await Video.findOneAndDelete({ _id: req.params.id, user: userId });
     
     if (!video) {
