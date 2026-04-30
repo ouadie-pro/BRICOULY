@@ -80,7 +80,11 @@ export default function ProviderProfileScreen({ isDesktop }) {
         // Fetch services
         const servicesData = await api.getProviderServices(id);
         console.log('[ProviderProfile] Services data:', servicesData);
-        setServices(Array.isArray(servicesData) ? servicesData : []);
+        const normalizedServices = (servicesData || []).map(s => ({
+          ...s,
+          id: s._id || s.id
+        }));
+        setServices(normalizedServices);
         
         // Fetch reviews
         const reviewsData = await api.getProviderReviews(id);

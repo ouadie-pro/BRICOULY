@@ -208,7 +208,7 @@ export const api = {
   },
 
   addPortfolioItem: async (formData) => {
-    return safeFetch(`${API_BASE}/portfolio`, { 
+    return safeFetch(`${API_BASE}/portfolio/upload`, { 
       method: 'POST', 
       headers: getAuthHeaders(), 
       body: formData 
