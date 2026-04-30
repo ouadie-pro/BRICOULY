@@ -1295,7 +1295,7 @@ onClick={() => navigate(`/search?category=${encodeURIComponent(cat.name)}`)}
                         </h3>
                         <div className="flex items-center gap-1 bg-yellow-100 dark:bg-yellow-900/30 px-1.5 py-0.5 rounded text-xs font-bold text-yellow-700 dark:text-yellow-500">
                           <FiStar style={{ fontSize: '14px' }} />
-                          {provider.rating}
+                          {provider.rating > 0 ? provider.rating.toFixed(1) : 'New'}
                         </div>
                       </div>
                       <p className="text-slate-500 dark:text-slate-400 text-sm">
@@ -1305,9 +1305,7 @@ onClick={() => navigate(`/search?category=${encodeURIComponent(cat.name)}`)}
                     <div className="flex items-end justify-between mt-2">
                         <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500 text-xs">
                           <FiMapPin style={{ fontSize: '14px' }} />
-                          {provider.calculatedDistance !== undefined 
-                            ? `${provider.calculatedDistance} km`
-                            : `${Math.round((provider.distance || 0) * 10) / 10} km`}
+                          {provider.city || (typeof provider.location === 'string' ? provider.location : '') || 'Maroc'}
                         </div>
                       <div className="flex items-center gap-3">
                         <span className="font-bold text-primary">
@@ -1638,7 +1636,7 @@ onClick={() => navigate(`/search?category=${encodeURIComponent(cat.name)}`)}
                     <h3 className="font-bold text-slate-900">{provider.name}</h3>
                     <div className="flex items-center gap-1 bg-yellow-100 px-1.5 py-0.5 rounded text-xs font-bold text-yellow-700">
                       <FiStar style={{ fontSize: '14px' }} />
-                      {provider.rating}
+                      {provider.rating > 0 ? provider.rating.toFixed(1) : 'New'}
                     </div>
                   </div>
                   <p className="text-slate-500 text-sm mt-1">
@@ -1646,12 +1644,10 @@ onClick={() => navigate(`/search?category=${encodeURIComponent(cat.name)}`)}
                   </p>
                 </div>
                 <div className="flex items-end justify-between mt-3">
-                  <div className="flex items-center gap-1 text-slate-400 text-xs">
-                    <FiMapPin style={{ fontSize: '14px' }} />
-                    {provider.calculatedDistance !== undefined 
-                      ? `${provider.calculatedDistance} km`
-                      : `${Math.round((provider.distance || 0) * 10) / 10} km`}
-                  </div>
+                    <div className="flex items-center gap-1 text-slate-400 text-xs">
+                      <FiMapPin style={{ fontSize: '14px' }} />
+                      {provider.city || (typeof provider.location === 'string' ? provider.location : '') || 'Maroc'}
+                    </div>
                   <div className="flex items-center gap-3">
                     <span className="font-bold text-primary">
                       {formatCurrency(provider.hourlyRate || 0)}

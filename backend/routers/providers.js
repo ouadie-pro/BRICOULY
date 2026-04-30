@@ -68,6 +68,29 @@ router.get('/:id/stats', async (req, res) => {
   }
 });
 
+router.post('/recalculate-stats', async (req, res) => {
+  try {
+    const Provider = require('../models/Provider');
+    const { calculateProviderStats } = require('../controllers/userController');
+    
+    const providers = await Provider.find({});
+    let updated = 0;
+    
+    for (const provider of providers) {
+      const stats = await calculateProviderStats(provider._id);
+      await Provider.findByIdAndUpdate(provider._id, {
+        rating: stats.rating,
+        reviewCount: stats.reviewCount,
+      });
+      updated++;
+    }
+    
+    res.json({ success: true, updated, total: providers.length });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 router.get('/:id/activity', async (req, res) => {
   try {
     const ServiceRequest = require('../models/ServiceRequest');

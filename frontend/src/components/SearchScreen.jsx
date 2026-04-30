@@ -163,30 +163,30 @@ export default function SearchScreen({ isDesktop }) {
     prevFiltersRef.current = currentFilters;
     
     const fetchProviders = async () => {
-      setLoading(true);
-      try {
-        const data = await api.getProviders({
-          profession: selectedProfession,
-          search: debouncedSearchQuery,
-          sort: sortBy,
-        });
-        
-        const providersList = Array.isArray(data) ? data : (data?.data || []);
-        rawProvidersRef.current = providersList;
-        setProviders(sortProviders(providersList, sortBy));
-      } catch (error) {
-        console.error('Error fetching providers:', error);
-        rawProvidersRef.current = [];
-        setProviders([]);
-      }
-      setLoading(false);
-    };
+  setLoading(true);
+  try {
+    const data = await api.getProviders({
+      profession: selectedProfession,
+      search: debouncedSearchQuery,
+      sort: sortBy,
+    });
+    
+    // The API now returns the providers directly (array)
+    const providersList = Array.isArray(data) ? data : (data?.data || []);
+    console.log('[SearchScreen] Providers fetched:', providersList.length);
+    setProviders(providersList);
+  } catch (error) {
+    console.error('Error fetching providers:', error);
+    setProviders([]);
+  }
+  setLoading(false);
+};
     
     fetchProviders();
   }, [selectedProfession, debouncedSearchQuery]);
 
   useEffect(() => {
-    if (rawProvidersRef.current.length > 0) {
+    if (Array.isArray(rawProvidersRef.current) && rawProvidersRef.current.length > 0) {
       setProviders(sortProviders(rawProvidersRef.current, sortBy));
     }
   }, [sortBy]);

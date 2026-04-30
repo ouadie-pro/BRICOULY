@@ -1,1418 +1,678 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../services/api';
-import RatingModal from './RatingModal';
 import { 
-  FiArrowLeft, FiShare2, FiCheckCircle, FiStar, FiMessageCircle, FiCalendar, FiCheck, FiX,
-  FiMapPin, FiPhone, FiMail, FiUserPlus, FiUserMinus, FiUsers, FiAlertCircle, FiPlay,
-  FiPlus, FiEdit2, FiTrash2, FiLoader, FiChevronLeft, FiChevronRight, FiClock
+  FiArrowLeft, FiStar, FiMapPin, FiClock, FiTool, FiMessageCircle, 
+  FiCalendar, FiCheckCircle, FiAward, FiUsers, FiBriefcase,
+  FiMail, FiPhone, FiGlobe, FiThumbsUp, FiShare2, FiBookmark,
+  FiCheck, FiX, FiEdit2, FiPlus, FiTrash2, FiLoader
 } from 'react-icons/fi';
 
-const formatCurrency = (amount) => `${amount} MAD`;
-
-const formatRelativeTime = (dateStr) => {
-  if (!dateStr) return '';
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now - date;
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffHours < 1) return 'À l\'instant';
-  if (diffHours < 24) return `Il y a ${diffHours} heure${diffHours > 1 ? 's' : ''}`;
-  if (diffDays === 1) return 'Hier';
-  if (diffDays < 7) return `Il y a ${diffDays} jour${diffDays > 1 ? 's' : ''}`;
-  if (diffDays < 30) return `Il y a ${Math.floor(diffDays / 7)} semaine${Math.floor(diffDays / 7) > 1 ? 's' : ''}`;
-  return date.toLocaleDateString('fr-FR');
-};
-
-const formatDate = (dateStr) => {
-  if (!dateStr) return '';
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
-};
-
-const StarRating = ({ rating, count, size = 14 }) => {
-  const roundedRating = Math.round(rating || 0);
+const StarRating = ({ rating, count, size = 'md' }) => {
+  const fullStars = Math.floor(rating || 0);
+  const hasHalfStar = (rating || 0) - fullStars >= 0.5;
+  const starSize = size === 'sm' ? 'text-sm' : size === 'lg' ? 'text-2xl' : 'text-base';
+  
   return (
-    <div className="flex items-center gap-0.5">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <span 
-          key={star} 
-          style={{ 
-            color: star <= roundedRating ? '#f59e0b' : '#d1d5db',
-            fontSize: `${size}px`
-          }}
-        >
-          ★
-        </span>
-      ))}
-      {count !== undefined && count > 0 && (
-        <span className="text-xs text-slate-500 ml-1">({count})</span>
+    <div className="flex items-center gap-1">
+      <div className="flex">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <FiStar
+            key={star}
+            className={`${starSize} ${star <= fullStars ? 'text-yellow-400 fill-yellow-400' : 
+              star === fullStars + 1 && hasHalfStar ? 'text-yellow-400' : 'text-gray-300'}`}
+          />
+        ))}
+      </div>
+      {rating > 0 && (
+        <span className="text-sm font-medium text-gray-700">{rating.toFixed(1)}</span>
+      )}
+      {count > 0 && (
+        <span className="text-sm text-gray-500">({count} reviews)</span>
       )}
     </div>
   );
 };
 
 const formatPhone = (phone) => {
-  if (!phone) return 'Non renseigné';
+  if (!phone) return 'Not provided';
   if (phone.startsWith('+')) return phone;
   if (phone.startsWith('0')) return `+212 ${phone.slice(1)}`;
   return phone;
 };
 
-const getResponseTimeDisplay = (responseTime) => {
-  if (responseTime) return responseTime;
-  return '< 1h';
-};
-
-const PortfolioLightbox = ({ items, currentIndex, onClose, onNext, onPrev }) => {
-  if (currentIndex === null) return null;
-  
-  return (
-    <div 
-      className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center"
-      onClick={onClose}
-    >
-      <button 
-        className="absolute top-4 right-4 p-2 text-white/80 hover:text-white transition-colors z-10"
-        onClick={onClose}
-      >
-        <FiX style={{ fontSize: '32px' }} />
-      </button>
-      
-      {currentIndex > 0 && (
-        <button 
-          className="absolute left-4 p-3 text-white/80 hover:text-white transition-colors z-10 bg-black/30 rounded-full"
-          onClick={(e) => { e.stopPropagation(); onPrev(); }}
-        >
-          <FiChevronLeft style={{ fontSize: '32px' }} />
-        </button>
-      )}
-      
-      {currentIndex < items.length - 1 && (
-        <button 
-          className="absolute right-4 p-3 text-white/80 hover:text-white transition-colors z-10 bg-black/30 rounded-full"
-          onClick={(e) => { e.stopPropagation(); onNext(); }}
-        >
-          <FiChevronRight style={{ fontSize: '32px' }} />
-        </button>
-      )}
-      
-      <div 
-        className="max-w-4xl max-h-[90vh] w-full mx-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <img 
-          src={items[currentIndex]?.imageUrl || items[currentIndex]?.image} 
-          alt={items[currentIndex]?.caption || items[currentIndex]?.title}
-          className="w-full h-full max-h-[85vh] object-contain rounded-lg"
-        />
-        {items[currentIndex]?.title && (
-          <p className="text-white text-center mt-4">{items[currentIndex].title}</p>
-        )}
-        <div className="flex justify-center items-center gap-4 mt-4 text-white">
-          <span className="text-sm opacity-70">
-            {currentIndex + 1} / {items.length}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 export default function ProviderProfileScreen({ isDesktop }) {
   const { id } = useParams();
-  const [provider, setProvider] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [reviews, setReviews] = useState([]);
-  const [services, setServices] = useState([]);
-  const [portfolio, setPortfolio] = useState([]);
-  const [activeTab, setActiveTab] = useState('about');
-  const [showRequestModal, setShowRequestModal] = useState(false);
-  const [selectedService, setSelectedService] = useState('');
-  const [requestDescription, setRequestDescription] = useState('');
-  const [requestSent, setRequestSent] = useState(false);
-  const [following, setFollowing] = useState(false);
-  const [completedBookings, setCompletedBookings] = useState([]);
-  const [showRatingModal, setShowRatingModal] = useState(false);
-  const [selectedBooking, setSelectedBooking] = useState(null);
-  const [userReview, setUserReview] = useState(null);
-  const [editingReview, setEditingReview] = useState(false);
-  const [canReview, setCanReview] = useState(false);
-  const [reviewCheckMessage, setReviewCheckMessage] = useState('');
-  
-  // Service form state
-  const [showServiceForm, setShowServiceForm] = useState(false);
-  const [editingService, setEditingService] = useState(null);
-  const [serviceName, setServiceName] = useState('');
-  const [serviceDescription, setServiceDescription] = useState('');
-  const [servicePrice, setServicePrice] = useState('');
-  const [serviceCategory, setServiceCategory] = useState('other');
-  const [savingService, setSavingService] = useState(false);
-  
   const navigate = useNavigate();
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-  const [portfolioLightboxIndex, setPortfolioLightboxIndex] = useState(null);
-
-  const openPortfolioLightbox = (index) => {
-    setPortfolioLightboxIndex(index);
-  };
-
-  const closePortfolioLightbox = () => {
-    setPortfolioLightboxIndex(null);
-  };
-
-  const prevPortfolioImage = () => {
-    if (portfolioLightboxIndex > 0) {
-      setPortfolioLightboxIndex(portfolioLightboxIndex - 1);
-    }
-  };
-
-  const nextPortfolioImage = () => {
-    if (portfolioLightboxIndex < portfolio.length - 1) {
-      setPortfolioLightboxIndex(portfolioLightboxIndex + 1);
-    }
-  };
+  const isProviderOwner = currentUser.role === 'provider' && String(currentUser.id) === String(id);
+  
+  const [provider, setProvider] = useState(null);
+  const [services, setServices] = useState([]);
+  const [reviews, setReviews] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showAddService, setShowAddService] = useState(false);
+  const [newService, setNewService] = useState({ name: '', description: '', price: '' });
+  const [editingService, setEditingService] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (portfolioLightboxIndex === null) return;
-      if (e.key === 'Escape') closePortfolioLightbox();
-      if (e.key === 'ArrowRight') nextPortfolioImage();
-      if (e.key === 'ArrowLeft') prevPortfolioImage();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [portfolioLightboxIndex]);
-
-  useEffect(() => {
-    const abortController = new AbortController();
-    let isMounted = true;
-    
-    const fetchData = async () => {
+    const fetchProviderData = async () => {
       setLoading(true);
       setError(null);
+      
       try {
-        const userStr = localStorage.getItem('user');
-        const token = localStorage.getItem('token');
-        const currentUser = userStr ? JSON.parse(userStr) : null;
+        console.log('[ProviderProfile] Fetching provider with ID:', id);
         
-        const isAuthenticated = !!token && currentUser?.id;
-        const isOwnProfile = isAuthenticated && String(currentUser.id) === String(id);
-
-        const [providerData, reviewsData, followStatusData, servicesData, portfolioData, bookingsData, canReviewData] = await Promise.all([
-          api.getProvider(id),
-          api.getProviderReviews(id),
-          isAuthenticated && !isOwnProfile ? api.checkFollowStatus(id) : Promise.resolve({ following: false }),
-          api.getProviderServices(id),
-          api.getPortfolio(id),
-          isAuthenticated && currentUser.role === 'user' ? api.getCompletedBookings() : Promise.resolve([]),
-          isAuthenticated && currentUser.role === 'user' ? api.checkCanReview(id) : Promise.resolve({ canReview: false, reason: 'Only clients can leave reviews' }),
-        ]);
-
-        if (!isMounted) return;
-
-        if (!isOwnProfile && id && /^[a-f0-9]{24}$/i.test(id)) {
-          api.incrementProfileView(id).catch(() => {});
-        }
-
-        if (bookingsData?.bookings) {
-          const providerBookings = bookingsData.bookings.filter(
-            b => b.provider?.user?._id === id || b.provider?.user === id
-          );
-          setCompletedBookings(providerBookings);
-        } else if (Array.isArray(bookingsData)) {
-          const providerBookings = bookingsData.filter(
-            b => b.provider?.user?._id === id || b.provider?.user === id
-          );
-          setCompletedBookings(providerBookings);
-        }
-
-        if (providerData && !providerData.error && providerData.name) {
-          setProvider(providerData);
-          if (providerData.services?.length > 0) {
-            setSelectedService(providerData.services[0].name);
-          }
-        } else if (providerData?.success === false || providerData?.error) {
-          setError(providerData?.error || 'Failed to load provider');
-        } else if (!providerData?.name) {
-          setError('Provider not found');
-        } else {
-          setError('Failed to load provider');
-        }
-
-        const reviewsArray = Array.isArray(reviewsData) ? reviewsData : (reviewsData?.reviews || []);
-        setReviews(reviewsArray);
-        setServices(servicesData || []);
-        setPortfolio(portfolioData || []);
-
-        if (isAuthenticated && Array.isArray(reviewsArray)) {
-          const existingUserReview = reviewsArray.find(
-            r => String(r.clientId) === String(currentUser.id)
-          );
-          setUserReview(existingUserReview || null);
-        }
-
-        setFollowing(followStatusData?.following || false);
-        setCanReview(canReviewData?.canReview || false);
-        setReviewCheckMessage(canReviewData?.reason || '');
-      } catch (err) {
-        if (!isMounted) return;
-        console.error('[ProviderProfileScreen] Fetch error:', err);
-        setError('Failed to load provider. Please try again.');
-      } finally {
-        if (isMounted) {
+        // Fetch provider details
+        const providerData = await api.getProvider(id);
+        console.log('[ProviderProfile] Provider data:', providerData);
+        
+        if (!providerData || providerData.error) {
+          setError(providerData?.error || 'Provider not found');
           setLoading(false);
+          return;
         }
+        
+        setProvider(providerData);
+        
+        // Fetch services
+        const servicesData = await api.getProviderServices(id);
+        console.log('[ProviderProfile] Services data:', servicesData);
+        setServices(Array.isArray(servicesData) ? servicesData : []);
+        
+        // Fetch reviews
+        const reviewsData = await api.getProviderReviews(id);
+        console.log('[ProviderProfile] Reviews data:', reviewsData);
+        setReviews(Array.isArray(reviewsData) ? reviewsData : []);
+        
+      } catch (err) {
+        console.error('[ProviderProfile] Error:', err);
+        setError(err.message || 'Failed to load provider data');
+      } finally {
+        setLoading(false);
       }
     };
     
     if (id) {
-      fetchData();
+      fetchProviderData();
     }
-    
-    return () => {
-      isMounted = false;
-      abortController.abort();
-    };
   }, [id]);
 
-  // Service CRUD handlers
-  const handleAddService = async () => {
-    if (!serviceName.trim() || !servicePrice) return;
-    setSavingService(true);
+  const handleAddService = async (e) => {
+    e.preventDefault();
+    if (!newService.name || !newService.price) {
+      alert('Please enter service name and price');
+      return;
+    }
+    
+    setIsSubmitting(true);
     try {
       const result = await api.addService({
-        name: serviceName,
-        description: serviceDescription,
-        price: parseInt(servicePrice),
-        category: serviceCategory,
+        name: newService.name,
+        description: newService.description,
+        price: parseFloat(newService.price)
       });
+      
       if (result.success) {
         setServices([...services, result.service]);
-        setShowServiceForm(false);
-        resetServiceForm();
+        setNewService({ name: '', description: '', price: '' });
+        setShowAddService(false);
+      } else {
+        alert(result.error || 'Failed to add service');
       }
     } catch (err) {
       console.error('Error adding service:', err);
+      alert('Failed to add service');
     } finally {
-      setSavingService(false);
+      setIsSubmitting(false);
     }
   };
 
-  const handleUpdateService = async () => {
-    if (!editingService || !serviceName.trim() || !servicePrice) return;
-    setSavingService(true);
+  const handleUpdateService = async (serviceId, updatedData) => {
+    setIsSubmitting(true);
     try {
-      const result = await api.updateService(editingService.id, {
-        name: serviceName,
-        description: serviceDescription,
-        price: parseInt(servicePrice),
-        category: serviceCategory,
-      });
+      const result = await api.updateService(serviceId, updatedData);
       if (result.success) {
-        setServices(services.map(s => s.id === editingService.id ? result.service : s));
-        setShowServiceForm(false);
+        setServices(services.map(s => s.id === serviceId ? result.service : s));
         setEditingService(null);
-        resetServiceForm();
+      } else {
+        alert(result.error || 'Failed to update service');
       }
     } catch (err) {
       console.error('Error updating service:', err);
+      alert('Failed to update service');
     } finally {
-      setSavingService(false);
+      setIsSubmitting(false);
     }
   };
 
   const handleDeleteService = async (serviceId) => {
-    if (!window.confirm('Are you sure you want to delete this service?')) return;
+    if (!confirm('Are you sure you want to delete this service?')) return;
+    
+    setIsSubmitting(true);
     try {
       const result = await api.deleteService(serviceId);
       if (result.success) {
         setServices(services.filter(s => s.id !== serviceId));
+      } else {
+        alert(result.error || 'Failed to delete service');
       }
     } catch (err) {
       console.error('Error deleting service:', err);
+      alert('Failed to delete service');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const openEditService = (service) => {
-    setEditingService(service);
-    setServiceName(service.name || '');
-    setServiceDescription(service.description || '');
-    setServicePrice(service.price?.toString() || '');
-    setServiceCategory(service.category || 'other');
-    setShowServiceForm(true);
+  const handleMessage = () => {
+    navigate(`/messages/${id}`);
   };
 
-  const resetServiceForm = () => {
-    setServiceName('');
-    setServiceDescription('');
-    setServicePrice('');
-    setServiceCategory('other');
-    setEditingService(null);
+  const handleBook = () => {
+    navigate(`/book/${id}`);
   };
-
-  const handleRequestService = async (e) => {
-    e.preventDefault();
-    const res = await api.createServiceRequest({
-      providerId: id,
-      serviceName: selectedService,
-      description: requestDescription,
-    });
-    if (res.success) {
-      setRequestSent(true);
-      setTimeout(() => {
-        setShowRequestModal(false);
-        setRequestSent(false);
-      }, 2000);
-    }
-  };
-
-  const handleFollow = async () => {
-    const userStr = localStorage.getItem('user');
-    const currentUser = userStr ? JSON.parse(userStr) : null;
-    
-    if (!currentUser?.id) {
-      alert('Please login to follow this provider');
-      return;
-    }
-    
-    if (currentUser.id === id) {
-      alert('You cannot follow yourself');
-      return;
-    }
-    
-    const res = await api.followUser(id);
-    if (res.success) {
-      setFollowing(res.following);
-    } else if (res.error) {
-      console.error('Follow error:', res.error);
-    }
-  };
-
-  const handleOpenRatingModal = (booking) => {
-    setSelectedBooking(booking);
-    setShowRatingModal(true);
-  };
-
-  const handleReviewSubmitted = (result, serviceRequestId) => {
-    // Remove the booking from the list of completed bookings
-    if (selectedBooking) {
-      setCompletedBookings(prev => prev.filter(b => 
-        (b._id || b.id) !== (selectedBooking._id || selectedBooking.id)
-      ));
-    }
-    // Refresh reviews
-    api.getProviderReviews(id).then(reviewsData => {
-      const reviews = Array.isArray(reviewsData) ? reviewsData : (reviewsData?.reviews || []);
-      setReviews(reviews);
-      const userStr = localStorage.getItem('user');
-      const currentUser = userStr ? JSON.parse(userStr) : null;
-      if (currentUser?.id) {
-        const existingUserReview = reviews.find(
-          r => String(r.clientId) === String(currentUser.id)
-        );
-        setUserReview(existingUserReview || null);
-      }
-      
-      // Update canReview status after submission
-      if (currentUser?.id && currentUser.role === 'user') {
-        api.checkCanReview(id).then(canReviewData => {
-          setCanReview(canReviewData?.canReview || false);
-          setReviewCheckMessage(canReviewData?.reason || '');
-        });
-      }
-    });
-    // Update provider rating in local state
-    if (result.newRating !== undefined) {
-      setProvider(prev => ({
-        ...prev,
-        rating: result.newRating,
-        reviewCount: result.reviewCount
-      }));
-    }
-    setEditingReview(false);
-  };
-
-  const handleOpenReviewModal = () => {
-    if (userReview) {
-      setEditingReview(true);
-      setSelectedBooking(null);
-    } else {
-      setSelectedBooking(null);
-      setEditingReview(false);
-    }
-    setShowRatingModal(true);
-  };
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-background-light dark:bg-background-dark p-4">
-        <FiAlertCircle style={{ fontSize: '60px' }} className="text-6xl text-slate-300 mb-4" />
-        <p className="text-slate-500 text-lg">{error}</p>
-        <button onClick={() => navigate(-1)} className="mt-4 px-4 py-2 bg-primary text-white rounded-lg">
-          Go Back
-        </button>
-      </div>
-    );
-  }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-background-light dark:bg-background-dark">
-        <FiLoader className="animate-spin text-4xl text-primary" />
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <FiLoader className="animate-spin text-4xl text-blue-500" />
       </div>
     );
   }
 
-  if (!provider) {
+  if (error || !provider) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-background-light dark:bg-background-dark p-4">
-        <FiAlertCircle style={{ fontSize: '60px' }} className="text-6xl text-slate-300 mb-4" />
-        <p className="text-slate-500 text-lg">Provider not found</p>
-        <button onClick={() => navigate(-1)} className="mt-4 px-4 py-2 bg-primary text-white rounded-lg">
-          Go Back
-        </button>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
+        <div className="text-center">
+          <FiTool className="text-6xl text-gray-300 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Provider Not Found</h2>
+          <p className="text-gray-500 mb-4">{error || 'The provider you are looking for does not exist.'}</p>
+          <button
+            onClick={() => navigate('/search')}
+            className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+          >
+            Find Other Providers
+          </button>
+        </div>
       </div>
     );
   }
-
-  const isOwnProfile = currentUser?.id ? String(currentUser.id) === String(provider?.id) : false;
-
-  const handleShare = async () => {
-    const url = window.location.href;
-    try {
-      await navigator.clipboard.writeText(url);
-      alert('Link copied to clipboard!');
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
-
-  const handleCall = () => {
-    if (provider.phone) {
-      window.location.href = `tel:${provider.phone}`;
-    }
-  };
-
-  // Follow button label
-  const followLabel = following ? 'Following' : 'Follow';
-  const followDisabled = false;
 
   if (!isDesktop) {
     return (
-      <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-24">
+      <div className="min-h-screen bg-gray-50 pb-24">
         {/* Header */}
-        <div className="sticky top-0 z-50 flex items-center bg-card-light dark:bg-card-dark p-4 pb-2 justify-between border-b border-gray-100 dark:border-gray-800 shadow-sm">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex size-12 shrink-0 items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full justify-center transition-colors"
-          >
-            <FiArrowLeft style={{ fontSize: '24px' }} />
-          </button>
-          <h2 className="text-text-light dark:text-text-dark text-lg font-bold leading-tight tracking-[-0.015em] text-center flex-1">
-            Provider Profile
-          </h2>
-          <div className="flex w-12 items-center justify-end">
-            <button 
-              onClick={handleShare}
-              className="flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full size-12 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            >
-              <FiShare2 style={{ fontSize: '24px' }} />
+        <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
+          <div className="flex items-center p-4">
+            <button onClick={() => navigate(-1)} className="p-2 -ml-2 hover:bg-gray-100 rounded-full">
+              <FiArrowLeft className="text-2xl" />
             </button>
+            <h1 className="flex-1 text-lg font-bold text-center">Provider Profile</h1>
+            <div className="w-10" />
           </div>
-        </div>
+        </header>
 
-        {/* Avatar + Name */}
-        <div className="flex flex-col">
-          <div className="flex p-4 pb-2 bg-card-light dark:bg-card-dark pt-6">
-            <div className="flex w-full flex-col gap-4 items-center">
-              <div className="relative">
-                {provider.avatar ? (
-                  <div
-                    className="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-32 w-32 border-4 border-background-light dark:border-background-dark shadow-md"
-                    style={{ backgroundImage: `url("${provider.avatar}")` }}
-                  />
-                ) : (
-                  <div className="bg-slate-300 aspect-square rounded-full h-32 w-32 border-4 border-background-light dark:border-background-dark shadow-md flex items-center justify-center">
-                    <span className="text-3xl font-bold text-slate-500">
-                      {provider.name ? provider.name.charAt(0).toUpperCase() : '?'}
-                    </span>
-                  </div>
-                )}
-                {provider.verified && (
-                  <div className="absolute bottom-1 right-1 bg-green-500 rounded-full p-1.5 border-4 border-card-light dark:border-card-dark">
-                    <FiCheckCircle style={{ fontSize: '14px' }} className="text-white text-sm" />
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-col items-center justify-center">
-                <p className="text-text-light dark:text-text-dark text-[22px] font-bold leading-tight tracking-[-0.015em] text-center">
-                  {provider.name}
-                </p>
-                <p className="text-secondary-text-light dark:text-secondary-text-dark text-base font-medium leading-normal text-center">
-                  {provider.profession}
-                </p>
-                <div className="flex items-center gap-1 mt-1">
-                  <FiStar style={{ fontSize: '16px' }} className="text-orange-400" />
-                  <span className="text-text-light dark:text-text-dark font-bold text-sm">{provider.rating || 0}</span>
-                  <span className="text-secondary-text-light dark:text-secondary-text-dark text-sm">
-                    ({provider.reviewCount || 0} reviews)
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Follow button — visible to everyone except own profile */}
-          {!isOwnProfile && (
-            <div className="px-4 pb-4 flex gap-3">
-              <button
-                onClick={handleFollow}
-                disabled={followDisabled}
-                className={`flex-1 py-2.5 rounded-xl font-medium transition-colors ${
-                  following || followDisabled
-                    ? 'bg-slate-200 text-slate-700'
-                    : 'bg-primary text-white'
-                }`}
-              >
-                {followLabel}
-              </button>
-              <Link
-                to={`/messages/${provider.id}`}
-                className="flex items-center justify-center gap-2 px-5 py-2.5 border border-primary text-primary rounded-xl hover:bg-blue-50 transition-colors"
-              >
-                <FiMessageCircle style={{ fontSize: '20px' }} />
-              </Link>
-            </div>
-          )}
-
-          {/* Stats */}
-          <div className="flex justify-around py-4 bg-card-light dark:bg-card-dark border-b border-gray-100 dark:border-gray-800">
-            <div className="flex flex-col items-center">
-              <p className="text-lg font-bold text-text-light dark:text-text-dark">{provider.jobsDone || 0}</p>
-              <p className="text-xs text-secondary-text-light dark:text-secondary-text-dark uppercase tracking-wide">Travaux Effectués</p>
-            </div>
-            <div className="w-px bg-gray-200 dark:bg-gray-700"></div>
-            <div className="flex flex-col items-center">
-              <StarRating rating={provider.rating || 0} count={provider.reviewCount || 0} />
-              <p className="text-xs text-secondary-text-light dark:text-secondary-text-dark uppercase tracking-wide mt-1">Note</p>
-            </div>
-            <div className="w-px bg-gray-200 dark:bg-gray-700"></div>
-            <div className="flex flex-col items-center">
-              <p className="text-lg font-bold text-text-light dark:text-text-dark">{formatCurrency(provider.hourlyRate || 0)}</p>
-              <p className="text-xs text-secondary-text-light dark:text-secondary-text-dark uppercase tracking-wide">Par Heure</p>
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="sticky top-[72px] z-40 bg-background-light dark:bg-background-dark pt-6 px-4 pb-2">
-            <div className="flex h-12 w-full items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-800 p-1">
-              {['About', 'Portfolio', 'Reviews'].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab.toLowerCase())}
-                  className={`flex cursor-pointer h-full grow items-center justify-center overflow-hidden rounded-lg px-2 transition-all ${
-                    activeTab === tab.toLowerCase()
-                      ? 'bg-card-light dark:bg-card-dark shadow-sm text-primary'
-                      : 'text-secondary-text-light dark:text-secondary-text-dark'
-                  }`}
-                >
-                  <span className="truncate text-sm font-semibold">{tab}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Tab content */}
-          <div className="px-4 py-2 space-y-6">
-            {activeTab === 'about' && (
-              <div className="bg-card-light dark:bg-card-dark p-5 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm">
-                <h3 className="text-text-light dark:text-text-dark text-lg font-bold mb-3">
-                  À propos de {provider.name?.split(' ')[0] || 'ce prestataire'}
-                </h3>
-                <p className="text-secondary-text-light dark:text-secondary-text-dark leading-relaxed">
-                  {provider.bio || `${provider.experience || 'Expérience non spécifiée'} - ${provider.profession || 'Prestataire de services'}`}
-                </p>
-                <div className="flex flex-wrap gap-4 mt-3">
-                  <div className="flex items-center gap-2 text-secondary-text-light dark:text-secondary-text-dark text-sm">
-                    <FiMapPin style={{ fontSize: '16px' }} />
-                    {provider.location || provider.city ? `${provider.location || provider.city}, Maroc` : 'Localisation non renseignée'}
-                  </div>
-                  {provider.phone && (
-                    <div className="flex items-center gap-2 text-secondary-text-light dark:text-secondary-text-dark text-sm">
-                      <FiPhone style={{ fontSize: '16px' }} />
-                      <button 
-                        onClick={handleCall}
-                        className="text-primary hover:underline"
-                      >
-                        {formatPhone(provider.phone)}
-                      </button>
-                    </div>
-                  )}
-                  {provider.responseTime && (
-                    <div className="flex items-center gap-2 text-secondary-text-light dark:text-secondary-text-dark text-sm">
-                      <FiClock style={{ fontSize: '16px' }} />
-                      <span>Temps de réponse: {getResponseTimeDisplay(provider.responseTime)}</span>
-                    </div>
-                  )}
-                </div>
-                <p className="text-secondary-text-light dark:text-secondary-text-dark text-sm mt-2">
-                  {provider.serviceArea || `${provider.distance || 1}km radius`}
-                </p>
-                <div className="flex flex-wrap gap-2 mt-4">
-                  {services.map((service, idx) => (
-                    <span
-                      key={service.id || idx}
-                      className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-text-light dark:text-text-dark text-xs font-medium rounded-full"
-                    >
-                      {service.name}
-                    </span>
-                  ))}
-                  {services.length === 0 && (
-                    <span className="text-slate-400 text-sm">No services yet</span>
-                  )}
-                </div>
+        {/* Profile Header */}
+        <div className="bg-white p-6 border-b border-gray-200">
+          <div className="flex items-center gap-4">
+            {provider.avatar ? (
+              <img 
+                src={provider.avatar} 
+                alt={provider.name}
+                className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center">
+                <span className="text-3xl font-bold text-blue-600">
+                  {provider.name?.charAt(0)?.toUpperCase() || '?'}
+                </span>
               </div>
             )}
-
-            {activeTab === 'portfolio' && (
+            <div className="flex-1">
+              <h2 className="text-xl font-bold text-gray-900">{provider.name}</h2>
+              <p className="text-gray-600 text-sm">{provider.profession}</p>
+              <StarRating rating={provider.rating} count={provider.reviewCount} size="sm" />
+            </div>
+          </div>
+          
+          <div className="mt-4 flex gap-2">
+            {currentUser.role === 'client' && (
               <>
-                {portfolio.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-2">
-                    {portfolio.map((item, index) => (
-                      <div 
-                        key={item.id || item._id || index} 
-                        className="aspect-square rounded-lg overflow-hidden bg-gray-200 cursor-pointer relative group"
-                        onClick={() => openPortfolioLightbox(index)}
-                      >
-                        <img 
-                          src={item.imageUrl || item.image} 
-                          alt={item.caption || item.title || 'Portfolio item'} 
-                          className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105" 
-                        />
-                        {item.title && (
-                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <p className="text-white text-xs truncate">{item.title}</p>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-center text-slate-500 py-8">No portfolio items yet.</p>
-                )}
-                <PortfolioLightbox 
-                  items={portfolio}
-                  currentIndex={portfolioLightboxIndex}
-                  onClose={closePortfolioLightbox}
-                  onNext={nextPortfolioImage}
-                  onPrev={prevPortfolioImage}
-                />
+                <button
+                  onClick={handleMessage}
+                  className="flex-1 py-2 border border-blue-500 text-blue-500 rounded-lg font-medium"
+                >
+                  <FiMessageCircle className="inline mr-2" />
+                  Message
+                </button>
+                <button
+                  onClick={handleBook}
+                  className="flex-1 py-2 bg-blue-500 text-white rounded-lg font-medium"
+                >
+                  Book Now
+                </button>
               </>
             )}
+          </div>
+        </div>
 
-            {activeTab === 'reviews' && (
-              <div className="space-y-4">
-                {/* Write a Review button for clients only */}
-                {!isOwnProfile && currentUser.role === 'user' && (
-                  <div className="bg-gradient-to-r from-primary/10 to-blue-50 dark:from-primary/5 dark:to-blue-900/20 p-4 rounded-xl border border-primary/20">
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
-                      {userReview 
-                        ? 'You\'ve already reviewed this provider.'
-                        : canReview
-                          ? `Share your experience with ${provider.name}!`
-                          : reviewCheckMessage || 'You cannot review this provider.'
-                      }
-                    </p>
-                    {canReview ? (
-                      <button
-                        onClick={handleOpenReviewModal}
-                        className="w-full py-3 bg-primary text-white font-bold rounded-xl hover:bg-blue-600 transition-colors"
-                      >
-                        {userReview ? 'Edit Your Review' : 'Leave a Review'}
-                      </button>
-                    ) : (
-                      <div className="w-full py-3 bg-slate-200 text-slate-500 font-bold rounded-xl text-center">
-                        Cannot Review
-                      </div>
-                    )}
-                  </div>
-                )}
+        {/* Stats */}
+        <div className="bg-white p-4 m-4 rounded-xl shadow-sm border border-gray-200">
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div>
+              <div className="text-2xl font-bold text-gray-900">{provider.jobsDone || 0}</div>
+              <div className="text-xs text-gray-500">Jobs Done</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-gray-900">{provider.rating?.toFixed(1) || '0'}</div>
+              <div className="text-xs text-gray-500">Rating</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-gray-900">{provider.hourlyRate || 0}</div>
+              <div className="text-xs text-gray-500">MAD/hr</div>
+            </div>
+          </div>
+        </div>
 
-                {/* Rating Summary */}
-                {reviews.length > 0 && (
-                  <div className="bg-card-light dark:bg-card-dark p-4 rounded-xl border border-gray-100 dark:border-gray-800">
-                    <div className="flex items-center gap-4">
-                      <div className="text-center min-w-[60px]">
-                        <p className="text-4xl font-black text-slate-900 dark:text-white">
-                          {provider.rating?.toFixed(1) || '0.0'}
-                        </p>
-                        <StarRating rating={provider.rating || 0} size={14} />
-                        <p className="text-xs text-slate-500 mt-1">
-                          {provider.reviewCount || 0} avis
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Reviews List */}
-                {reviews.length > 0 ? reviews.map((review) => (
-                  <div
-                    key={review.id || review._id}
-                    className="bg-card-light dark:bg-card-dark p-4 rounded-xl border border-gray-100 dark:border-gray-800"
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-2">
-                        {review.clientAvatar ? (
-                          <div
-                            className="w-8 h-8 rounded-full bg-cover bg-center"
-                            style={{ backgroundImage: `url("${review.clientAvatar}")` }}
-                          />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold">
-                            {review.clientName?.charAt(0) || '?'}
-                          </div>
-                        )}
-                        <div>
-                          <p className="text-sm font-bold text-text-light dark:text-text-dark">{review.clientName}</p>
-                          <StarRating rating={review.rating || 0} size={12} />
-                        </div>
-                      </div>
-                      <span className="text-xs text-secondary-text-light dark:text-secondary-text-dark">
-                        {formatRelativeTime(review.createdAt)}
-                      </span>
-                    </div>
-                    {review.comment && (
-                      <p className="text-sm text-secondary-text-light dark:text-secondary-text-dark">{review.comment}</p>
-                    )}
-                  </div>
-                )) : (
-                  <div className="text-center py-8">
-                    <span className="text-5xl">⭐</span>
-                    <p className="text-slate-500 mt-2">No reviews yet</p>
-                    <small className="text-slate-400">Be the first to review this professional</small>
-                  </div>
-                )}
+        {/* About */}
+        <div className="bg-white p-4 m-4 rounded-xl shadow-sm border border-gray-200">
+          <h3 className="font-bold text-gray-900 mb-3">About</h3>
+          <p className="text-gray-600 text-sm">{provider.bio || 'No bio provided'}</p>
+          
+          <div className="mt-3 space-y-2 text-sm">
+            {provider.location && (
+              <div className="flex items-center gap-2 text-gray-500">
+                <FiMapPin className="text-gray-400" />
+                <span>{provider.location}</span>
+              </div>
+            )}
+            {provider.phone && (
+              <div className="flex items-center gap-2 text-gray-500">
+                <FiPhone className="text-gray-400" />
+                <span>{formatPhone(provider.phone)}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2 text-gray-500">
+              <FiClock className="text-gray-400" />
+              <span>Response: {provider.responseTime || '< 1h'}</span>
+            </div>
+            {provider.verified && (
+              <div className="flex items-center gap-2 text-green-600">
+                <FiCheckCircle />
+                <span>Verified Professional</span>
               </div>
             )}
           </div>
         </div>
 
-        {/* Bottom CTA — only users can request a service; anyone can message */}
-        {!isOwnProfile && (
-          <div className="fixed bottom-0 left-0 right-0 bg-card-light dark:bg-card-dark border-t border-gray-100 dark:border-gray-800 p-4 safe-area-bottom z-50">
-            <div className="flex items-center gap-4 max-w-lg mx-auto">
-              {currentUser.role === 'user' && (
-                <button
-                  onClick={() => setShowRequestModal(true)}
-                  className="flex-1 bg-primary hover:bg-blue-600 text-white font-bold h-12 rounded-xl shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2"
-                >
-                  <FiCalendar style={{ fontSize: '18px' }} />
-                  Request Service
-                </button>
-              )}
-              <Link
-                to={`/messages/${provider.id}`}
-                className={`flex items-center justify-center gap-2 h-12 rounded-xl border border-primary text-primary transition-colors hover:bg-blue-50 ${
-                  currentUser.role === 'user' ? 'w-12' : 'flex-1'
-                }`}
+        {/* Services */}
+        <div className="bg-white p-4 m-4 rounded-xl shadow-sm border border-gray-200">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="font-bold text-gray-900">Services Offered</h3>
+            {isProviderOwner && (
+              <button
+                onClick={() => setShowAddService(!showAddService)}
+                className="text-blue-500 text-sm font-medium"
               >
-                <FiMessageCircle style={{ fontSize: '18px' }} />
-                {currentUser.role !== 'user' && <span className="font-bold">Message</span>}
-              </Link>
-            </div>
+                {showAddService ? 'Cancel' : '+ Add Service'}
+              </button>
+            )}
           </div>
-        )}
-
-        {/* Request Modal */}
-        {showRequestModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-surface-dark rounded-2xl max-w-md w-full p-6">
-              {requestSent ? (
-                <div className="text-center py-8">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <FiCheck style={{ fontSize: '30px' }} className="text-green-600 text-3xl" />
-                  </div>
-                  <h3 className="text-xl font-bold text-slate-900 mb-2">Request Sent!</h3>
-                  <p className="text-slate-500">The provider will respond to your request soon.</p>
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-bold text-slate-900">Request Service</h3>
-                    <button onClick={() => setShowRequestModal(false)} className="p-2 hover:bg-slate-100 rounded-full">
-                      <FiX />
-                    </button>
-                  </div>
-                  <form onSubmit={handleRequestService}>
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-slate-700 mb-2">Select Service</label>
-                      <select
-                        value={selectedService}
-                        onChange={(e) => setSelectedService(e.target.value)}
-                        className="w-full p-3 border border-slate-200 rounded-xl"
-                      >
-                        {services.map((service) => (
-                          <option key={service.id || service._id} value={service.name}>
-                            {service.name} - {formatCurrency(service.price || 0)}
-                          </option>
-                        ))}
-                        {services.length === 0 && (
-                          <option value="">Aucun service disponible</option>
-                        )}
-                      </select>
-                    </div>
-                    <div className="mb-6">
-                      <label className="block text-sm font-medium text-slate-700 mb-2">Describe Your Issue</label>
-                      <textarea
-                        value={requestDescription}
-                        onChange={(e) => setRequestDescription(e.target.value)}
-                        className="w-full p-3 border border-slate-200 rounded-xl resize-none min-h-[120px]"
-                        placeholder="Describe what you need help with..."
-                        required
+          
+          {showAddService && isProviderOwner && (
+            <form onSubmit={handleAddService} className="mb-4 p-3 bg-gray-50 rounded-lg">
+              <input
+                type="text"
+                placeholder="Service name"
+                value={newService.name}
+                onChange={(e) => setNewService({ ...newService, name: e.target.value })}
+                className="w-full p-2 mb-2 border rounded-lg"
+              />
+              <input
+                type="text"
+                placeholder="Description (optional)"
+                value={newService.description}
+                onChange={(e) => setNewService({ ...newService, description: e.target.value })}
+                className="w-full p-2 mb-2 border rounded-lg"
+              />
+              <input
+                type="number"
+                placeholder="Price (MAD)"
+                value={newService.price}
+                onChange={(e) => setNewService({ ...newService, price: e.target.value })}
+                className="w-full p-2 mb-2 border rounded-lg"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 py-2 bg-blue-500 text-white rounded-lg"
+                >
+                  {isSubmitting ? 'Adding...' : 'Add Service'}
+                </button>
+              </div>
+            </form>
+          )}
+          
+          {services.length === 0 ? (
+            <p className="text-gray-500 text-sm text-center py-4">
+              {isProviderOwner ? 'No services added yet. Click + to add.' : 'No services listed yet.'}
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {services.map((service) => (
+                <div key={service.id} className="border-b border-gray-100 pb-3 last:border-0">
+                  {editingService === service.id ? (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        defaultValue={service.name}
+                        ref={(input) => input?.focus()}
+                        onBlur={(e) => handleUpdateService(service.id, { name: e.target.value })}
+                        className="w-full p-2 border rounded-lg"
                       />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setEditingService(null)}
+                          className="px-3 py-1 text-gray-500"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setShowRequestModal(false)}
-                        className="flex-1 py-3 text-slate-600 font-medium hover:bg-slate-100 rounded-xl"
-                      >
-                        Cancel
-                      </button>
-                      <button type="submit" className="flex-1 py-3 bg-primary text-white font-bold rounded-xl hover:bg-blue-600">
-                        Send Request
-                      </button>
+                  ) : (
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-medium text-gray-900">{service.name}</h4>
+                        {service.description && (
+                          <p className="text-sm text-gray-500">{service.description}</p>
+                        )}
+                        <p className="text-sm font-bold text-blue-600 mt-1">{service.price} MAD</p>
+                      </div>
+                      {isProviderOwner && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setEditingService(service.id)}
+                            className="p-1 text-gray-400 hover:text-gray-600"
+                          >
+                            <FiEdit2 className="text-sm" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteService(service.id)}
+                            className="p-1 text-gray-400 hover:text-red-500"
+                          >
+                            <FiTrash2 className="text-sm" />
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  </form>
-                </>
-              )}
+                  )}
+                </div>
+              ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
+
+        {/* Reviews */}
+        <div className="bg-white p-4 m-4 rounded-xl shadow-sm border border-gray-200 mb-24">
+          <h3 className="font-bold text-gray-900 mb-3">Reviews ({reviews.length})</h3>
+          {reviews.length === 0 ? (
+            <p className="text-gray-500 text-sm text-center py-4">No reviews yet</p>
+          ) : (
+            <div className="space-y-4">
+              {reviews.slice(0, 5).map((review) => (
+                <div key={review.id} className="border-b border-gray-100 pb-3 last:border-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <StarRating rating={review.rating} size="sm" />
+                  </div>
+                  <p className="text-sm text-gray-600">{review.comment}</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    — {review.clientName}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     );
   }
 
-  // ---- DESKTOP ----
+  // Desktop Layout
   return (
-    <div className="flex gap-8">
-      <div className="flex-1">
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="flex p-6 pb-4 bg-slate-50">
-            <div className="flex w-full gap-6 items-center">
-              <div className="relative">
-                {provider.avatar ? (
-                  <div
-                    className="bg-center bg-no-repeat aspect-square bg-cover rounded-2xl h-32 w-32 border-4 border-white shadow-md"
-                    style={{ backgroundImage: `url("${provider.avatar}")` }}
-                  />
-                ) : (
-                  <div className="bg-slate-300 aspect-square rounded-2xl h-32 w-32 border-4 border-white shadow-md flex items-center justify-center">
-                    <span className="text-3xl font-bold text-slate-500">
-                      {provider.name ? provider.name.charAt(0).toUpperCase() : '?'}
-                    </span>
-                  </div>
-                )}
-                {provider.verified && (
-                  <div className="absolute bottom-2 right-2 bg-green-500 rounded-full p-1.5 border-4 border-white">
-                    <FiCheckCircle style={{ fontSize: '14px' }} className="text-white text-sm" />
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-col justify-center">
-                <h1 className="text-2xl font-bold text-slate-900 mb-1">{provider.name}</h1>
-                <p className="text-slate-500 text-base">{provider.profession}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <FiStar style={{ fontSize: '20px' }} className="text-amber-400" fill="currentColor" />
-                  <span className="font-bold text-slate-900">{provider.rating || 0}</span>
-                  <span className="text-slate-500">({provider.reviewCount || 0} reviews)</span>
+    <div className="max-w-6xl mx-auto p-6">
+      <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-600 mb-6">
+        <FiArrowLeft /> Back
+      </button>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - Profile Info */}
+        <div className="lg:col-span-1">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sticky top-20">
+            <div className="text-center">
+              {provider.avatar ? (
+                <img 
+                  src={provider.avatar} 
+                  alt={provider.name}
+                  className="w-32 h-32 rounded-full object-cover mx-auto border-4 border-gray-200"
+                />
+              ) : (
+                <div className="w-32 h-32 rounded-full bg-blue-100 flex items-center justify-center mx-auto">
+                  <span className="text-4xl font-bold text-blue-600">
+                    {provider.name?.charAt(0)?.toUpperCase() || '?'}
+                  </span>
                 </div>
+              )}
+              <h2 className="text-2xl font-bold text-gray-900 mt-4">{provider.name}</h2>
+              <p className="text-gray-600">{provider.profession}</p>
+              <div className="flex justify-center mt-2">
+                <StarRating rating={provider.rating} count={provider.reviewCount} />
               </div>
             </div>
-          </div>
-
-          {/* Follow + Message — visible to everyone except own profile */}
-          {!isOwnProfile && (
-            <div className="px-6 pb-4 flex gap-3">
-              <button
-                onClick={handleFollow}
-                disabled={followDisabled}
-                className={`px-6 py-2.5 rounded-xl font-medium transition-colors ${
-                  following || followDisabled
-                    ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                    : 'bg-primary text-white hover:bg-blue-600'
-                }`}
-              >
-                {followLabel}
-              </button>
-              <button
-                onClick={() => navigate(`/book/${provider.id}`)}
-                className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-xl hover:bg-blue-600 transition-colors"
-              >
-                <FiCalendar style={{ fontSize: '18px' }} />
-                Book Now
-              </button>
-              <Link
-                to={`/messages/${provider.id}`}
-                className="flex items-center gap-2 px-6 py-2.5 border border-primary text-primary rounded-xl hover:bg-blue-50 transition-colors"
-              >
-                <FiMessageCircle style={{ fontSize: '18px' }} />
-                Message
-              </Link>
-            </div>
-          )}
-
-          {/* Stats */}
-          <div className="flex justify-around py-6 border-b border-slate-200">
-            <div className="flex flex-col items-center">
-              <p className="text-xl font-bold text-slate-900">{provider.jobsDone || 0}</p>
-              <p className="text-xs text-slate-500 uppercase tracking-wide">Travaux Effectués</p>
-            </div>
-            <div className="w-px bg-slate-200"></div>
-            <div className="flex flex-col items-center">
-              <StarRating rating={provider.rating || 0} count={provider.reviewCount || 0} size={16} />
-              <p className="text-xs text-slate-500 uppercase tracking-wide mt-1">Note</p>
-            </div>
-            <div className="w-px bg-slate-200"></div>
-            <div className="flex flex-col items-center">
-              <p className="text-xl font-bold text-slate-900">{formatCurrency(provider.hourlyRate || 0)}</p>
-              <p className="text-xs text-slate-500 uppercase tracking-wide">Par Heure</p>
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="p-6">
-            <div className="flex gap-4 mb-6">
-              {['About', 'Portfolio', 'Reviews'].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab.toLowerCase())}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    activeTab === tab.toLowerCase() ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-
-            {activeTab === 'about' && (
-              <>
-                <div className="mb-6">
-                  <h3 className="text-lg font-bold text-slate-900 mb-3">À propos de {provider.name?.split(' ')[0] || 'ce prestataire'}</h3>
-                  <p className="text-slate-600 leading-relaxed">{provider.bio || `${provider.experience || 'Expérience non spécifiée'} - ${provider.profession || 'Prestataire de services'}`}</p>
-                  <div className="flex flex-wrap gap-4 mt-3">
-                  <div className="flex items-center gap-2 text-slate-500 text-sm">
-                    <FiMapPin style={{ fontSize: '18px' }} />
-                    {provider.location || provider.city ? `${provider.location || provider.city}, Maroc` : 'Localisation non renseignée'}
-                  </div>
-                  <div className="flex items-center gap-2 text-slate-500 text-sm">
-                    <FiPhone style={{ fontSize: '18px' }} />
-                    <button 
-                      onClick={handleCall}
-                      className="text-primary hover:underline"
-                    >
-                      {formatPhone(provider.phone)}
-                    </button>
-                  </div>
-                  {provider.responseTime && (
-                    <div className="flex items-center gap-2 text-slate-500 text-sm">
-                      <FiClock style={{ fontSize: '18px' }} />
-                      <span>Temps de réponse: {getResponseTimeDisplay(provider.responseTime)}</span>
-                    </div>
-                  )}
-                </div>
-                  {provider.serviceArea && (
-                    <p className="text-slate-400 text-sm mt-2">
-                      {provider.serviceArea.includes('km') ? `Rayon de service: ${provider.serviceArea}` : provider.serviceArea}
-                    </p>
-                  )}
-                </div>
-                <div className="rounded-xl border border-slate-200 overflow-hidden">
-                  <div className="p-4 border-b border-slate-200 flex justify-between items-center">
-                    <h3 className="text-lg font-bold text-slate-900">Services Offered</h3>
-                    {isOwnProfile && (
-                      <button
-                        onClick={() => { resetServiceForm(); setShowServiceForm(true); }}
-                        className="flex items-center gap-1 px-3 py-1 bg-primary text-white text-sm rounded-lg hover:bg-blue-600"
-                      >
-                        <FiPlus /> Add
-                      </button>
-                    )}
-                  </div>
-                  <div className="divide-y divide-slate-200">
-                    {services.map((service) => (
-                      <div key={service.id || service._id} className="flex items-center justify-between p-4">
-                        <div>
-                          <span className="text-slate-700 font-medium">{service.name}</span>
-                          {service.description && (
-                            <p className="text-slate-500 text-sm">{service.description}</p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-primary font-semibold">{formatCurrency(service.price || 0)}</span>
-                          {isOwnProfile && (
-                            <div className="flex gap-1">
-                              <button onClick={() => openEditService(service)} className="p-1 text-slate-400 hover:text-primary">
-                                <FiEdit2 style={{ fontSize: '14px' }} />
-                              </button>
-                              <button onClick={() => handleDeleteService(service.id || service._id)} className="p-1 text-slate-400 hover:text-red-500">
-                                <FiTrash2 style={{ fontSize: '14px' }} />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                    {services.length === 0 && (
-                      <p className="p-4 text-slate-500 text-center">Aucun service proposé pour le moment.</p>
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
-
-            {activeTab === 'portfolio' && (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {portfolio.length > 0 ? portfolio.map((item) => (
-                  <div key={item.id || item._id} className="aspect-square rounded-xl overflow-hidden bg-gray-100">
-                    <img
-                      src={item.imageUrl}
-                      alt={item.caption}
-                      className="w-full h-full object-cover hover:scale-105 transition-transform"
-                    />
-                  </div>
-                )) : (
-                  <p className="col-span-3 text-center text-slate-500 py-8">Aucun élément dans le portfolio pour le moment.</p>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'reviews' && (
-              <div className="space-y-4">
-                {/* Write a Review button for clients who have completed bookings */}
-                {!isOwnProfile && currentUser.role === 'user' && (completedBookings.length > 0 || userReview) && (
-                  <div className="bg-gradient-to-r from-primary/10 to-blue-50 dark:from-primary/5 dark:to-blue-900/20 p-5 rounded-xl border border-primary/20">
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
-                      {userReview 
-                        ? 'Vous avez déjà noté ce professionnel. Modifiez votre avis !'
-                        : completedBookings.length > 0
-                          ? `Vous avez utilisé les services de ${provider.name} ? Partagez votre expérience !`
-                          : 'Partagez votre expérience avec ce professionnel.'
-                      }
-                    </p>
-                    <button
-                      onClick={handleOpenReviewModal}
-                      className="w-full py-3 bg-primary text-white font-bold rounded-xl hover:bg-blue-600 transition-colors"
-                    >
-                      {userReview ? 'Modifier mon avis' : 'Laisser un avis'}
-                    </button>
-                  </div>
-                )}
-
-                {/* Rating Summary */}
-                {reviews.length > 0 && (
-                  <div className="rounded-xl border border-slate-200 p-5">
-                    <div className="flex gap-8 items-center">
-                      <div className="flex flex-col items-center justify-center min-w-[80px]">
-                        <p className="text-5xl font-black text-slate-900">{provider.rating ? provider.rating.toFixed(1) : '0.0'}</p>
-                        <StarRating rating={provider.rating || 0} size={16} />
-                        <p className="text-xs text-slate-500 mt-2">Basé sur {provider.reviewCount || 0} avis</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Reviews List */}
-                {reviews.length > 0 ? reviews.map((review) => (
-                  <div key={review.id || review._id} className="border-t border-slate-200 pt-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-3">
-                        {review.clientAvatar ? (
-                          <div
-                            className="w-10 h-10 rounded-full bg-cover bg-center"
-                            style={{ backgroundImage: `url("${review.clientAvatar}")` }}
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold">
-                            {review.clientName?.charAt(0) || '?'}
-                          </div>
-                        )}
-                        <div>
-                          <p className="font-semibold text-slate-900">{review.clientName}</p>
-                          <StarRating rating={review.rating || 0} size={14} />
-                        </div>
-                      </div>
-                      <span className="text-xs text-slate-500">{formatRelativeTime(review.createdAt)}</span>
-                    </div>
-                    {review.comment && <p className="text-slate-600">{review.comment}</p>}
-                  </div>
-                )) : (
-                  <div className="text-center py-8">
-                    <span className="text-5xl">⭐</span>
-                    <p className="text-slate-500 mt-2">No reviews yet</p>
-                    <small className="text-slate-400">Be the first to review this professional</small>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Sidebar */}
-      <div className="w-80 shrink-0">
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 sticky top-24">
-          <div className="mb-4">
-            <span className="text-sm text-slate-500">À partir de</span>
-            <p className="text-3xl font-bold text-slate-900">
-              {formatCurrency(provider.hourlyRate || 0)}
-              <span className="text-base font-normal text-slate-500">/hr</span>
-            </p>
-          </div>
-
-          {!isOwnProfile && (
-            <div className="flex flex-col gap-3">
-              {currentUser.role === 'user' && (
+            
+            <div className="mt-6 flex gap-3">
+              {currentUser.role === 'client' && (
                 <>
-                  <Link
-                    to={`/book/${provider.id}`}
-                    className="flex items-center justify-center gap-2 w-full h-12 bg-primary hover:bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/30 transition-all"
-                  >
-                    <FiCalendar style={{ fontSize: '18px' }} />
-                    Réserver maintenant
-                  </Link>
                   <button
-                    onClick={() => setShowRequestModal(true)}
-                    className="flex items-center justify-center gap-2 w-full h-12 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-colors"
+                    onClick={handleMessage}
+                    className="flex-1 py-2 border border-blue-500 text-blue-500 rounded-lg font-medium hover:bg-blue-50"
                   >
-                    <FiCalendar style={{ fontSize: '18px' }} />
-                    Demander un devis
+                    <FiMessageCircle className="inline mr-2" />
+                    Message
+                  </button>
+                  <button
+                    onClick={handleBook}
+                    className="flex-1 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600"
+                  >
+                    Book Now
                   </button>
                 </>
               )}
-              <Link
-                to={`/messages/${provider.id}`}
-                className="flex items-center justify-center gap-2 w-full h-12 bg-white border border-primary text-primary font-bold rounded-xl hover:bg-blue-50 transition-colors"
-              >
-                <FiMessageCircle style={{ fontSize: '18px' }} />
-                Send Message
-              </Link>
             </div>
-          )}
-
-          <div className="flex justify-center gap-4 mt-6 pt-6 border-t border-slate-200">
-            <button 
-              onClick={handleCall}
-              className="flex items-center justify-center w-12 h-12 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors text-slate-600"
-              title={provider.phone ? `Appeler ${provider.phone}` : 'Numéro non disponible'}
-            >
-              <FiPhone style={{ fontSize: '18px' }} />
-            </button>
-            <button 
-              onClick={handleShare}
-              className="flex items-center justify-center w-12 h-12 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors text-slate-600"
-              title="Partager ce profil"
-            >
-              <FiShare2 />
-            </button>
-            {!isOwnProfile && (
-              <button
-                onClick={handleFollow}
-                disabled={followDisabled}
-                className={`flex items-center justify-center w-12 h-12 rounded-full transition-colors ${
-                  following || followDisabled
-                    ? 'bg-primary text-white'
-                    : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                }`}
-              >
-                                {following ? <FiUserMinus /> : <FiUserPlus />}
-              </button>
+            
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <div className="text-2xl font-bold text-gray-900">{provider.jobsDone || 0}</div>
+                  <div className="text-xs text-gray-500">Jobs Done</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-gray-900">{provider.rating?.toFixed(1) || '0'}</div>
+                  <div className="text-xs text-gray-500">Rating</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-blue-600">{provider.hourlyRate || 0}</div>
+                  <div className="text-xs text-gray-500">MAD/hr</div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-6 space-y-3">
+              {provider.location && (
+                <div className="flex items-center gap-2 text-gray-600 text-sm">
+                  <FiMapPin className="text-gray-400" />
+                  <span>{provider.location}</span>
+                </div>
+              )}
+              {provider.phone && (
+                <div className="flex items-center gap-2 text-gray-600 text-sm">
+                  <FiPhone className="text-gray-400" />
+                  <span>{formatPhone(provider.phone)}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2 text-gray-600 text-sm">
+                <FiClock className="text-gray-400" />
+                <span>Response: {provider.responseTime || '< 1h'}</span>
+              </div>
+              {provider.serviceArea && (
+                <div className="flex items-center gap-2 text-gray-600 text-sm">
+                  <FiGlobe className="text-gray-400" />
+                  <span>Service Area: {provider.serviceArea}</span>
+                </div>
+              )}
+              {provider.verified && (
+                <div className="flex items-center gap-2 text-green-600 text-sm">
+                  <FiCheckCircle />
+                  <span>Verified Professional</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {/* Right Column - Services, Reviews, About */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* About */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-3">About</h3>
+            <p className="text-gray-600">{provider.bio || 'No bio provided'}</p>
+          </div>
+          
+          {/* Services */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-gray-900">Services Offered</h3>
+              {isProviderOwner && (
+                <button
+                  onClick={() => setShowAddService(!showAddService)}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 text-white rounded-lg text-sm"
+                >
+                  <FiPlus /> Add Service
+                </button>
+              )}
+            </div>
+            
+            {showAddService && isProviderOwner && (
+              <form onSubmit={handleAddService} className="mb-6 p-4 bg-gray-50 rounded-lg">
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <input
+                    type="text"
+                    placeholder="Service name *"
+                    value={newService.name}
+                    onChange={(e) => setNewService({ ...newService, name: e.target.value })}
+                    className="p-2 border rounded-lg"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Price (MAD) *"
+                    value={newService.price}
+                    onChange={(e) => setNewService({ ...newService, price: e.target.value })}
+                    className="p-2 border rounded-lg"
+                  />
+                </div>
+                <textarea
+                  placeholder="Description (optional)"
+                  value={newService.description}
+                  onChange={(e) => setNewService({ ...newService, description: e.target.value })}
+                  className="w-full p-2 mb-3 border rounded-lg"
+                  rows={2}
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-lg"
+                  >
+                    {isSubmitting ? 'Adding...' : 'Add Service'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddService(false)}
+                    className="px-4 py-2 border rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
+            
+            {services.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">
+                {isProviderOwner ? 'No services added yet. Click "Add Service" to get started.' : 'No services listed yet.'}
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {services.map((service) => (
+                  <div key={service.id} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-semibold text-gray-900">{service.name}</h4>
+                        {service.description && (
+                          <p className="text-sm text-gray-500 mt-1">{service.description}</p>
+                        )}
+                        <p className="text-lg font-bold text-blue-600 mt-2">{service.price} MAD</p>
+                      </div>
+                      {isProviderOwner && (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => {
+                              setEditingService(service.id);
+                              setNewService({ name: service.name, description: service.description, price: service.price });
+                            }}
+                            className="p-1 text-gray-400 hover:text-gray-600"
+                          >
+                            <FiEdit2 />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteService(service.id)}
+                            className="p-1 text-gray-400 hover:text-red-500"
+                          >
+                            <FiTrash2 />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          {/* Reviews */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Reviews ({reviews.length})</h3>
+            {reviews.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">No reviews yet. Be the first to leave a review!</p>
+            ) : (
+              <div className="space-y-4">
+                {reviews.map((review) => (
+                  <div key={review.id} className="border-b border-gray-100 pb-4 last:border-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <StarRating rating={review.rating} size="sm" />
+                      <span className="text-sm text-gray-500">· {new Date(review.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    <p className="text-gray-600">{review.comment}</p>
+                    <p className="text-sm text-gray-400 mt-2">— {review.clientName}</p>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>
       </div>
-
-      {/* Request Modal */}
-      {showRequestModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6">
-            {requestSent ? (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <FiCheck style={{ fontSize: '30px' }} className="text-green-600 text-3xl" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-2">Request Sent!</h3>
-                <p className="text-slate-500">The provider will respond to your request soon.</p>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-slate-900">Request Service</h3>
-                  <button onClick={() => setShowRequestModal(false)} className="p-2 hover:bg-slate-100 rounded-full">
-                    <FiX />
-                  </button>
-                </div>
-                <form onSubmit={handleRequestService}>
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Sélectionner un service</label>
-                    <select
-                      value={selectedService}
-                      onChange={(e) => setSelectedService(e.target.value)}
-                      className="w-full p-3 border border-slate-200 rounded-xl"
-                    >
-                      {services.map((service) => (
-                        <option key={service.id || service._id} value={service.name}>
-                          {service.name} - {formatCurrency(service.price || 0)}
-                        </option>
-                      ))}
-                      {services.length === 0 && (
-                        <option value="">Aucun service disponible</option>
-                      )}
-                    </select>
-                  </div>
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Describe Your Issue</label>
-                    <textarea
-                      value={requestDescription}
-                      onChange={(e) => setRequestDescription(e.target.value)}
-                      className="w-full p-3 border border-slate-200 rounded-xl resize-none min-h-[120px]"
-                      placeholder="Describe what you need help with..."
-                      required
-                    />
-                  </div>
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setShowRequestModal(false)}
-                      className="flex-1 py-3 text-slate-600 font-medium hover:bg-slate-100 rounded-xl"
-                    >
-                      Cancel
-                    </button>
-                    <button type="submit" className="flex-1 py-3 bg-primary text-white font-bold rounded-xl hover:bg-blue-600">
-                      Send Request
-                    </button>
-                  </div>
-                </form>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Service Form Modal */}
-      {showServiceForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-surface-dark rounded-2xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-                {editingService ? 'Edit Service' : 'Add Service'}
-              </h3>
-              <button 
-                onClick={() => { setShowServiceForm(false); resetServiceForm(); }} 
-                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full"
-              >
-                <FiX />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Service Name *
-                </label>
-                <input
-                  type="text"
-                  value={serviceName}
-                  onChange={(e) => setServiceName(e.target.value)}
-                  className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-transparent focus:outline-none focus:border-primary"
-                  placeholder="e.g., Home Cleaning"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Description
-                </label>
-                <textarea
-                  value={serviceDescription}
-                  onChange={(e) => setServiceDescription(e.target.value)}
-                  className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-transparent resize-none focus:outline-none focus:border-primary"
-                  placeholder="Describe what this service includes..."
-                  rows={3}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Price ($) *
-                </label>
-                <input
-                  type="number"
-                  value={servicePrice}
-                  onChange={(e) => setServicePrice(e.target.value)}
-                  className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-transparent focus:outline-none focus:border-primary"
-                  placeholder="e.g., 50"
-                  min="1"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Category
-                </label>
-                <select
-                  value={serviceCategory}
-                  onChange={(e) => setServiceCategory(e.target.value)}
-                  className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl bg-transparent focus:outline-none focus:border-primary"
-                >
-                  <option value="cleaning">Cleaning</option>
-                  <option value="repairs">Repairs</option>
-                  <option value="electrical">Electrical</option>
-                  <option value="plumbing">Plumbing</option>
-                  <option value="painting">Painting</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button
-                type="button"
-                onClick={() => { setShowServiceForm(false); resetServiceForm(); }}
-                className="flex-1 py-3 text-slate-600 font-medium hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={editingService ? handleUpdateService : handleAddService}
-                disabled={savingService || !serviceName.trim() || !servicePrice}
-                className="flex-1 py-3 bg-primary text-white font-bold rounded-xl hover:bg-blue-600 disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {savingService && <FiLoader className="animate-spin" />}
-                {editingService ? 'Update' : 'Add'} Service
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Rating Modal */}
-      <RatingModal
-        isOpen={showRatingModal}
-        onClose={() => {
-          setShowRatingModal(false);
-          setSelectedBooking(null);
-          setEditingReview(false);
-        }}
-        provider={provider}
-        booking={selectedBooking}
-        existingReview={editingReview ? userReview : null}
-        onReviewSubmitted={handleReviewSubmitted}
-      />
     </div>
   );
 }

@@ -5,12 +5,13 @@ const Review = require('../models/Review');
 
 const calculateProviderStats = async (providerId) => {
   try {
-    const [completedBookings, reviews] = await Promise.all([
+    const [completedBookings, completedServiceRequests, reviews] = await Promise.all([
       Booking.countDocuments({ provider: providerId, status: 'completed' }),
+      require('../models/ServiceRequest').countDocuments({ acceptedProviderId: providerId, status: 'completed' }),
       Review.find({ provider: providerId })
     ]);
     
-    const jobsDone = completedBookings;
+    const jobsDone = completedBookings + completedServiceRequests;
     let rating = 0;
     let reviewCount = reviews.length;
     
@@ -32,7 +33,7 @@ exports.getProviders = async (req, res) => {
     
     console.log('[getProviders] Query params:', { search, profession, sort });
     
-    let query = { available: true };
+    let query = {};
 
     if (profession) {
       query.profession = { $regex: new RegExp(`^${profession}$`, 'i') };

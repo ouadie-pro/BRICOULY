@@ -17,6 +17,20 @@ function getUserId() {
   return user?.id || user?._id || null;
 }
 
+function getAuthHeaders() {
+  const token = localStorage.getItem('token');
+  const userId = getUserId();
+  const headers = {};
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  if (userId) {
+    headers['x-user-id'] = userId;
+  }
+  return headers;
+}
+
 async function safeFetch(url, options = {}) {
   try {
     const token = localStorage.getItem('token');
@@ -116,7 +130,8 @@ export const api = {
 
   // Professions
   getProfessions: async () => {
-    return safeFetch(`${API_BASE}/professions`);
+    const result = await safeFetch(`${API_BASE}/professions`);
+    return Array.isArray(result) ? result : [];
   },
 
   addProfession: async (professionData) => {
@@ -129,20 +144,42 @@ export const api = {
   // Providers
   getProviders: async (params = {}) => {
     const queryParams = new URLSearchParams();
-    if (params.profession) queryParams.append('profession', params.profession);
-    if (params.search) queryParams.append('search', params.search);
+    if (params.profession && params.profession !== '') queryParams.append('profession', params.profession);
+    if (params.search && params.search.trim()) queryParams.append('search', params.search);
     if (params.sort) queryParams.append('sort', params.sort);
-    return safeFetch(`${API_BASE}/providers?${queryParams}`);
+    if (params.page) queryParams.append('page', params.page);
+    if (params.limit) queryParams.append('limit', params.limit);
+    
+    const url = `${API_BASE}/providers?${queryParams.toString()}`;
+    console.log('[API] getProviders URL:', url);
+    
+    const result = await safeFetch(url);
+    console.log('[API] getProviders result:', result);
+    
+    // Handle both response formats
+    if (result.data && Array.isArray(result.data)) {
+      return result.data;
+    }
+    if (Array.isArray(result)) {
+      return result;
+    }
+    return [];
   },
 
   getProvider: async (id) => {
-    return safeFetch(`${API_BASE}/providers/${id}`);
+    if (!id) return null;
+    console.log('[API] getProvider called with ID:', id);
+    const result = await safeFetch(`${API_BASE}/providers/${id}`);
+    console.log('[API] getProvider result:', result);
+    return result;
   },
 
   // Provider Services
   getProviderServices: async (providerId) => {
     if (!providerId) return [];
-    return safeFetch(`${API_BASE}/providers/${providerId}/services`);
+    console.log('[API] getProviderServices for ID:', providerId);
+    const result = await safeFetch(`${API_BASE}/providers/${providerId}/services`);
+    return Array.isArray(result) ? result : [];
   },
 
   addService: async (serviceData) => {
@@ -167,13 +204,13 @@ export const api = {
 
   // Portfolio
   getPortfolio: async (providerId) => {
-    return safeFetch(`${API_BASE}/portfolio/${providerId}`);
+    return safeFetch(`${API_BASE}/providers/${providerId}/portfolio`);
   },
 
   addPortfolioItem: async (formData) => {
     return safeFetch(`${API_BASE}/portfolio`, { 
       method: 'POST', 
-      headers: { 'x-user-id': getUserId() }, 
+      headers: getAuthHeaders(), 
       body: formData 
     });
   },
@@ -181,7 +218,7 @@ export const api = {
   deletePortfolioItem: async (id) => {
     return safeFetch(`${API_BASE}/portfolio/${id}`, { 
       method: 'DELETE', 
-      headers: { 'x-user-id': getUserId() } 
+      headers: getAuthHeaders() 
     });
   },
 
@@ -396,7 +433,7 @@ export const api = {
 
   // Reviews
   getProviderReviews: async (providerId) => {
-    return safeFetch(`${API_BASE}/providers/${providerId}/reviews`);
+    return safeFetch(`${API_BASE}/reviews/provider/${providerId}`);
   },
 
   submitReview: async (reviewData) => {
@@ -438,9 +475,6 @@ export const api = {
     if (!requestId) {
       throw new Error('Request ID is required');
     }
-    
-    console.log('respondToFollowRequest - requestId:', requestId, 'action:', action);
-    
     return safeFetch(`${API_BASE}/follow/respond`, {
       method: 'POST',
       body: JSON.stringify({ requestId, action }),
