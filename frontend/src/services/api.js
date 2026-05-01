@@ -641,7 +641,7 @@ export const api = {
   },
 
   updateBookingStatus: async (bookingId, status) => {
-    return safeFetch(`${API_BASE}/bookings/${bookingId}`, {
+    return safeFetch(`${API_BASE}/bookings/${bookingId}/status`, {
       method: 'PUT',
       body: JSON.stringify({ status }),
     });

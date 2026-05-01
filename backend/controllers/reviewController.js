@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Provider = require('../models/Provider');
 const Review = require('../models/Review');
@@ -99,17 +100,21 @@ exports.getReviews = async (req, res) => {
 
 exports.createReview = async (req, res) => {
   try {
-    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
-    
-    const userId = req.user.id.toString();
-    const user = await User.findById(userId);
-    
+    const jwt = require('jsonwebtoken');
+    const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+    const user = await User.findById(decoded.id);
     if (!user || user.role !== 'client') {
       return res.status(403).json({ 
         success: false, 
         error: 'Only clients can leave reviews' 
       });
     }
+    const userId = user._id.toString();
     
     const { providerId, bookingId, serviceRequestId, rating, comment, punctuality, professionalism, quality } = req.body;
     
@@ -263,14 +268,18 @@ exports.createReview = async (req, res) => {
 
 exports.updateReview = async (req, res) => {
   try {
-    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
-    
-    const userId = req.user.id.toString();
-    const user = await User.findById(userId);
-    
+    const jwt = require('jsonwebtoken');
+    const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+    const user = await User.findById(decoded.id);
     if (!user || user.role !== 'client') {
       return res.status(403).json({ success: false, error: 'Only clients can update reviews' });
     }
+    const userId = user._id.toString();
     
     const { reviewId } = req.params;
     const { rating, comment, punctuality, professionalism, quality } = req.body;
@@ -328,14 +337,18 @@ exports.updateReview = async (req, res) => {
 
 exports.deleteReview = async (req, res) => {
   try {
-    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
-    
-    const userId = req.user.id.toString();
-    const user = await User.findById(userId);
-    
+    const jwt = require('jsonwebtoken');
+    const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+    const user = await User.findById(decoded.id);
     if (!user) {
       return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
+    const userId = user._id.toString();
     
     const { reviewId } = req.params;
     
@@ -371,7 +384,13 @@ exports.deleteReview = async (req, res) => {
 
 exports.checkCanReview = async (req, res) => {
   try {
-    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    if (!req.user) {
+      return res.json({
+        success: true,
+        canReview: false,
+        reason: 'Please log in to submit a review.'
+      });
+    }
     
     const userId = req.user.id.toString();
     const { providerId } = req.params;
