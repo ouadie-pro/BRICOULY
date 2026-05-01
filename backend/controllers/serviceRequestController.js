@@ -2,6 +2,146 @@ const ServiceRequest = require('../models/ServiceRequest');
 const User = require('../models/User');
 const Provider = require('../models/Provider');
 
+// Get available service types with counts
+exports.getServiceTypesWithCounts = async (req, res) => {
+  try {
+    const counts = await ServiceRequest.aggregate([
+      { $match: { status: 'open' } },
+      { $group: { _id: '$serviceType', count: { $sum: 1 } } }
+    ]);
+
+    const types = ServiceRequest.SERVICE_TYPES.map(type => ({
+      value: type,
+      label: type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' '),
+      count: counts.find(c => c._id === type)?.count || 0
+    }));
+
+    res.json({ success: true, types });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Get requests by location
+exports.getRequestsByLocation = async (req, res) => {
+  try {
+    const { city, radius = 10 } = req.query;
+
+    if (!city) {
+      return res.status(400).json({ success: false, error: 'City parameter required' });
+    }
+
+    const query = {
+      status: 'open',
+      location: { $regex: city, $options: 'i' }
+    };
+
+    const requests = await ServiceRequest.find(query)
+      .populate('clientId', 'name avatar')
+      .sort({ createdAt: -1 })
+      .limit(50);
+
+    res.json({ success: true, requests: requests.map(r => formatServiceRequest(req, r)) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Apply with message to request (enhanced)
+exports.applyToRequestWithDetails = async (req, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    if (req.user.role !== 'provider') {
+      return res.status(403).json({ success: false, error: 'Only providers can apply' });
+    }
+
+    const userId = req.user.id.toString();
+    const { id } = req.params;
+    const { message, proposedPrice, estimatedDuration } = req.body;
+
+    const request = await ServiceRequest.findById(id);
+
+    if (!request) {
+      return res.status(404).json({ success: false, error: 'Service request not found' });
+    }
+
+    if (request.status !== 'open') {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot apply to a closed service request'
+      });
+    }
+
+    const alreadyApplied = request.applications?.some(
+      app => app.providerId?.toString() === userId
+    );
+
+    if (alreadyApplied) {
+      return res.status(400).json({
+        success: false,
+        error: 'You have already applied to this service request'
+      });
+    }
+
+    if (request.clientId.toString() === userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'You cannot apply to your own service request'
+      });
+    }
+
+    const provider = await Provider.findOne({ user: userId });
+    if (!provider) {
+      return res.status(404).json({ success: false, error: 'Provider profile not found' });
+    }
+
+    request.applications.push({
+      providerId: userId,
+      message: message || '',
+      proposedPrice: proposedPrice || provider.hourlyRate,
+      estimatedDuration: estimatedDuration || null,
+      status: 'pending'
+    });
+
+    await request.save();
+
+    // Notify client
+    const io = req.app.get('io');
+    if (io) {
+      const Notification = require('../models/Notification');
+      await Notification.create({
+        user: request.clientId,
+        type: 'new_application',
+        title: 'New Application',
+        text: `${req.user.name} applied to your request: ${request.title}`,
+        fromUser: userId,
+      });
+      io.to(`user:${request.clientId.toString()}`).emit('notification', {
+        type: 'new_application',
+        title: 'New Application',
+        text: `${req.user.name} applied to your request`,
+        fromUserId: userId,
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Application submitted successfully',
+      application: {
+        providerId: userId,
+        providerName: req.user.name,
+        status: 'pending',
+        message: message || '',
+        proposedPrice: proposedPrice || provider.hourlyRate,
+        estimatedDuration: estimatedDuration || null,
+        appliedAt: new Date()
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 const formatServiceRequest = (req, sr) => {
   return {
     id: sr._id.toString(),

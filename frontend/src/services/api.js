@@ -257,6 +257,10 @@ export const api = {
     return safeFetch(`${API_BASE}/service-requests/${requestId}`);
   },
 
+  getServiceRequestById: async (requestId) => {
+    return safeFetch(`${API_BASE}/service-requests/${requestId}`);
+  },
+
   createServiceRequest: async (requestData) => {
     return safeFetch(`${API_BASE}/service-requests`, {
       method: 'POST',
@@ -454,6 +458,17 @@ export const api = {
     return safeFetch(`${API_BASE}/reviews/can-review/${providerId}`);
   },
 
+  getUserReviews: async (userId) => {
+    return safeFetch(`${API_BASE}/reviews/user/${userId}`);
+  },
+
+  updateReview: async (reviewId, reviewData) => {
+    return safeFetch(`${API_BASE}/reviews/${reviewId}`, {
+      method: 'PUT',
+      body: JSON.stringify(reviewData),
+    });
+  },
+
   getCompletedBookings: async () => {
     return safeFetch(`${API_BASE}/bookings?status=completed`);
   },
@@ -550,7 +565,28 @@ export const api = {
     return safeFetch(`${API_BASE}/providers/search?service=${encodeURIComponent(service)}`);
   },
 
+  saveSearchHistory: async (query) => {
+    return safeFetch(`${API_BASE}/users/search-history`, {
+      method: 'POST',
+      body: JSON.stringify({ query }),
+    });
+  },
+
+  getSearchHistory: async () => {
+    return safeFetch(`${API_BASE}/users/search-history`);
+  },
+
+  clearSearchHistory: async () => {
+    return safeFetch(`${API_BASE}/users/search-history`, {
+      method: 'DELETE',
+    });
+  },
+
   getUser: async (userId) => {
+    return safeFetch(`${API_BASE}/users/${userId}`);
+  },
+
+  getUserProfile: async (userId) => {
     return safeFetch(`${API_BASE}/users/${userId}`);
   },
 
@@ -571,8 +607,18 @@ export const api = {
     return safeFetch(`${API_BASE}/providers/${providerId}/stats`);
   },
 
+  getProviderDashboardStats: async () => {
+    const user = getStoredUser();
+    if (!user?.id) return null;
+    return safeFetch(`${API_BASE}/providers/${user.id}/dashboard-stats`);
+  },
+
   getWeeklyActivity: async (providerId) => {
     return safeFetch(`${API_BASE}/providers/${providerId}/activity`);
+  },
+
+  getProviderAvailability: async (providerId) => {
+    return safeFetch(`${API_BASE}/providers/${providerId}/availability`);
   },
 
   incrementProfileView: async (targetUserId) => {

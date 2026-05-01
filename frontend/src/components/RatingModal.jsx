@@ -81,7 +81,7 @@ export default function RatingModal({
 
     try {
       const reviewData = {
-        providerId: provider.id,
+        providerId: provider.id || provider._id,
         rating: selectedRating,
         comment,
         punctuality,
@@ -103,11 +103,14 @@ export default function RatingModal({
           onReviewSubmitted({
             rating: selectedRating,
             comment,
-            newRating: result.newRating,
-            reviewCount: result.reviewCount
+            newRating: result.providerStats?.rating || result.newRating,
+            reviewCount: result.providerStats?.reviewCount || result.reviewCount
           });
         }
         onClose();
+        if (window.showToast) {
+          window.showToast('Avis publié avec succès !', 'success');
+        }
       } else {
         setError(result.error || 'Erreur lors de la soumission');
       }

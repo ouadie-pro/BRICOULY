@@ -87,6 +87,32 @@ const generateToken = (userId, role) => {
   );
 };
 
+// Helper to check if user has specific role
+const hasRole = (user, role) => {
+  return user && user.role === role;
+};
+
+// Helper to check if user is authenticated
+const isAuthenticated = (user) => {
+  return user && user.id;
+};
+
+// Get user ID from request (handles both auth methods)
+const getUserIdFromRequest = (req) => {
+  if (req.user && req.user.id) {
+    return req.user.id.toString();
+  }
+  return req.headers['x-user-id'];
+};
+
+// Get user role from request
+const getUserRoleFromRequest = (req) => {
+  if (req.user && req.user.role) {
+    return req.user.role;
+  }
+  return null;
+};
+
 module.exports = {
   auth,
   requireClient,
@@ -94,5 +120,9 @@ module.exports = {
   requireAdmin,
   requireRole,
   generateToken,
-  JWT_SECRET
+  JWT_SECRET,
+  hasRole,
+  isAuthenticated,
+  getUserIdFromRequest,
+  getUserRoleFromRequest
 };

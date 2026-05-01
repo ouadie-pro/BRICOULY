@@ -30,6 +30,8 @@ io.on('connection', (socket) => {
       socket.userId = userId;
       onlineUsers.set(userId, socket.id);
       io.emit('onlineUsers', Array.from(onlineUsers.keys()));
+      // Notify followers that user is online
+      socket.broadcast.emit('userOnline', { userId });
     }
   });
 
@@ -37,35 +39,72 @@ io.on('connection', (socket) => {
     if (socket.userId) {
       onlineUsers.delete(socket.userId);
       io.emit('onlineUsers', Array.from(onlineUsers.keys()));
+      socket.broadcast.emit('userOffline', { userId: socket.userId });
     }
   });
 
   // Booking events
   socket.on('booking_created', (data) => {
-    const { providerId, bookingId, service } = data;
+    const { providerId, bookingId, service, clientName, date, time } = data;
     io.to(`user:${providerId}`).emit('new_booking_notification', {
       bookingId,
       service,
-      message: 'New booking request received'
+      clientName,
+      date,
+      time,
+      message: `New booking request for ${service}`
     });
   });
 
   socket.on('booking_confirmed', (data) => {
-    const { clientId, bookingId } = data;
+    const { clientId, bookingId, service, date, time } = data;
     io.to(`user:${clientId}`).emit('booking_status_updated', {
       bookingId,
       status: 'confirmed',
-      message: 'Your booking has been confirmed'
+      service,
+      date,
+      time,
+      message: 'Your booking has been confirmed!'
     });
   });
 
   socket.on('booking_completed', (data) => {
-    const { clientId, bookingId } = data;
+    const { clientId, bookingId, service } = data;
     io.to(`user:${clientId}`).emit('booking_status_updated', {
       bookingId,
       status: 'completed',
-      message: 'Service has been marked as completed'
+      service,
+      message: 'Great! Your service has been marked as completed.'
     });
+  });
+
+  socket.on('booking_cancelled', (data) => {
+    const { clientId, providerId, bookingId } = data;
+    if (clientId) {
+      io.to(`user:${clientId}`).emit('booking_status_updated', {
+        bookingId,
+        status: 'cancelled',
+        message: 'Your booking has been cancelled.'
+      });
+    }
+    if (providerId) {
+      io.to(`user:${providerId}`).emit('booking_status_updated', {
+        bookingId,
+        status: 'cancelled',
+        message: 'A booking has been cancelled.'
+      });
+    }
+  });
+
+  // Typing indicator handling
+  socket.on('typing', ({ fromUserId, toUserId, isTyping }) => {
+    if (toUserId) {
+      io.to(`user:${toUserId}`).emit('userTyping', {
+        fromUserId,
+        isTyping,
+        timestamp: new Date().toISOString()
+      });
+    }
   });
 });
 

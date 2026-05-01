@@ -248,3 +248,96 @@ exports.updateProvider = async (req, res) => {
     });
   }
 };
+
+// Get provider dashboard stats with earnings
+exports.getProviderDashboardStats = async (req, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    if (req.user.role !== 'provider') {
+      return res.status(403).json({ success: false, error: 'Only providers can access stats' });
+    }
+
+    const userId = req.user.id;
+
+    const provider = await Provider.findOne({ user: userId });
+    if (!provider) {
+      return res.status(404).json({ success: false, error: 'Provider not found' });
+    }
+
+    const ServiceRequest = require('../models/ServiceRequest');
+    const Message = require('../models/Message');
+
+    const [completedServiceRequests, activeServiceRequests, completedBookings, pendingBookings, reviews] = await Promise.all([
+      ServiceRequest.countDocuments({ acceptedProviderId: provider._id, status: 'completed' }),
+      ServiceRequest.countDocuments({ acceptedProviderId: provider._id, status: 'in_progress' }),
+      Booking.countDocuments({ provider: provider._id, status: 'completed' }),
+      Booking.countDocuments({ provider: provider._id, status: 'pending' }),
+      Review.find({ provider: provider._id })
+    ]);
+
+    const jobsDone = completedServiceRequests + completedBookings;
+    const activeJobs = activeServiceRequests;
+    const pendingBookingsCount = pendingBookings;
+
+    let rating = 0;
+    if (reviews.length > 0) {
+      rating = Math.round((reviews.reduce((sum, r) => sum + r.rating,0) / reviews.length) * 10) / 10;
+    }
+
+    // Calculate total earnings from completed bookings
+    const completedBookingsList = await Booking.find({ provider: provider._id, status: 'completed' });
+    const totalEarnings = completedBookingsList.reduce((sum, b) => sum + (b.price || 0),0);
+
+    // Get unread messages count
+    const unreadMessages = await Message.countDocuments({
+      receiver: userId,
+      read: false
+    });
+
+    // Get profile views
+    const user = await User.findById(userId);
+    const profileViews = user?.profileViews || 0;
+
+    // Get weekly activity
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const today = new Date();
+    const activity = [];
+
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      date.setHours(0,0,0,0);
+      const nextDate = new Date(date);
+      nextDate.setDate(nextDate.getDate() + 1);
+
+      const views = await ServiceRequest.countDocuments({
+        acceptedProviderId: provider._id,
+        createdAt: { $gte: date, $lt: nextDate }
+      });
+
+      activity.push({
+        day: days[date.getDay() === 0 ? 6 : date.getDay() - 1],
+        views,
+        messages: 0
+      });
+    }
+
+    res.json({
+      success: true,
+      stats: {
+        jobsDone,
+        activeJobs,
+        rating,
+        reviewCount: reviews.length,
+        pendingBookings: pendingBookingsCount,
+        unreadMessages,
+        profileViews,
+        totalEarnings
+      },
+      activity
+    });
+  } catch (error) {
+    console.error('Error getting provider stats:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};

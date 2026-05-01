@@ -96,11 +96,18 @@ export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther 
         }
 
         // Check if current user already follows this profile
-        const myFollowingIds = await api.getMyFollowing();
-if (Array.isArray(myFollowingIds)) {
-  // FIXED: Check the id property of each user object
-  setIsFollowing(myFollowingIds.some((user) => String(user.id) === String(targetUserId)));
-}
+        if (isViewingOther && targetUserId && currentUser.id) {
+          try {
+            const status = await api.checkFollowStatus(targetUserId);
+            setIsFollowing(status.following);
+          } catch (err) {
+            // Fallback to checking following list
+            const myFollowingIds = await api.getMyFollowing();
+            if (Array.isArray(myFollowingIds)) {
+              setIsFollowing(myFollowingIds.some((u) => String(u.id) === String(targetUserId)));
+            }
+          }
+        }
       } catch (err) {
         console.error('Error loading user:', err);
       }

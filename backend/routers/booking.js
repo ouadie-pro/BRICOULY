@@ -9,7 +9,7 @@ router.get('/', auth, getBookings);
 router.post('/', auth, requireClient, createBooking);
 // Both can update booking status (providers can confirm/complete, clients can cancel)
 router.put('/:id', auth, updateBookingStatus);
-// Only clients can cancel their own bookings
-router.delete('/:id', auth, requireClient, cancelBooking);
+// Both can cancel bookings (handled inside controller by role)
+router.delete('/:id', auth, cancelBooking);
 
 module.exports = router;

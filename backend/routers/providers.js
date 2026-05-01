@@ -8,6 +8,15 @@ router.get('/', getProviders);
 
 router.get('/search', getProvidersByService);
 
+router.get('/me/dashboard-stats', auth, async (req, res) => {
+  try {
+    const { getProviderDashboardStats } = require('../controllers/providerController');
+    await getProviderDashboardStats(req, res);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 router.get('/:id', getProviderById);
 router.get('/:id/reviews', getProviderReviews);
 router.get('/:id/services', getProviderServices);
