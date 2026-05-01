@@ -97,13 +97,75 @@ io.on('connection', (socket) => {
   });
 
   // Typing indicator handling
-  socket.on('typing', ({ fromUserId, toUserId, isTyping }) => {
+  socket.on('typing', ({ fromUserId, toUserId }) => {
     if (toUserId) {
-      io.to(`user:${toUserId}`).emit('userTyping', {
-        fromUserId,
-        isTyping,
-        timestamp: new Date().toISOString()
-      });
+      io.to(`user:${toUserId}`).emit('userTyping', { fromUserId });
+    }
+  });
+
+  socket.on('stopTyping', ({ fromUserId, toUserId }) => {
+    if (toUserId) {
+      io.to(`user:${toUserId}`).emit('userStoppedTyping', { fromUserId });
+    }
+  });
+
+  // Message handling - save to database
+  socket.on('send_message', async (data) => {
+    const { receiverId, content, type, mediaUrl } = data;
+    const senderId = socket.userId;
+    
+    if (senderId && receiverId) {
+      const Conversation = require('./models/Conversation');
+      const Message = require('./models/Message');
+      const User = require('./models/User');
+      const mongoose = require('mongoose');
+      
+      try {
+        let conversation = await Conversation.findOne({
+          participants: { $all: [new mongoose.Types.ObjectId(senderId), new mongoose.Types.ObjectId(receiverId)] }
+        });
+        
+        if (!conversation) {
+          conversation = await Conversation.create({
+            participants: [new mongoose.Types.ObjectId(senderId), new mongoose.Types.ObjectId(receiverId)],
+          });
+        }
+        
+        const message = await Message.create({
+          conversationId: conversation._id,
+          sender: new mongoose.Types.ObjectId(senderId),
+          receiver: new mongoose.Types.ObjectId(receiverId),
+          content: content || '',
+          mediaUrl: mediaUrl || null,
+          type: type || 'text',
+          read: false
+        });
+        
+        conversation.lastMessage = content || (mediaUrl ? '[Media]' : '');
+        conversation.lastMessageAt = new Date();
+        await conversation.save();
+        
+        const sender = await User.findById(senderId).select('name avatar');
+        
+        const messageData = {
+          id: message._id,
+          conversationId: conversation._id,
+          senderId: senderId,
+          senderName: sender?.name,
+          senderAvatar: sender?.avatar,
+          receiverId: receiverId,
+          content: content || '',
+          mediaUrl: mediaUrl,
+          type: type || 'text',
+          read: false,
+          createdAt: message.createdAt
+        };
+        
+        io.to(`user:${receiverId}`).emit('newMessage', messageData);
+        io.to(`user:${senderId}`).emit('messageSent', messageData);
+      } catch (err) {
+        console.error('Socket message error:', err);
+      }
     }
   });
 });

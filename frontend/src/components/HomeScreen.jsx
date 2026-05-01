@@ -812,8 +812,9 @@ export default function HomeScreen({ isDesktop }) {
       <div className={`bg-white rounded-3xl shadow-md border border-slate-100 p-6 w-full`}>
         {/* Header */}
         <div className="flex items-center gap-3">
-          <div
-            className="w-12 h-12 rounded-full bg-slate-100 bg-cover bg-center flex items-center justify-center flex-shrink-0"
+          <button
+            onClick={() => navigate(`/user/${item.authorId}`)}
+            className="w-12 h-12 rounded-full bg-slate-100 bg-cover bg-center flex items-center justify-center flex-shrink-0 overflow-hidden"
             style={{ backgroundImage: item.authorAvatar ? `url("${item.authorAvatar}")` : undefined }}
           >
             {!item.authorAvatar && (
@@ -821,7 +822,7 @@ export default function HomeScreen({ isDesktop }) {
                 {item.authorName?.charAt(0) || '?'}
               </span>
             )}
-          </div>
+          </button>
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-base text-slate-800 truncate">{item.authorName}</p>
             <div className="flex items-center gap-2 mt-0.5">
@@ -938,16 +939,17 @@ export default function HomeScreen({ isDesktop }) {
               <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
                 {(compact ? comments.slice(-2) : comments).map((c) => (
                   <div key={c.id} className="flex gap-2">
-                    <div
-                      className="w-8 h-8 rounded-full bg-slate-100 bg-cover bg-center flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundImage: c.authorAvatar ? `url("${c.authorAvatar}")` : undefined }}
-                    >
+                  <button
+                    onClick={() => navigate(`/user/${c.authorId}`)}
+                    className="w-8 h-8 rounded-full bg-slate-100 bg-cover bg-center flex items-center justify-center flex-shrink-0 overflow-hidden"
+                    style={{ backgroundImage: c.authorAvatar ? `url("${c.authorAvatar}")` : undefined }}
+                  >
                       {!c.authorAvatar && (
                         <span className="font-bold text-slate-500 text-xs">
                           {c.authorName?.charAt(0)}
                         </span>
                       )}
-                    </div>
+                  </button>
                     <div className="flex-1 bg-slate-50 rounded-lg px-3 py-1.5">
                       <p className="font-medium text-sm text-slate-900">{c.authorName}</p>
                       <p className="text-sm text-slate-600">{c.content}</p>
@@ -989,8 +991,9 @@ export default function HomeScreen({ isDesktop }) {
         <header className="flex flex-col gap-4 p-5 pt-8 bg-background-light dark:bg-background-dark sticky top-0 z-20">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div
-                className="bg-center bg-no-repeat bg-cover rounded-full size-12 border-2 border-white dark:border-slate-700 shadow-sm"
+              <button
+                onClick={() => navigate('/profile')}
+                className="bg-center bg-no-repeat bg-cover rounded-full size-12 border-2 border-white dark:border-slate-700 shadow-sm overflow-hidden"
                 style={{
                   backgroundImage: user?.avatar
                     ? `url("${user.avatar}")`
@@ -1004,7 +1007,7 @@ export default function HomeScreen({ isDesktop }) {
                     </span>
                   </div>
                 )}
-              </div>
+              </button>
               <div className="flex flex-col">
                 <span className="text-slate-500 dark:text-slate-400 text-xs font-medium">
                   Good Morning 👋

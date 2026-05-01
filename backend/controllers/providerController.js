@@ -341,3 +341,52 @@ exports.getProviderDashboardStats = async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
+
+// Get weekly activity for provider
+exports.getWeeklyActivity = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const today = new Date();
+    const activity = [];
+
+    const provider = await Provider.findOne({ user: id });
+    if (!provider) {
+      return res.json(days.map(day => ({ day, views: 0, messages: 0 })));
+    }
+
+    const ServiceRequest = require('../models/ServiceRequest');
+    const Message = require('../models/Message');
+
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      date.setHours(0, 0, 0, 0);
+      const nextDate = new Date(date);
+      nextDate.setDate(nextDate.getDate() + 1);
+
+      const [views, messages] = await Promise.all([
+        ServiceRequest.countDocuments({
+          acceptedProviderId: provider._id,
+          createdAt: { $gte: date, $lt: nextDate }
+        }),
+        Message.countDocuments({
+          receiver: id,
+          createdAt: { $gte: date, $lt: nextDate }
+        })
+      ]);
+
+      activity.push({
+        day: days[date.getDay() === 0 ? 6 : date.getDay() - 1],
+        views,
+        messages
+      });
+    }
+
+    res.json(activity);
+  } catch (error) {
+    console.error('Error getting weekly activity:', error);
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    res.json(days.map(day => ({ day, views: 0, messages: 0 })));
+  }
+};

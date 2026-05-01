@@ -1,1224 +1,720 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+// frontend/src/components/ProfileScreen.jsx - CREATE THIS FILE
+
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../services/api';
-import {
-  FiArrowLeft, FiUserPlus, FiUserMinus, FiEdit, FiX, FiCheckCircle, FiCamera,
-  FiMessageCircle, FiMail, FiPhone, FiMapPin, FiFileText, FiCalendar, FiPlus,
-  FiTrash2, FiStar, FiCheck, FiUsers, FiImage, FiHeart
+import { useToast } from '../context/ToastContext';
+import { 
+  FiUser, FiMail, FiPhone, FiMapPin, FiBriefcase, FiStar, 
+  FiEdit2, FiSave, FiX, FiCamera, FiLoader, FiCheckCircle,
+  FiClock, FiDollarSign, FiHeart, FiUsers, FiLogOut, FiArrowLeft,
+  FiMessageCircle, FiCalendar, FiTool, FiAward, FiTrendingUp
 } from 'react-icons/fi';
 
-export default function ProfileScreen({ isDesktop, onUserUpdate, isViewingOther }) {
-  const { id: userId } = useParams();
-  const [user, setUser] = useState(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [location, setLocation] = useState('');
-  const [city, setCity] = useState('');
-  const [bio, setBio] = useState('');
-  const [hourlyRate, setHourlyRate] = useState('');
-  const [profession, setProfession] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadedAvatar, setUploadedAvatar] = useState(null);
-  const [articles, setArticles] = useState([]);
-  const [reviews, setReviews] = useState([]);
-  const [followers, setFollowers] = useState([]);
-  const [following, setFollowing] = useState([]);
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [followRequestSent, setFollowRequestSent] = useState(false);
-  const [showArticleForm, setShowArticleForm] = useState(false);
-  const [articleTitle, setArticleTitle] = useState('');
-  const [articleContent, setArticleContent] = useState('');
-  const [articleImages, setArticleImages] = useState([]);
-  const [articleImagePreviews, setArticleImagePreviews] = useState([]);
-  const [isSubmittingArticle, setIsSubmittingArticle] = useState(false);
-  const [activeTab, setActiveTab] = useState('info');
-  const [portfolio, setPortfolio] = useState([]);
-  const [showPortfolioForm, setShowPortfolioForm] = useState(false);
-  const [portfolioImage, setPortfolioImage] = useState(null);
-  const [portfolioImagePreview, setPortfolioImagePreview] = useState(null);
-  const [portfolioCaption, setPortfolioCaption] = useState('');
-  const [isUploadingPortfolio, setIsUploadingPortfolio] = useState(false);
-  const avatarInputRef = useRef(null);
-  const articleImageInputRef = useRef(null);
-  const portfolioImageInputRef = useRef(null);
+export default function ProfileScreen({ isDesktop, isViewingOther, onUserUpdate }) {
+  const { id } = useParams();
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-  const targetUserId = isViewingOther ? userId : currentUser.id;
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [services, setServices] = useState([]);
+  const [portfolio, setPortfolio] = useState([]);
+  const [reviews, setReviews] = useState([]);
+
+  const isOwnProfile = !isViewingOther || 
+    (currentUser.id === id) || 
+    (currentUser.id === profile?.id);
+
+  const userId = isViewingOther ? id : currentUser.id;
 
   useEffect(() => {
-    const loadUserData = async () => {
-      if (!targetUserId) return;
-      try {
-        let userData;
-        if (isViewingOther) {
-          // Try provider first, fall back to plain user
-          const providerData = await api.getProvider(targetUserId).catch(() => null);
-          if (providerData && !providerData.error) {
-            userData = providerData;
-          } else {
-            userData = await api.getUser(targetUserId);
-          }
-        } else if (currentUser.role === 'provider') {
-          userData = await api.getProvider(currentUser.id);
-        } else {
-          userData = await api.getCurrentUser();
-        }
+    loadProfile();
+  }, [userId]);
 
-        if (userData) {
-          setUser(userData);
-          setName(userData.name || '');
-          setPhone(userData.phone || '');
-          setLocation(userData.location || userData.address || '');
-          setCity(userData.city || '');
-          setBio(userData.bio || '');
-          setHourlyRate(userData.hourlyRate || '');
-          setProfession(userData.profession || '');
-        }
-
-        const isTargetProvider = userData?.role === 'provider';
-        
-        const [userArticles, userFollowers, userFollowing, userReviews] = await Promise.all([
-          api.getUserArticles(targetUserId),
-          api.getFollowers(targetUserId),
-          api.getFollowing(targetUserId),
-          isTargetProvider ? api.getProviderReviews?.(targetUserId).catch(() => []) : Promise.resolve([]),
-        ]);
-        setArticles(userArticles || []);
-        setFollowers(userFollowers || []);
-        setFollowing(userFollowing || []);
-        setReviews(userReviews || []);
-
-        // Fetch portfolio if user is a provider
-        if (userData?.role === 'provider' || currentUser.role === 'provider') {
-          const portfolioData = await api.getPortfolio(targetUserId);
-          setPortfolio(portfolioData || []);
-        }
-
-        // Check if current user already follows this profile
-        if (isViewingOther && targetUserId && currentUser.id) {
-          try {
-            const status = await api.checkFollowStatus(targetUserId);
-            setIsFollowing(status.following);
-          } catch (err) {
-            // Fallback to checking following list
-            const myFollowingIds = await api.getMyFollowing();
-            if (Array.isArray(myFollowingIds)) {
-              setIsFollowing(myFollowingIds.some((u) => String(u.id) === String(targetUserId)));
-            }
-          }
-        }
-      } catch (err) {
-        console.error('Error loading user:', err);
-      }
-    };
-    loadUserData();
-  }, [targetUserId, currentUser.id, currentUser.role, isViewingOther]);
-
-  // --- handleFollow must be defined BEFORE any early returns ---
-  const handleFollow = async () => {
-    if (followRequestSent) return;
-    const res = await api.followProvider(targetUserId);
-    if (res.success) {
-      if (res.message === 'Follow request sent') {
-        setFollowRequestSent(true);
-      } else if (res.message === 'Request cancelled') {
-        setFollowRequestSent(false);
-        setIsFollowing(false);
+  const loadProfile = async () => {
+    setLoading(true);
+    try {
+      // Load user profile
+      let userData;
+      if (isViewingOther) {
+        userData = await api.getUser(userId);
+        const providerData = await api.getProvider(userId).catch(() => null);
+        setProfile(providerData || userData);
       } else {
-        setIsFollowing(res.following);
+        userData = currentUser;
+        setProfile(currentUser);
       }
+
+      // Load stats
+      if (currentUser.role === 'provider') {
+        const stats = await api.getProviderStats(userId);
+        const userStats = await api.getProviderDashboardStats();
+        setProfile(prev => ({ ...prev, ...stats, ...userStats }));
+        
+        const servicesData = await api.getProviderServices(userId);
+        setServices(servicesData || []);
+        
+        const portfolioData = await api.getPortfolio(userId);
+        setPortfolio(portfolioData || []);
+      }
+
+      // Load reviews
+      const reviewsData = await api.getProviderReviews(userId);
+      setReviews(reviewsData || []);
+
+      // Load follow counts
+      const followers = await api.getFollowers(userId);
+      const following = await api.getFollowing(userId);
+      setFollowersCount(followers?.length || 0);
+      setFollowingCount(following?.length || 0);
+
+      // Check follow status
+      if (isViewingOther && currentUser.id !== userId) {
+        try {
+          const followStatus = await api.checkFollowStatus(userId);
+          setIsFollowing(followStatus?.following || false);
+        } catch (err) {
+          // Fallback to checking following list
+          try {
+            const myFollowingData = await api.getMyFollowing();
+            const myFollowing = Array.isArray(myFollowingData) ? myFollowingData : (myFollowingData?.data || []);
+            setIsFollowing(myFollowing.some((u) => String(u.id || u._id) === String(userId)));
+          } catch (fallbackErr) {
+            console.error('Error checking follow status:', fallbackErr);
+            setIsFollowing(false);
+          }
+        }
+      }
+
+    } catch (err) {
+      console.error('Error loading profile:', err);
+      showToast('Failed to load profile', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateProfile = async () => {
+    setIsSaving(true);
+    try {
+      const result = await api.updateProfile(editForm);
+      if (result.success) {
+        const updatedUser = result.user;
+        setProfile(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        if (onUserUpdate) onUserUpdate(updatedUser);
+        setIsEditing(false);
+        showToast('Profile updated successfully!', 'success');
+      } else {
+        showToast(result.error || 'Failed to update profile', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to update profile', 'error');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleAvatarChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    setIsUploading(true);
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Image must be less than 5MB', 'error');
+      return;
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      showToast('Only JPEG, PNG, WebP, and GIF are allowed', 'error');
+      return;
+    }
+
+    setAvatarFile(file);
+    const previewUrl = URL.createObjectURL(file);
+    setAvatarPreview(previewUrl);
+
+    const formData = new FormData();
+    formData.append('file', file);
+    
     try {
       const result = await api.uploadAvatar(file);
       if (result.success) {
-        const avatarUrl = `${window.location.origin}${result.filePath}?t=${Date.now()}`;
-        setUploadedAvatar(avatarUrl);
-        localStorage.setItem(
-          'user',
-          JSON.stringify({ ...JSON.parse(localStorage.getItem('user') || '{}'), avatar: result.filePath })
-        );
-        if (onUserUpdate) onUserUpdate({ ...user, avatar: result.filePath });
+        setProfile(prev => ({ ...prev, avatar: result.filePath }));
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        user.avatar = result.filePath;
+        localStorage.setItem('user', JSON.stringify(user));
+        showToast('Avatar updated!', 'success');
       }
     } catch (err) {
-      console.error('Error uploading avatar:', err);
-    } finally {
-      setIsUploading(false);
+      showToast('Failed to upload avatar', 'error');
     }
   };
 
-  const handleSave = async () => {
+  const handleFollowToggle = async () => {
     try {
-      const updates = { name, phone, location, city };
-      if (currentUser.role === 'provider') {
-        updates.bio = bio;
-        updates.hourlyRate = hourlyRate;
-        updates.profession = profession;
-      }
-      const result = await api.updateProfile(updates);
-      if (result.success) {
-        const updatedUser = { ...user, ...updates };
-        setUser(updatedUser);
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-        if (onUserUpdate) onUserUpdate(updatedUser);
-        setIsEditing(false);
-      }
+      const result = await api.followUser(userId);
+      setIsFollowing(result.following);
+      setFollowersCount(prev => result.following ? prev + 1 : prev - 1);
+      showToast(result.following ? `Following ${profile.name}` : `Unfollowed ${profile.name}`, 'success');
     } catch (err) {
-      console.error('Error updating profile:', err);
+      showToast('Failed to update follow status', 'error');
     }
   };
 
-  const handleArticleImageSelect = (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length > 0) {
-      const newImages = [...articleImages, ...files].slice(0, 10);
-      setArticleImages(newImages);
-      const newPreviews = newImages.map(file => URL.createObjectURL(file));
-      setArticleImagePreviews(newPreviews);
-    }
-  };
+  const StarRating = ({ rating, count }) => (
+    <div className="flex items-center gap-2">
+      <div className="flex">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <FiStar
+            key={star}
+            className={`${star <= Math.floor(rating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
+            size={16}
+          />
+        ))}
+      </div>
+      <span className="text-sm font-medium">{rating?.toFixed(1) || 0}</span>
+      {count > 0 && <span className="text-sm text-gray-500">({count})</span>}
+    </div>
+  );
 
-  const removeArticleImage = (index) => {
-    setArticleImages(prev => prev.filter((_, i) => i !== index));
-    setArticleImagePreviews(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleSubmitArticle = async () => {
-    if (!articleTitle.trim() || !articleContent.trim()) return;
-    setIsSubmittingArticle(true);
-    try {
-      const result = await api.createArticle({ title: articleTitle, content: articleContent, images: articleImages });
-      if (result.success) {
-        setArticles([result.article, ...articles]);
-        setShowArticleForm(false);
-        setArticleTitle('');
-        setArticleContent('');
-        setArticleImages([]);
-        setArticleImagePreviews([]);
-      }
-    } catch (err) {
-      console.error('Error creating article:', err);
-    } finally {
-      setIsSubmittingArticle(false);
-    }
-  };
-
-  const handleLikeArticle = async (articleId) => {
-    const res = await api.likeArticle(articleId);
-    if (res.success) {
-      setArticles(articles.map((a) => (a.id === articleId ? { ...a, likesCount: res.likesCount, isLiked: res.isLiked } : a)));
-    }
-  };
-
-  const handlePortfolioImageSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setPortfolioImage(file);
-      setPortfolioImagePreview(URL.createObjectURL(file));
-    }
-  };
-
-  const handleAddPortfolio = async () => {
-    if (!portfolioImage) return;
-    setIsUploadingPortfolio(true);
-    try {
-      const result = await api.uploadPortfolio(portfolioImage, portfolioCaption);
-      if (result.success) {
-        setPortfolio([result.portfolio, ...portfolio]);
-        setShowPortfolioForm(false);
-        setPortfolioImage(null);
-        setPortfolioImagePreview(null);
-        setPortfolioCaption('');
-      }
-    } catch (err) {
-      console.error('Error uploading portfolio:', err);
-    } finally {
-      setIsUploadingPortfolio(false);
-    }
-  };
-
-  const handleDeletePortfolio = async (portfolioId) => {
-    try {
-      const result = await api.deletePortfolio(portfolioId);
-      if (result.success) {
-        setPortfolio(portfolio.filter((p) => p._id !== portfolioId));
-      }
-    } catch (err) {
-      console.error('Error deleting portfolio:', err);
-    }
-  };
-
-  const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString();
-
-  const getAvatarUrl = (url) => {
-    if (!url) return null;
-    if (url.startsWith('http')) return url;
-    return `${window.location.origin}${url}?t=${Date.now()}`;
-  };
-
-  if (!user) {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-background-light dark:bg-background-dark">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
       </div>
     );
   }
 
-  const hasAvatar =
-    uploadedAvatar || (user?.avatar && user.avatar.length > 0 && !user.avatar.includes('undefined'));
-  const displayAvatar = uploadedAvatar || (user?.avatar ? getAvatarUrl(user.avatar) : null);
+  if (!profile) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <p className="text-gray-500">User not found</p>
+        <button onClick={() => navigate('/home')} className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg">
+          Go Home
+        </button>
+      </div>
+    );
+  }
 
-  const isOwnProfile = !isViewingOther;
-  const followLabel = isFollowing ? 'Following' : followRequestSent ? 'Request Sent' : 'Follow';
-
-  // ---- MOBILE ----
   if (!isDesktop) {
+    // Mobile Layout
     return (
-      <div className="flex flex-col min-h-screen bg-background-light dark:bg-background-dark pb-24">
-        <div className="sticky top-0 z-50 flex items-center bg-card-light dark:bg-card-dark p-4 pb-2 justify-between border-b border-gray-100 dark:border-gray-800 shadow-sm">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex size-12 shrink-0 items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full justify-center transition-colors"
-          >
-            <FiArrowLeft style={{ fontSize: '24px' }} />
-          </button>
-          <h2 className="text-text-light dark:text-text-dark text-lg font-bold leading-tight tracking-[-0.015em] text-center flex-1">
-            {isViewingOther ? user?.name : 'My Profile'}
-          </h2>
-          {isViewingOther ? (
-            <button
-              onClick={handleFollow}
-              disabled={followRequestSent}
-              className={`flex items-center justify-center size-10 rounded-full font-medium transition-colors ${
-                isFollowing || followRequestSent ? 'bg-slate-200 text-slate-700' : 'bg-primary text-white'
-              }`}
-            >
-              {isFollowing ? <FiUserMinus style={{ fontSize: '20px' }} /> : <FiUserPlus style={{ fontSize: '20px' }} />}
+      <div className="flex flex-col min-h-screen bg-gray-50 pb-24">
+        {/* Header */}
+        <header className="sticky top-0 z-40 bg-white border-b border-gray-200">
+          <div className="flex items-center justify-between p-4">
+            <button onClick={() => navigate(-1)} className="p-2 -ml-2 hover:bg-gray-100 rounded-full">
+              <FiArrowLeft className="text-xl" />
             </button>
-          ) : (
-            <button
-              onClick={() => setIsEditing(!isEditing)}
-              className="flex size-12 shrink-0 items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full justify-center transition-colors"
-            >
-              {isEditing ? <FiX className="text-primary" style={{ fontSize: '24px' }} /> : <FiEdit className="text-primary" style={{ fontSize: '24px' }} />}
-            </button>
-          )}
-        </div>
-
-        <div className="flex flex-col">
-          <div className="flex p-4 pb-2 bg-card-light dark:bg-card-dark pt-6">
-            <div className="flex w-full flex-col gap-4 items-center">
-              <div className="relative">
-                {hasAvatar ? (
-                  <div
-                    className="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-32 w-32 border-4 border-background-light dark:border-background-dark shadow-md"
-                    style={{ backgroundImage: `url("${displayAvatar}")` }}
-                  />
-                ) : (
-                  <div className="bg-slate-300 aspect-square rounded-full h-32 w-32 border-4 border-background-light dark:border-background-dark shadow-md flex items-center justify-center">
-                    <span className="text-4xl font-bold text-slate-500">
-                      {user.name ? user.name.charAt(0).toUpperCase() : '?'}
-                    </span>
-                  </div>
-                )}
-                {user.verified && (
-                  <div className="absolute bottom-1 right-1 bg-green-500 rounded-full p-1.5 border-4 border-card-light dark:border-card-dark">
-                    <FiCheckCircle className="text-white text-sm" />
-                  </div>
-                )}
-                {isEditing && (
-                  <button
-                    onClick={() => avatarInputRef.current?.click()}
-                    disabled={isUploading}
-                    className="absolute bottom-1 right-1 bg-primary rounded-full p-2 border-4 border-card-light dark:border-card-dark hover:bg-blue-600 transition-colors"
-                  >
-                    {isUploading ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    ) : (
-                      <FiCamera className="text-white text-sm" />
-                    )}
-                  </button>
-                )}
-              </div>
-              <input type="file" ref={avatarInputRef} onChange={handleAvatarChange} accept="image/*" className="hidden" />
-              <div className="flex flex-col items-center justify-center">
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="text-center text-[22px] font-bold bg-transparent border-b border-primary focus:outline-none"
-                  />
-                ) : (
-                  <p className="text-text-light dark:text-text-dark text-[22px] font-bold leading-tight tracking-[-0.015em] text-center">
-                    {user.name}
-                  </p>
-                )}
-                <p className="text-secondary-text-light dark:text-secondary-text-dark text-base font-medium leading-normal text-center">
-                  {user.role === 'provider' ? user.profession : 'Client'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Message button when viewing another user */}
-          {isViewingOther && (
-            <div className="px-4 pb-2">
-              <button
-                onClick={() => navigate(`/messages/${targetUserId}`)}
-                className="w-full py-2 border border-primary text-primary rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-blue-50 transition-colors"
-              >
-                <FiMessageCircle className="text-[18px]" />
-                Send Message
+            <h1 className="text-lg font-bold">
+              {isOwnProfile ? 'My Profile' : profile.name}
+            </h1>
+            {isOwnProfile && (
+              <button onClick={() => setIsEditing(!isEditing)} className="p-2 text-blue-500">
+                <FiEdit2 className="text-xl" />
               </button>
-            </div>
-          )}
-
-          {isEditing && (
-            <div className="px-4 pb-4">
-              <button onClick={handleSave} className="w-full py-3 bg-primary text-white rounded-xl font-medium">
-                Save Changes
+            )}
+            {!isOwnProfile && (
+              <button onClick={handleFollowToggle} className={`px-4 py-2 rounded-lg text-sm font-medium ${isFollowing ? 'bg-gray-100 text-gray-700' : 'bg-blue-500 text-white'}`}>
+                {isFollowing ? 'Following' : 'Follow'}
               </button>
-            </div>
-          )}
-
-          <div className="flex justify-around py-4 bg-card-light dark:bg-card-dark border-b border-gray-100 dark:border-gray-800">
-            <div className="flex flex-col items-center">
-              <p className="text-lg font-bold text-text-light dark:text-text-dark">{user.jobsDone || 0}</p>
-              <p className="text-xs text-secondary-text-light dark:text-secondary-text-dark uppercase tracking-wide">Jobs Done</p>
-            </div>
-            <div className="w-px bg-gray-200 dark:bg-gray-700"></div>
-            <div className="flex flex-col items-center">
-              <p className="text-lg font-bold text-text-light dark:text-text-dark">{user.rating || 0}</p>
-              <p className="text-xs text-secondary-text-light dark:text-secondary-text-dark uppercase tracking-wide">Rating</p>
-            </div>
-            <div className="w-px bg-gray-200 dark:bg-gray-700"></div>
-            <div className="flex flex-col items-center">
-              <p className="text-lg font-bold text-text-light dark:text-text-dark">{user.reviewCount || 0}</p>
-              <p className="text-xs text-secondary-text-light dark:text-secondary-text-dark uppercase tracking-wide">Reviews</p>
-            </div>
+            )}
           </div>
+        </header>
 
-          <div className="p-4 bg-card-light dark:bg-card-dark">
-            <h3 className="font-semibold text-text-light dark:text-text-dark mb-4">Profile Information</h3>
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                <FiMail className="text-slate-400" />
-                <div>
-                  <p className="text-xs text-slate-500">Email</p>
-                  <p className="text-sm font-medium text-text-light dark:text-text-dark">{user.email}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                <FiPhone className="text-slate-400" />
-                <div>
-                  <p className="text-xs text-slate-500">Phone</p>
-                  {isEditing ? (
-                    <input
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="text-sm font-medium bg-transparent border-b border-primary focus:outline-none"
-                      placeholder="Add phone number"
-                    />
-                  ) : (
-                    <p className="text-sm font-medium text-text-light dark:text-text-dark">{user.phone || 'Not set'}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                <FiMapPin className="text-slate-400" />
-                <div className="flex-1">
-                  <p className="text-xs text-slate-500">Location</p>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={location}
-                      onChange={(e) => setLocation(e.target.value)}
-                      className="text-sm font-medium bg-transparent border-b border-primary focus:outline-none w-full"
-                      placeholder="Add location (e.g., Casablanca)"
-                    />
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-text-light dark:text-text-dark">
-                        {user.location || user.address || 'Not set'}
-                      </p>
-                      {!user.location && !user.address && !isEditing && !isViewingOther && (
-                        <button
-                          onClick={() => setIsEditing(true)}
-                          className="text-xs text-primary font-medium hover:underline"
-                        >
-                          Add
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {currentUser.role === 'provider' && !isViewingOther && (
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                  <FiFileText className="text-slate-400 mt-1" />
-                  <div>
-                    <p className="text-xs text-slate-500">Bio</p>
-                    {isEditing ? (
-                      <textarea
-                        value={bio}
-                        onChange={(e) => setBio(e.target.value)}
-                        className="text-sm font-medium bg-transparent border-b border-primary focus:outline-none w-full resize-none"
-                        rows={3}
-                        placeholder="Add bio"
-                      />
-                    ) : (
-                      <p className="text-sm font-medium text-text-light dark:text-text-dark">{user.bio || 'Not set'}</p>
-                    )}
-                  </div>
+        {/* Profile Info */}
+        <div className="bg-white p-6 text-center border-b border-gray-100">
+          <div className="relative inline-block">
+            <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 mx-auto">
+              {avatarPreview ? (
+                <img src={avatarPreview} className="w-full h-full object-cover" />
+              ) : profile.avatar ? (
+                <img src={profile.avatar.startsWith('http') ? profile.avatar : window.location.origin + profile.avatar} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600">
+                  <span className="text-3xl font-bold text-white">{profile.name?.charAt(0)}</span>
                 </div>
               )}
-
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-                <FiCalendar className="text-slate-400" />
-                <div>
-                  <p className="text-xs text-slate-500">Member Since</p>
-                  <p className="text-sm font-medium text-text-light dark:text-text-dark">
-                    {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
-                  </p>
-                </div>
-              </div>
             </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ---- DESKTOP ----
-  return (
-    <div className="p-8 max-w-5xl mx-auto w-full">
-      {/* Banner */}
-      <div className="h-40 rounded-t-2xl bg-gradient-to-r from-primary via-blue-500 to-purple-600 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgdmlld0JveD0iMCAwIDYwIDYwIj48ZyBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMtNi42MjcgMC0xMiA1LjM3My0xMiAxMnM1LjM3MyAxMiAxMiAxMiAxMi01LjM3MyAxMi0xMi01LjM3My0xMi0xMi0xMnptMCAxOGMtMy4zMTQgMC02LTIuNjg2LTYtNnMyLjY4Ni02IDYtNiA2IDIuNjg2IDYgNi0yLjY4NiA2LTYgNnoiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjEiLz48L2c+PC9zdmc+')] opacity-30"></div>
-      </div>
-      
-      <div className="bg-white rounded-b-2xl shadow-sm border border-slate-200 border-t-0 px-8 pb-8">
-        {/* Avatar overlapping banner */}
-        <div className="relative -mt-16 mb-4 flex justify-between items-end">
-          <div className="relative">
-            {hasAvatar ? (
-              <div
-                className="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-32 w-32 border-4 border-white shadow-lg"
-                style={{ backgroundImage: `url("${displayAvatar}")` }}
-              />
-            ) : (
-              <div className="bg-slate-300 aspect-square rounded-full h-32 w-32 border-4 border-white shadow-lg flex items-center justify-center">
-                <span className="text-5xl font-bold text-slate-500">
-                  {user.name ? user.name.charAt(0).toUpperCase() : '?'}
-                </span>
-              </div>
-            )}
-            {isEditing && !isViewingOther && (
-              <button
-                onClick={() => avatarInputRef.current?.click()}
-                disabled={isUploading}
-                className="absolute bottom-1 right-1 bg-primary rounded-full p-2 border-4 border-white hover:bg-blue-600 transition-colors shadow-md"
-              >
-                {isUploading ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                ) : (
-                  <FiCamera className="text-white text-sm" />
-                )}
-              </button>
-            )}
-            <input
-              type="file"
-              ref={avatarInputRef}
-              onChange={handleAvatarChange}
-              accept="image/*"
-              className="hidden"
-            />
-            {user.verified && (
-              <div className="absolute bottom-2 left-2 bg-green-500 rounded-full p-1.5 border-4 border-white">
-                <FiCheckCircle className="text-white text-sm" />
-              </div>
+            {isOwnProfile && (
+              <label className="absolute bottom-0 right-0 p-1.5 bg-blue-500 rounded-full cursor-pointer">
+                <FiCamera className="text-white text-xs" />
+                <input type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+              </label>
             )}
           </div>
-          
-          <div className="flex gap-3 mb-2">
-            {isViewingOther ? (
-              <>
-                <button
-                  onClick={() => navigate(`/messages/${targetUserId}`)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg border border-primary text-primary hover:bg-blue-50 transition-colors font-medium"
-                >
-                  <FiMessageCircle />
-                  Message
-                </button>
-                <button
-                  onClick={handleFollow}
-                  disabled={followRequestSent}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                    isFollowing || followRequestSent
-                      ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                      : 'bg-primary text-white hover:bg-blue-600'
-                  }`}
-                >
-                  {isFollowing ? <FiUserMinus /> : <FiUserPlus />}
-                  {followLabel}
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={() => setIsEditing(!isEditing)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                  isEditing ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' : 'bg-primary text-white hover:bg-blue-600'
-                }`}
-              >
-                {isEditing ? <FiX /> : <FiEdit />}
-                {isEditing ? 'Cancel' : 'Edit Profile'}
-              </button>
-            )}
-          </div>
-        </div>
-        
-        {/* Name and title */}
-        <div className="mb-6">
-          {isEditing && !isViewingOther ? (
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="text-2xl font-bold bg-transparent border-b border-primary focus:outline-none w-full mb-1"
-            />
-          ) : (
-            <h1 className="text-2xl font-bold text-slate-900">{user?.name}</h1>
+          <h2 className="text-xl font-bold mt-3">{profile.name}</h2>
+          {profile.role === 'provider' && (
+            <p className="text-blue-600 text-sm font-medium mt-1">{profile.profession}</p>
           )}
-          <p className="text-slate-500">{user?.role === 'provider' ? user?.profession : 'Client'}</p>
-        </div>
-        
-        {/* Stats row */}
-        <div className="flex gap-8 py-4 border-y border-slate-200 mb-6">
-          <button
-            onClick={() => setActiveTab('followers')}
-            className="flex flex-col items-center hover:text-primary transition-colors"
-          >
-            <p className="text-xl font-bold text-slate-900">{followers.length}</p>
-            <p className="text-sm text-slate-500">Followers</p>
-          </button>
-          <button
-            onClick={() => setActiveTab('following')}
-            className="flex flex-col items-center hover:text-primary transition-colors"
-          >
-            <p className="text-xl font-bold text-slate-900">{following.length}</p>
-            <p className="text-sm text-slate-500">Following</p>
-          </button>
-          {user?.role === 'provider' && (
-            <>
-              <div className="flex flex-col items-center">
-                <p className="text-xl font-bold text-slate-900">{user?.jobsDone || 0}</p>
-                <p className="text-sm text-slate-500">Jobs Done</p>
-              </div>
-              <div className="flex flex-col items-center">
-                <p className="text-xl font-bold text-slate-900 flex items-center gap-1">
-                  <FiStar className="text-amber-400 text-lg" />
-                  {user?.rating || 0}
-                </p>
-                <p className="text-sm text-slate-500">Rating</p>
-              </div>
-            </>
+          {profile.verified && (
+            <div className="flex items-center justify-center gap-1 mt-1">
+              <FiCheckCircle className="text-blue-500 text-sm" />
+              <span className="text-xs text-gray-500">Verified Professional</span>
+            </div>
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-        {/* Left column - Info card */}
-        <div className="md:col-span-1">
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-            <h3 className="text-lg font-semibold text-slate-900 mb-4">About</h3>
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <FiMail className="text-primary" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs text-slate-500">Email</p>
-                  <p className="text-sm font-medium text-slate-900">{user?.email}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <FiPhone className="text-primary" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs text-slate-500">Phone</p>
-                  {isEditing && !isViewingOther ? (
-                    <input
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="text-sm font-medium bg-transparent border-b border-primary focus:outline-none w-full"
-                      placeholder="Add phone number"
-                    />
-                  ) : (
-                    <p className="text-sm font-medium text-slate-900">{user?.phone || 'Not set'}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <FiMapPin className="text-primary" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs text-slate-500">Location</p>
-                  {isEditing && !isViewingOther ? (
-                    <input
-                      type="text"
-                      value={location}
-                      onChange={(e) => setLocation(e.target.value)}
-                      className="text-sm font-medium bg-transparent border-b border-primary focus:outline-none w-full"
-                      placeholder="Add location"
-                    />
-                  ) : (
-                    <p className="text-sm font-medium text-slate-900">{user?.location || user?.address || 'Not set'}</p>
-                  )}
-                </div>
-              </div>
-
-              {(user?.role === 'provider' || user?.bio) && (
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-50">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <FiFileText className="text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs text-slate-500 mb-1">Bio</p>
-                    {isEditing && !isViewingOther && currentUser.role === 'provider' ? (
-                      <textarea
-                        value={bio}
-                        onChange={(e) => setBio(e.target.value)}
-                        className="text-sm font-medium bg-transparent border border-slate-200 rounded-lg p-2 w-full resize-none focus:outline-none focus:border-primary"
-                        rows={3}
-                        placeholder="Add bio"
-                      />
-                    ) : (
-                      <p className="text-sm font-medium text-slate-900">{user?.bio || 'Not set'}</p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <FiCalendar className="text-primary" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500">Member Since</p>
-                  <p className="text-sm font-medium text-slate-900">
-                    {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
-                  </p>
-                </div>
-              </div>
-
-              {isEditing && !isViewingOther && (
-                <button
-                  onClick={handleSave}
-                  className="w-full py-3 rounded-xl font-medium bg-primary text-white hover:bg-blue-600 transition-colors"
-                >
-                  Save Changes
-                </button>
-              )}
-            </div>
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-px bg-gray-200">
+          <div className="bg-white p-3 text-center">
+            <p className="text-lg font-bold">{profile.jobsDone || 0}</p>
+            <p className="text-xs text-gray-500">Jobs Done</p>
+          </div>
+          <div className="bg-white p-3 text-center">
+            <p className="text-lg font-bold">{followersCount}</p>
+            <p className="text-xs text-gray-500">Followers</p>
+          </div>
+          <div className="bg-white p-3 text-center">
+            <p className="text-lg font-bold">{followingCount}</p>
+            <p className="text-xs text-gray-500">Following</p>
           </div>
         </div>
 
-        {/* Right column - Tabs */}
-        <div className="md:col-span-2">
-          <div className="mt-6">
-            <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
-              {[
-                'info', 
-                'followers', 
-                'following', 
-                ...(user?.role === 'provider' || currentUser.role === 'provider' ? ['portfolio'] : []),
-                ...(isViewingOther && user?.role === 'user' ? ['reviews'] : []), // FIXED: #3
-                'articles'
-              ].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`flex-1 py-2 px-2 rounded-md text-sm font-medium transition-colors ${
-                    activeTab === tab ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  {tab === 'followers'
-                    ? `Followers (${followers.length})`
-                    : tab === 'following'
-                    ? `Following (${following.length})`
-                    : tab === 'articles'
-                    ? `Articles (${articles.length})`
-                    : tab === 'reviews'
-                    ? `Reviews (${reviews.length})`
-                    : 'Info'}
-                </button>
+        {/* Bio */}
+        {profile.bio && (
+          <div className="bg-white mt-3 p-4">
+            <p className="text-sm text-gray-600">{profile.bio}</p>
+          </div>
+        )}
+
+        {/* Contact Info */}
+        <div className="bg-white mt-3 p-4 space-y-3">
+          <h3 className="font-semibold">Contact Information</h3>
+          {profile.phone && (
+            <div className="flex items-center gap-3 text-sm text-gray-600">
+              <FiPhone className="text-gray-400" />
+              <span>{profile.phone}</span>
+            </div>
+          )}
+          {profile.email && (
+            <div className="flex items-center gap-3 text-sm text-gray-600">
+              <FiMail className="text-gray-400" />
+              <span>{profile.email}</span>
+            </div>
+          )}
+          {profile.location && (
+            <div className="flex items-center gap-3 text-sm text-gray-600">
+              <FiMapPin className="text-gray-400" />
+              <span>{profile.location}</span>
+            </div>
+          )}
+          {profile.hourlyRate > 0 && (
+            <div className="flex items-center gap-3 text-sm text-gray-600">
+              <FiDollarSign className="text-gray-400" />
+              <span>{profile.hourlyRate} MAD/hour</span>
+            </div>
+          )}
+        </div>
+
+        {/* Services (Provider only) */}
+        {profile.role === 'provider' && services.length > 0 && (
+          <div className="bg-white mt-3 p-4">
+            <h3 className="font-semibold mb-3">Services Offered</h3>
+            <div className="space-y-2">
+              {services.map(service => (
+                <div key={service.id} className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
+                  <span className="text-sm">{service.name}</span>
+                  <span className="text-sm font-medium text-blue-600">{service.price} MAD</span>
+                </div>
               ))}
             </div>
+          </div>
+        )}
 
-            {activeTab === 'articles' && (
-              <div className="mt-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-slate-900">Articles</h3>
+        {/* Reviews */}
+        {reviews.length > 0 && (
+          <div className="bg-white mt-3 p-4">
+            <h3 className="font-semibold mb-3">Client Reviews</h3>
+            <div className="space-y-3">
+              {reviews.slice(0, 3).map(review => (
+                <div key={review.id} className="border-b border-gray-100 pb-3 last:border-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <StarRating rating={review.rating} />
+                    <span className="text-xs text-gray-400">{new Date(review.createdAt).toLocaleDateString()}</span>
+                  </div>
+                  <p className="text-sm text-gray-600">{review.comment}</p>
+                  <p className="text-xs text-gray-400 mt-1">- {review.clientName}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="p-4 space-y-3 mt-3">
+          {!isOwnProfile && (
+            <button
+              onClick={() => navigate(`/messages/${userId}`)}
+              className="w-full py-3 bg-blue-500 text-white rounded-xl font-medium flex items-center justify-center gap-2"
+            >
+              <FiMessageCircle /> Send Message
+            </button>
+          )}
+          {!isOwnProfile && currentUser.role === 'client' && profile.role === 'provider' && (
+            <button
+              onClick={() => navigate(`/book/${userId}`)}
+              className="w-full py-3 border border-blue-500 text-blue-500 rounded-xl font-medium"
+            >
+              Book Service
+            </button>
+          )}
+          {isOwnProfile && (
+            <button
+              onClick={() => {
+                localStorage.removeItem('user');
+                localStorage.removeItem('token');
+                localStorage.removeItem('userId');
+                navigate('/auth');
+              }}
+              className="w-full py-3 border border-red-300 text-red-600 rounded-xl font-medium flex items-center justify-center gap-2"
+            >
+              <FiLogOut /> Sign Out
+            </button>
+          )}
+        </div>
+
+        {/* Edit Modal */}
+        {isEditing && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between p-4 border-b">
+                <h3 className="text-lg font-bold">Edit Profile</h3>
+                <button onClick={() => setIsEditing(false)} className="p-1">
+                  <FiX className="text-xl" />
+                </button>
+              </div>
+              <div className="p-4 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Name</label>
+                  <input
+                    type="text"
+                    value={editForm.name !== undefined ? editForm.name : profile.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    className="w-full p-3 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Phone</label>
+                  <input
+                    type="tel"
+                    value={editForm.phone !== undefined ? editForm.phone : profile.phone || ''}
+                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                    className="w-full p-3 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Location</label>
+                  <input
+                    type="text"
+                    value={editForm.location !== undefined ? editForm.location : profile.location || ''}
+                    onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                    className="w-full p-3 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Bio</label>
+                  <textarea
+                    value={editForm.bio !== undefined ? editForm.bio : profile.bio || ''}
+                    onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
+                    className="w-full p-3 border rounded-lg resize-none"
+                    rows={3}
+                  />
+                </div>
+                {profile.role === 'provider' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Hourly Rate (MAD)</label>
+                      <input
+                        type="number"
+                        value={editForm.hourlyRate !== undefined ? editForm.hourlyRate : profile.hourlyRate || 0}
+                        onChange={(e) => setEditForm({ ...editForm, hourlyRate: parseFloat(e.target.value) })}
+                        className="w-full p-3 border rounded-lg"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Specialization</label>
+                      <input
+                        type="text"
+                        value={editForm.specialization !== undefined ? editForm.specialization : profile.profession || profile.specialization || ''}
+                        onChange={(e) => setEditForm({ ...editForm, specialization: e.target.value })}
+                        className="w-full p-3 border rounded-lg"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="flex gap-3 p-4 border-t">
+                <button onClick={() => setIsEditing(false)} className="flex-1 py-3 border rounded-lg">
+                  Cancel
+                </button>
+                <button onClick={handleUpdateProfile} disabled={isSaving} className="flex-1 py-3 bg-blue-500 text-white rounded-lg">
+                  {isSaving ? <FiLoader className="animate-spin inline" /> : <FiSave className="inline mr-1" />}
+                  {isSaving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Desktop Layout
+  return (
+    <div className="max-w-5xl mx-auto space-y-6">
+      {/* Profile Header */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="h-32 bg-gradient-to-r from-blue-500 to-blue-600"></div>
+        <div className="px-6 pb-6">
+          <div className="flex items-end -mt-12 mb-4">
+            <div className="relative">
+              <div className="w-28 h-28 rounded-full overflow-hidden bg-gray-200 border-4 border-white shadow-lg">
+                {avatarPreview ? (
+                  <img src={avatarPreview} className="w-full h-full object-cover" />
+                ) : profile.avatar ? (
+                  <img src={profile.avatar.startsWith('http') ? profile.avatar : window.location.origin + profile.avatar} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600">
+                    <span className="text-4xl font-bold text-white">{profile.name?.charAt(0)}</span>
+                  </div>
+                )}
+              </div>
+              {isOwnProfile && (
+                <label className="absolute bottom-0 right-0 p-2 bg-blue-500 rounded-full cursor-pointer shadow-md">
+                  <FiCamera className="text-white text-sm" />
+                  <input type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+                </label>
+              )}
+            </div>
+            <div className="flex-1 ml-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-2xl font-bold">{profile.name}</h1>
+                  {profile.role === 'provider' && (
+                    <p className="text-blue-600 font-medium">{profile.profession}</p>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  {!isOwnProfile && (
+                    <>
+                      <button onClick={handleFollowToggle} className={`px-5 py-2 rounded-lg font-medium ${isFollowing ? 'bg-gray-100 text-gray-700' : 'bg-blue-500 text-white'}`}>
+                        {isFollowing ? 'Following' : 'Follow'}
+                      </button>
+                      <button onClick={() => navigate(`/messages/${userId}`)} className="px-5 py-2 border border-blue-500 text-blue-500 rounded-lg font-medium">
+                        Message
+                      </button>
+                      {currentUser.role === 'client' && profile.role === 'provider' && (
+                        <button onClick={() => navigate(`/book/${userId}`)} className="px-5 py-2 bg-blue-500 text-white rounded-lg font-medium">
+                          Book Service
+                        </button>
+                      )}
+                    </>
+                  )}
                   {isOwnProfile && (
-                    <button
-                      onClick={() => setShowArticleForm(true)}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-primary text-white text-sm rounded-lg hover:bg-blue-600 transition-colors"
-                    >
-                      <FiPlus className="text-[18px]" />
-                      Write Article
+                    <button onClick={() => setIsEditing(true)} className="px-5 py-2 border border-gray-200 rounded-lg font-medium flex items-center gap-2">
+                      <FiEdit2 /> Edit Profile
                     </button>
                   )}
                 </div>
-
-                {showArticleForm && (
-                  <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-surface-dark rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
-                      <h3 className="text-xl font-bold mb-4">Write Article</h3>
-                      <div
-                        onClick={() => articleImageInputRef.current?.click()}
-                        className="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center cursor-pointer hover:border-primary transition-colors mb-4"
-                      >
-                        {articleImagePreviews.length > 0 ? (
-                          <div className="grid grid-cols-3 gap-2">
-                            {articleImagePreviews.map((preview, idx) => (
-                              <div key={idx} className="relative aspect-square group">
-                                <img
-                                  src={preview}
-                                  alt={`Preview ${idx + 1}`}
-                                  className="w-full h-full object-cover rounded-lg transition-transform duration-200 group-hover:scale-105"
-                                  style={{
-                                    imageRendering: 'auto',
-                                    WebkitImageRendering: 'auto'
-                                  }}
-                                />
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    removeArticleImage(idx);
-                                  }}
-                                  className="absolute top-1 right-1 bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-lg"
-                                >
-                                  <FiX className="text-[12px]" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <>
-                            <FiImage className="text-4xl text-slate-400" />
-                            <p className="text-slate-500 mt-2">Add images (optional)</p>
-                          </>
-                        )}
-                      </div>
-                      <input
-                        type="file"
-                        ref={articleImageInputRef}
-                        onChange={handleArticleImageSelect}
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                      />
-                      <input
-                        type="text"
-                        value={articleTitle}
-                        onChange={(e) => setArticleTitle(e.target.value)}
-                        placeholder="Article title *"
-                        className="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent mb-3"
-                      />
-                      <textarea
-                        value={articleContent}
-                        onChange={(e) => setArticleContent(e.target.value)}
-                        placeholder="Write your article content... *"
-                        className="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent resize-none"
-                        rows={8}
-                      />
-                      <div className="flex gap-3 mt-6">
-                        <button
-                          onClick={() => {
-                            setShowArticleForm(false);
-                            setArticleTitle('');
-                            setArticleContent('');
-                            setArticleImages([]);
-                            setArticleImagePreviews([]);
-                          }}
-                          className="flex-1 py-3 rounded-lg border border-slate-200 font-medium"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={handleSubmitArticle}
-                          disabled={!articleTitle.trim() || !articleContent.trim() || isSubmittingArticle}
-                          className="flex-1 py-3 rounded-lg bg-primary text-white font-medium disabled:opacity-50"
-                        >
-                          {isSubmittingArticle ? 'Publishing...' : 'Publish Article'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {articles.length === 0 ? (
-                  <div className="text-center py-8 bg-slate-50 rounded-xl">
-                    <FiFileText className="text-5xl text-slate-300" />
-                    <p className="text-slate-500 mt-2">No articles yet</p>
-                    {isOwnProfile && (
-                      <button
-                        onClick={() => setShowArticleForm(true)}
-                        className="mt-3 px-4 py-2 bg-primary text-white text-sm rounded-lg"
-                      >
-                        Write Your First Article
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {articles.map((article) => {
-                      const articleImages = article.images && article.images.length > 0 
-                        ? article.images 
-                        : article.imageUrl ? [article.imageUrl] : [];
-                      return (
-                        <div key={article.id} className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
-                          {articleImages.length > 0 && (
-                            <div className="relative w-full h-64 mb-4 overflow-hidden rounded-lg bg-slate-100">
-                              <img
-                                src={articleImages[0].startsWith('http') ? articleImages[0] : `${window.location.origin}${articleImages[0]}`}
-                                alt={article.title}
-                                className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-                                style={{
-                                  imageRendering: 'auto',
-                                  WebkitImageRendering: 'auto',
-                                  imageOrientation: 'from-image'
-                                }}
-                                loading="lazy"
-                                onError={(e) => {
-                                  e.target.style.display = 'none';
-                                  e.target.parentElement.innerHTML = `
-                                    <div class="w-full h-full flex items-center justify-center bg-slate-200">
-                                      <div class="text-center">
-                                        <svg class="w-12 h-12 text-slate-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                        </svg>
-                                        <p class="text-slate-500 text-sm">Image not available</p>
-                                      </div>
-                                    </div>
-                                  `;
-                                }}
-                              />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
-                            </div>
-                          )}
-                          <h4 className="font-bold text-slate-900 text-lg mb-2">{article.title}</h4>
-                          <p className="text-slate-600 text-sm mb-3 line-clamp-3">{article.content}</p>
-                          <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                            <span className="text-xs text-slate-400">{formatDate(article.createdAt)}</span>
-                            <button
-                              onClick={() => handleLikeArticle(article.id)}
-                              className="flex items-center gap-1 text-slate-500 hover:text-red-500 text-sm transition-colors"
-                            >
-                              <FiHeart className="text-[18px]" />
-                              {article.likesCount || article.likes || 0}
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
               </div>
-            )}
+            </div>
+          </div>
 
-            {activeTab === 'portfolio' && (user?.role === 'provider' || currentUser.role === 'provider') && (
-              <div className="mt-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-slate-900">Portfolio</h3>
-                  {isOwnProfile && (
-                    <button
-                      onClick={() => setShowPortfolioForm(true)}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-primary text-white text-sm rounded-lg hover:bg-blue-600 transition-colors"
-                    >
-                      <FiPlus className="text-[18px]" />
-                      Add Work
-                    </button>
-                  )}
-                </div>
+          {profile.verified && (
+            <div className="flex items-center gap-1 mt-2">
+              <FiCheckCircle className="text-blue-500" />
+              <span className="text-sm text-gray-600">Verified Professional</span>
+            </div>
+          )}
+        </div>
 
-                {showPortfolioForm && (
-                  <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-surface-dark rounded-2xl w-full max-w-md p-6">
-                      <h3 className="text-xl font-bold mb-4">Add Portfolio Item</h3>
-                      <div
-                        onClick={() => portfolioImageInputRef.current?.click()}
-                        className="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center cursor-pointer hover:border-primary transition-colors mb-4"
-                      >
-                        {portfolioImagePreview ? (
-                          <img
-                            src={portfolioImagePreview}
-                            alt="Preview"
-                            className="w-full max-h-48 object-contain rounded"
-                          />
-                        ) : (
-                          <>
-                            <FiImage className="text-4xl text-slate-400" />
-                            <p className="text-slate-500 mt-2">Click to select image</p>
-                          </>
-                        )}
-                      </div>
-                      <input
-                        type="file"
-                        ref={portfolioImageInputRef}
-                        onChange={handlePortfolioImageSelect}
-                        accept="image/*"
-                        className="hidden"
-                      />
-                      <input
-                        type="text"
-                        value={portfolioCaption}
-                        onChange={(e) => setPortfolioCaption(e.target.value)}
-                        placeholder="Caption (optional)"
-                        className="w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent mb-3"
-                      />
-                      <div className="flex gap-3 mt-6">
-                        <button
-                          onClick={() => {
-                            setShowPortfolioForm(false);
-                            setPortfolioImage(null);
-                            setPortfolioImagePreview(null);
-                            setPortfolioCaption('');
-                          }}
-                          className="flex-1 py-3 rounded-lg border border-slate-200 font-medium"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={handleAddPortfolio}
-                          disabled={!portfolioImage || isUploadingPortfolio}
-                          className="flex-1 py-3 rounded-lg bg-primary text-white font-medium disabled:opacity-50"
-                        >
-                          {isUploadingPortfolio ? 'Uploading...' : 'Add'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {portfolio.length === 0 ? (
-                  <div className="text-center py-8 bg-slate-50 rounded-xl">
-                    <FiImage className="text-5xl text-slate-300" />
-                    <p className="text-slate-500 mt-2">No portfolio items yet</p>
-                    {isOwnProfile && (
-                      <button
-                        onClick={() => setShowPortfolioForm(true)}
-                        className="mt-3 px-4 py-2 bg-primary text-white text-sm rounded-lg"
-                      >
-                        Add Your First Work
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {portfolio.map((item) => (
-                      <div key={item._id} className="relative group aspect-square rounded-xl overflow-hidden bg-slate-100">
-                        <img
-                          src={item.imageUrl?.startsWith('http') ? item.imageUrl : `${window.location.origin}${item.imageUrl}`}
-                          alt={item.caption}
-                          className="w-full h-full object-cover"
-                        />
-                        {item.caption && (
-                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                            <p className="text-white text-xs truncate">{item.caption}</p>
-                          </div>
-                        )}
-                        {isOwnProfile && (
-                          <button
-                            onClick={() => handleDeletePortfolio(item._id)}
-                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 bg-red-500 text-white p-1.5 rounded-full transition-opacity"
-                          >
-                            <FiTrash2 className="text-[16px]" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'reviews' && (
-              <div className="mt-4">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">Reviews Received</h3>
-                {reviews.length === 0 ? (
-                  <div className="text-center py-8 bg-slate-50 rounded-xl">
-                    <FiStar className="text-5xl text-slate-300" />
-                    <p className="text-slate-500 mt-2">No reviews yet</p>
-                    <p className="text-slate-400 text-sm mt-1">Reviews from providers will appear here</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {reviews.map((review) => (
-                      <div key={review.id} className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center">
-                            <span className="text-sm font-bold text-slate-500">
-                              {review.reviewerName?.charAt(0) || '?'}
-                            </span>
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-semibold text-slate-900">{review.reviewerName}</p>
-                            <p className="text-xs text-slate-500">{review.reviewerProfession || 'Provider'}</p>
-                          </div>
-                          <div className="flex items-center gap-0.5">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <FiStar key={star} className={`text-sm ${star <= (review.rating || 0) ? 'text-amber-400' : 'text-slate-300'}`} />
-                            ))}
-                          </div>
-                        </div>
-                        {review.comment && (
-                          <p className="text-sm text-slate-600">{review.comment}</p>
-                        )}
-                        <p className="text-xs text-slate-400 mt-2">
-                          {formatDate(review.createdAt)}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'followers' && (
-              <div className="mt-4">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">Followers</h3>
-                {followers.length === 0 ? (
-                  <div className="text-center py-8 bg-slate-50 rounded-xl">
-                    <FiUsers className="text-5xl text-slate-300" />
-                    <p className="text-slate-500 mt-2">No followers yet</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {followers.map((follower) => (
-                      <div
-                        key={follower.id}
-                        className="flex items-center gap-3 p-4 bg-white rounded-xl shadow-sm border border-slate-200"
-                      >
-                        <div
-                          className="w-12 h-12 rounded-full bg-cover bg-center bg-slate-200 cursor-pointer"
-                          style={{
-                            backgroundImage: follower.avatar
-                              ? `url("${window.location.origin}${follower.avatar}")`
-                              : undefined,
-                          }}
-                          onClick={() =>
-                            navigate(follower.role === 'provider' ? `/provider/${follower.id}` : `/user/${follower.id}`)
-                          }
-                        >
-                          {!follower.avatar && (
-                            <div className="w-full h-full rounded-full flex items-center justify-center">
-                              <span className="text-sm font-bold text-slate-500">
-                                {follower.name?.charAt(0).toUpperCase() || '?'}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <div
-                          className="flex-1 min-w-0 cursor-pointer"
-                          onClick={() =>
-                            navigate(follower.role === 'provider' ? `/provider/${follower.id}` : `/user/${follower.id}`)
-                          }
-                        >
-                          <p className="font-semibold text-slate-900 truncate">{follower.name}</p>
-                          <p className="text-xs text-slate-500 truncate">
-                            {follower.role === 'provider' ? follower.profession : 'Client'}
-                          </p>
-                        </div>
-                        <span
-                          className={`px-2 py-0.5 rounded text-xs font-medium ${
-                            follower.role === 'provider' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
-                          }`}
-                        >
-                          {follower.role === 'provider' ? 'Provider' : 'Client'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'following' && (
-              <div className="mt-4">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">Following</h3>
-                {following.length === 0 ? (
-                  <div className="text-center py-8 bg-slate-50 rounded-xl">
-                    <FiUsers className="text-5xl text-slate-300" />
-                    <p className="text-slate-500 mt-2">Not following anyone yet</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {following.map((u) => (
-                      <div
-                        key={u.id}
-                        className="flex items-center gap-3 p-4 bg-white rounded-xl shadow-sm border border-slate-200"
-                      >
-                        <div
-                          className="w-12 h-12 rounded-full bg-cover bg-center bg-slate-200 cursor-pointer"
-                          style={{
-                            backgroundImage: u.avatar
-                              ? `url("${window.location.origin}${u.avatar}")`
-                              : undefined,
-                          }}
-                          onClick={() =>
-                            navigate(u.role === 'provider' ? `/provider/${u.id}` : `/user/${u.id}`)
-                          }
-                        >
-                          {!u.avatar && (
-                            <div className="w-full h-full rounded-full flex items-center justify-center">
-                              <span className="text-sm font-bold text-slate-500">
-                                {u.name?.charAt(0).toUpperCase() || '?'}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <div
-                          className="flex-1 min-w-0 cursor-pointer"
-                          onClick={() => navigate(u.role === 'provider' ? `/provider/${u.id}` : `/user/${u.id}`)}
-                        >
-                          <p className="font-semibold text-slate-900 truncate">{u.name}</p>
-                          <p className="text-xs text-slate-500 truncate">
-                            {u.role === 'provider' ? u.profession : 'Client'}
-                          </p>
-                        </div>
-                        <span
-                          className={`px-2 py-0.5 rounded text-xs font-medium ${
-                            u.role === 'provider' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
-                          }`}
-                        >
-                          {u.role === 'provider' ? 'Provider' : 'Client'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+        {/* Stats Bar */}
+        <div className="grid grid-cols-4 gap-4 px-6 py-4 bg-gray-50 border-t border-gray-100">
+          <div className="text-center">
+            <p className="text-2xl font-bold">{profile.jobsDone || 0}</p>
+            <p className="text-xs text-gray-500">Jobs Completed</p>
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-bold">{followersCount}</p>
+            <p className="text-xs text-gray-500">Followers</p>
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-bold">{followingCount}</p>
+            <p className="text-xs text-gray-500">Following</p>
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-bold">{profile.rating?.toFixed(1) || 0}</p>
+            <p className="text-xs text-gray-500">Rating</p>
           </div>
         </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-6">
+        {/* Left Column - Bio & Contact */}
+        <div className="col-span-1 space-y-6">
+          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
+            <h3 className="font-semibold mb-3">About</h3>
+            <p className="text-gray-600 text-sm">{profile.bio || 'No bio provided yet.'}</p>
+          </div>
+
+          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
+            <h3 className="font-semibold mb-3">Contact</h3>
+            <div className="space-y-2 text-sm">
+              {profile.phone && (
+                <div className="flex items-center gap-2 text-gray-600">
+                  <FiPhone className="text-gray-400" /> {profile.phone}
+                </div>
+              )}
+              {profile.email && (
+                <div className="flex items-center gap-2 text-gray-600">
+                  <FiMail className="text-gray-400" /> {profile.email}
+                </div>
+              )}
+              {profile.location && (
+                <div className="flex items-center gap-2 text-gray-600">
+                  <FiMapPin className="text-gray-400" /> {profile.location}
+                </div>
+              )}
+              {profile.hourlyRate > 0 && (
+                <div className="flex items-center gap-2 text-gray-600">
+                  <FiDollarSign className="text-gray-400" /> {profile.hourlyRate} MAD/hour
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column - Services & Reviews */}
+        <div className="col-span-2 space-y-6">
+          {profile.role === 'provider' && services.length > 0 && (
+            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
+              <h3 className="font-semibold mb-3">Services Offered</h3>
+              <div className="space-y-2">
+                {services.map(service => (
+                  <div key={service.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <span>{service.name}</span>
+                    <span className="font-medium text-blue-600">{service.price} MAD</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {reviews.length > 0 && (
+            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
+              <h3 className="font-semibold mb-3">Reviews ({reviews.length})</h3>
+              <div className="space-y-4">
+                {reviews.map(review => (
+                  <div key={review.id} className="border-b border-gray-100 pb-4 last:border-0">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <StarRating rating={review.rating} />
+                        <span className="text-sm font-medium">{review.clientName}</span>
+                      </div>
+                      <span className="text-xs text-gray-400">{new Date(review.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    <p className="text-gray-600 text-sm">{review.comment}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Edit Modal (Desktop) */}
+      {isEditing && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-xl font-bold">Edit Profile</h3>
+              <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-gray-100 rounded-full">
+                <FiX className="text-xl" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Name</label>
+                <input
+                  type="text"
+                  value={editForm.name !== undefined ? editForm.name : profile.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Phone</label>
+                <input
+                  type="tel"
+                  value={editForm.phone !== undefined ? editForm.phone : profile.phone || ''}
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                  className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Location</label>
+                <input
+                  type="text"
+                  value={editForm.location !== undefined ? editForm.location : profile.location || ''}
+                  onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                  className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Bio</label>
+                <textarea
+                  value={editForm.bio !== undefined ? editForm.bio : profile.bio || ''}
+                  onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
+                  className="w-full p-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={4}
+                />
+              </div>
+              {profile.role === 'provider' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Hourly Rate (MAD)</label>
+                    <input
+                      type="number"
+                      value={editForm.hourlyRate !== undefined ? editForm.hourlyRate : profile.hourlyRate || 0}
+                      onChange={(e) => setEditForm({ ...editForm, hourlyRate: parseFloat(e.target.value) })}
+                      className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Specialization</label>
+                    <input
+                      type="text"
+                      value={editForm.specialization !== undefined ? editForm.specialization : profile.profession || profile.specialization || ''}
+                      onChange={(e) => setEditForm({ ...editForm, specialization: e.target.value })}
+                      className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="flex gap-3 p-6 border-t">
+              <button onClick={() => setIsEditing(false)} className="flex-1 py-3 border rounded-lg font-medium">
+                Cancel
+              </button>
+              <button onClick={handleUpdateProfile} disabled={isSaving} className="flex-1 py-3 bg-blue-500 text-white rounded-lg font-medium">
+                {isSaving ? <FiLoader className="animate-spin inline mr-2" /> : <FiSave className="inline mr-2" />}
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

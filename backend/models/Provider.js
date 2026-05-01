@@ -97,4 +97,9 @@ const providerSchema = new mongoose.Schema({
   },
 });
 
+providerSchema.index({ profession: 1 });
+providerSchema.index({ rating: -1 });
+providerSchema.index({ user: 1 });
+providerSchema.index({ available: 1 });
+
 module.exports = mongoose.model('Provider', providerSchema);

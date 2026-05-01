@@ -57,9 +57,12 @@ export default function MessagesScreen({ isDesktop }) {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (token) {
+    const userId = currentUser.id;
+    
+    if (token && userId) {
       const newSocket = io('http://localhost:3001', {
-        auth: { token }
+        auth: { token },
+        transports: ['websocket']
       });
       
       newSocket.on('connect', () => {

@@ -49,7 +49,7 @@ router.get('/:id/stats', async (req, res) => {
       status: 'in_progress'
     });
     
-    // Calculate average rating from Review.find({ providerId: provider._id })
+    // Calculate average rating from Review.find({ provider: provider._id })
     const reviews = await Review.find({ provider: provider._id });
     const rating = reviews.length > 0 
       ? Math.round((reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length) * 10) / 10
@@ -139,11 +139,11 @@ router.get('/:id/activity', async (req, res) => {
         createdAt: { $gte: date, $lt: nextDate }
       });
       
-      // Count messages: Message where receiverId = id, created in that day
-      const messages = await Message.countDocuments({
-        receiverId: id,
-        createdAt: { $gte: date, $lt: nextDate }
-      });
+      // Count messages: Message where receiver = id, created in that day
+        const messages = await Message.countDocuments({
+          receiver: id,
+          createdAt: { $gte: date, $lt: nextDate }
+        });
       
       activity.push({
         day: days[date.getDay() === 0 ? 6 : date.getDay() - 1],
