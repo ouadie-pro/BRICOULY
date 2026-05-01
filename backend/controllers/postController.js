@@ -3,6 +3,38 @@ const Provider = require('../models/Provider');
 const Post = require('../models/Post');
 const Comment = require('../models/Comment');
 
+// Maps all possible Provider.profession values to the Post.serviceCategory
+// display-name format stored in the database.
+const professionToCategory = {
+  // Lowercase variants (new signups)
+  'plumber':          'Plumber',
+  'electrician':      'Electrician',
+  'painter':          'Painter',
+  'carpenter':        'Carpenter',
+  'cleaner':          'Home Cleaner',
+  'home cleaner':     'Home Cleaner',
+  'mover':            'Mover',
+  'hvac':             'HVAC Technician',
+  'hvac technician':  'HVAC Technician',
+  'landscaper':       'Landscaper',
+  'roofer':           'Roofer',
+  'appliance_repair': 'Appliance Repair',
+  'appliance repair': 'Appliance Repair',
+  'general':          'General',
+  // Capitalized variants (seeded providers — pass through as-is)
+  'Plumber':          'Plumber',
+  'Electrician':      'Electrician',
+  'Painter':          'Painter',
+  'Carpenter':        'Carpenter',
+  'Home Cleaner':     'Home Cleaner',
+  'Mover':            'Mover',
+  'HVAC Technician':  'HVAC Technician',
+  'Landscaper':       'Landscaper',
+  'Roofer':           'Roofer',
+  'Appliance Repair': 'Appliance Repair',
+  'General':          'General',
+};
+
 exports.getPosts = async (req, res) => {
   try {
     const userId = req.user?.id?.toString() || req.headers['x-user-id'];
@@ -21,13 +53,32 @@ exports.getPosts = async (req, res) => {
     let query = {};
     
     if (currentUser && currentUser.role === 'provider' && providerProfession) {
+      // Normalize to the exact string stored in Post.serviceCategory
+      const normalizedCategory =
+        professionToCategory[providerProfession] ||
+        professionToCategory[providerProfession?.toLowerCase()] ||
+        null;
+
       query = {
         $or: [
-          { serviceCategory: providerProfession },
+          // Posts targeted at this provider's category
+          ...(normalizedCategory
+            ? [{ serviceCategory: normalizedCategory }]
+            : []),
+          // Also show posts with no category (general audience posts)
           { serviceCategory: null },
-          { serviceCategory: { $exists: false } }
+          { serviceCategory: { $exists: false } },
+          // Also show posts by the provider themselves
+          { author: currentUser._id },
         ]
       };
+
+      console.log(
+        `[getPosts] provider profession="${providerProfession}"`,
+        `→ normalizedCategory="${normalizedCategory}"`,
+        `query:`,
+        JSON.stringify(query)
+      );
     }
     
     const posts = await Post.find(query)
@@ -85,18 +136,25 @@ exports.createPost = async (req, res) => {
     }
     
     const { content, type, serviceCategory } = req.body;
-    
+
+    // Normalize serviceCategory to match Post enum (display-name format)
+    const normalizedServiceCategory = serviceCategory
+      ? (professionToCategory[serviceCategory] ||
+         professionToCategory[serviceCategory?.toLowerCase()] ||
+         serviceCategory)
+      : null;
+
     let images = [];
     if (req.files && req.files.length > 0) {
       images = req.files.map(file => `/uploads/${file.filename}`);
     }
-    
+
     const post = await Post.create({
       author: userId,
       content,
       images,
       type: type || 'post',
-      serviceCategory: serviceCategory || null,
+      serviceCategory: normalizedServiceCategory,
       likes: [],
       commentsCount: 0,
     });

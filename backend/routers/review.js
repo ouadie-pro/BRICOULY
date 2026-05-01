@@ -7,13 +7,14 @@ const {
   deleteReview,
   checkCanReview
 } = require('../controllers/reviewController');
+const { auth } = require('../middleware/authMiddleware');
 
 router.get('/provider/:providerId', getReviews);
 
-router.get('/can-review/:providerId', checkCanReview);
+router.get('/can-review/:providerId', auth, checkCanReview);
 
-router.post('/', createReview);
-router.put('/:reviewId', updateReview);
-router.delete('/:reviewId', deleteReview);
+router.post('/', auth, createReview);
+router.put('/:reviewId', auth, updateReview);
+router.delete('/:reviewId', auth, deleteReview);
 
 module.exports = router;

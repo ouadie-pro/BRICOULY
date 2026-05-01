@@ -38,17 +38,23 @@ export default function AuthScreen({ onAuth }) {
   };
 
   const defaultProfessions = [
-    { id: 1, name: 'Plumber', icon: FiDroplet, color: '#3b82f6' },
-    { id: 2, name: 'Electrician', icon: FiZap, color: '#eab308' },
-    { id: 3, name: 'Painter', icon: FiBox, color: '#ec4899' },
-    { id: 4, name: 'Carpenter', icon: FiTool, color: '#f59e0b' },
-    { id: 5, name: 'Home Cleaner', icon: FiFeather, color: '#8b5cf6' },
-    { id: 6, name: 'Mover', icon: FiTruck, color: '#22c55e' },
-    { id: 7, name: 'HVAC Technician', icon: FiWind, color: '#06b6d4' },
-    { id: 8, name: 'Landscaper', icon: FiFeather, color: '#84cc16' },
-    { id: 9, name: 'Roofer', icon: FiHome, color: '#dc2626' },
-    { id: 10, name: 'Appliance Repair', icon: FiShoppingBag, color: '#6366f1' },
+    { _id: 'plumber', name: 'Plumber', specialization: 'plumber', icon: FiDroplet, color: '#3b82f6' },
+    { _id: 'electrician', name: 'Electrician', specialization: 'electrician', icon: FiZap, color: '#eab308' },
+    { _id: 'painter', name: 'Painter', specialization: 'painter', icon: FiBox, color: '#ec4899' },
+    { _id: 'carpenter', name: 'Carpenter', specialization: 'carpenter', icon: FiTool, color: '#f59e0b' },
+    { _id: 'cleaner', name: 'Home Cleaner', specialization: 'cleaner', icon: FiFeather, color: '#8b5cf6' },
+    { _id: 'mover', name: 'Mover', specialization: 'mover', icon: FiTruck, color: '#22c55e' },
+    { _id: 'hvac', name: 'HVAC Technician', specialization: 'hvac', icon: FiWind, color: '#06b6d4' },
+    { _id: 'landscaper', name: 'Landscaper', specialization: 'landscaper', icon: FiFeather, color: '#84cc16' },
+    { _id: 'roofer', name: 'Roofer', specialization: 'roofer', icon: FiHome, color: '#dc2626' },
+    { _id: 'appliance_repair', name: 'Appliance Repair', specialization: 'appliance_repair', icon: FiShoppingBag, color: '#6366f1' },
   ];
+
+  const getSpecializationFromProfession = (profession) => {
+    if (!profession) return 'general';
+    if (profession.specialization) return profession.specialization;
+    return profession.name?.toLowerCase().replace(/ /g, '_') || 'general';
+  };
 
   useEffect(() => {
     const loadProfessions = async () => {
@@ -100,14 +106,22 @@ export default function AuthScreen({ onAuth }) {
           setError(res.error || 'Login failed');
         }
       } else {
+        // Resolve the selected profession name(s) from the professions list
+        // selectedProfessions contains IDs (numeric or _id strings)
+        // We need to find the matching profession name to send as specialization
+        const selectedProfessionObjects = (professions || defaultProfessions).filter(p =>
+          selectedProfessions.includes(p.id || p._id)
+        );
+        const primaryProfessionName = selectedProfessionObjects[0]?.name || '';
+
         const res = await api.signup({ 
           name, 
           email, 
           password, 
           role,
           phone,
-          professionId: role === 'provider' ? selectedProfessions[0] : null,
-          professionIds: role === 'provider' ? selectedProfessions : [],
+          // Send the actual profession name as 'specialization' (what backend reads)
+          specialization: role === 'provider' ? primaryProfessionName : undefined,
           bio: role === 'provider' ? bio : '',
           hourlyRate: role === 'provider' ? parseFloat(hourlyRate) || 0 : undefined,
         });

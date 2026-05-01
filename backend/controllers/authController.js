@@ -11,6 +11,29 @@ exports.signup = async (req, res) => {
   try {
     const { name, email, password, role, phone, specialization, bio } = req.body;
     
+    // Normalize specialization: map display names to backend enum values
+    const normalizeSpecialization = (raw) => {
+      if (!raw) return 'general';
+      const map = {
+        'plumber':          'plumber',
+        'electrician':      'electrician',
+        'painter':          'painter',
+        'carpenter':        'carpenter',
+        'home cleaner':     'cleaner',
+        'cleaner':          'cleaner',
+        'mover':            'mover',
+        'hvac technician':  'hvac',
+        'hvac':             'hvac',
+        'landscaper':       'landscaper',
+        'roofer':           'roofer',
+        'appliance repair': 'appliance_repair',
+        'appliance_repair': 'appliance_repair',
+        'general':          'general',
+      };
+      return map[raw.toLowerCase().trim()] || 'general';
+    };
+    const normalizedSpecialization = normalizeSpecialization(specialization);
+    
     if (!name || !email || !password) {
       return res.status(400).json({ success: false, error: 'Name, email, and password are required' });
     }
@@ -26,16 +49,6 @@ exports.signup = async (req, res) => {
     
     const userRole = role === 'provider' ? 'provider' : 'client';
     
-    if (userRole === 'provider' && specialization) {
-      const validSpecialization = SERVICE_SPECIALIZATIONS.includes(specialization);
-      if (!validSpecialization) {
-        return res.status(400).json({ 
-          success: false, 
-          error: `Invalid specialization. Must be one of: ${SERVICE_SPECIALIZATIONS.join(', ')}` 
-        });
-      }
-    }
-    
     const user = await User.create({
       name,
       email: email.toLowerCase(),
@@ -44,15 +57,15 @@ exports.signup = async (req, res) => {
       avatar: '',
       phone: phone || '',
       location: 'Maroc',
-      specialization: userRole === 'provider' ? specialization || 'general' : '',
+      specialization: userRole === 'provider' ? normalizedSpecialization : '',
     });
     
     if (userRole === 'provider') {
       await Provider.create({
         user: user._id,
-        profession: specialization || 'general',
+        profession: normalizedSpecialization,
         bio: bio || '',
-        hourlyRate: 50,
+        hourlyRate: parseFloat(req.body.hourlyRate) || 50,
         rating: 0,
         reviewCount: 0,
         jobsDone: 0,
