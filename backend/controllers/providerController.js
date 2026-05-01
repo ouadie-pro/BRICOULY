@@ -258,43 +258,61 @@ exports.getProviderDashboardStats = async (req, res) => {
     }
 
     const userId = req.user.id;
-
     const provider = await Provider.findOne({ user: userId });
+
     if (!provider) {
       return res.status(404).json({ success: false, error: 'Provider not found' });
     }
 
     const ServiceRequest = require('../models/ServiceRequest');
     const Message = require('../models/Message');
+    const Review = require('../models/Review');
+    const Booking = require('../models/Booking');
+    const Follow = require('../models/Follow');
 
-    const [completedServiceRequests, activeServiceRequests, completedBookings, pendingBookings, reviews] = await Promise.all([
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    const [
+      pendingBookings,
+      acceptedBookings,
+      completedBookings,
+      cancelledBookings,
+      monthlyBookings,
+      completedServiceRequests,
+      activeServiceRequests,
+      reviews,
+      unreadMessages,
+      followers
+    ] = await Promise.all([
+      Booking.countDocuments({ provider: provider._id, status: 'pending' }),
+      Booking.countDocuments({ provider: provider._id, status: 'accepted' }),
+      Booking.countDocuments({ provider: provider._id, status: 'completed' }),
+      Booking.countDocuments({ provider: provider._id, status: 'cancelled' }),
+      Booking.find({ provider: provider._id, status: 'completed', completedAt: { $gte: firstDayOfMonth, $lte: lastDayOfMonth } }),
       ServiceRequest.countDocuments({ acceptedProviderId: provider._id, status: 'completed' }),
       ServiceRequest.countDocuments({ acceptedProviderId: provider._id, status: 'in_progress' }),
-      Booking.countDocuments({ provider: provider._id, status: 'completed' }),
-      Booking.countDocuments({ provider: provider._id, status: 'pending' }),
-      Review.find({ provider: provider._id })
+      Review.find({ provider: provider._id }),
+      Message.countDocuments({ receiver: userId, read: false }),
+      Follow.countDocuments({ targetUser: userId })
     ]);
 
-    const jobsDone = completedServiceRequests + completedBookings;
-    const activeJobs = activeServiceRequests;
-    const pendingBookingsCount = pendingBookings;
+    const jobsDone = completedBookings + completedServiceRequests;
+    const activeJobs = acceptedBookings + activeServiceRequests;
 
     let rating = 0;
+    let avgPunctuality = 0;
+    let avgProfessionalism = 0;
+
     if (reviews.length > 0) {
-      rating = Math.round((reviews.reduce((sum, r) => sum + r.rating,0) / reviews.length) * 10) / 10;
+      rating = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+      avgPunctuality = reviews.reduce((sum, r) => sum + (r.punctuality || 0), 0) / reviews.length;
+      avgProfessionalism = reviews.reduce((sum, r) => sum + (r.professionalism || 0), 0) / reviews.length;
     }
 
-    // Calculate total earnings from completed bookings
-    const completedBookingsList = await Booking.find({ provider: provider._id, status: 'completed' });
-    const totalEarnings = completedBookingsList.reduce((sum, b) => sum + (b.price || 0),0);
+    const monthlyEarnings = monthlyBookings.reduce((sum, b) => sum + (b.price || 0), 0);
 
-    // Get unread messages count
-    const unreadMessages = await Message.countDocuments({
-      receiver: userId,
-      read: false
-    });
-
-    // Get profile views
     const user = await User.findById(userId);
     const profileViews = user?.profileViews || 0;
 
@@ -306,19 +324,25 @@ exports.getProviderDashboardStats = async (req, res) => {
     for (let i = 6; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
-      date.setHours(0,0,0,0);
+      date.setHours(0, 0, 0, 0);
       const nextDate = new Date(date);
       nextDate.setDate(nextDate.getDate() + 1);
 
-      const views = await ServiceRequest.countDocuments({
-        acceptedProviderId: provider._id,
-        createdAt: { $gte: date, $lt: nextDate }
-      });
+      const [views, messagesCount] = await Promise.all([
+        ServiceRequest.countDocuments({
+          acceptedProviderId: provider._id,
+          createdAt: { $gte: date, $lt: nextDate }
+        }),
+        Message.countDocuments({
+          receiver: userId,
+          createdAt: { $gte: date, $lt: nextDate }
+        })
+      ]);
 
       activity.push({
         day: days[date.getDay() === 0 ? 6 : date.getDay() - 1],
         views,
-        messages: 0
+        messages: messagesCount
       });
     }
 
@@ -327,12 +351,18 @@ exports.getProviderDashboardStats = async (req, res) => {
       stats: {
         jobsDone,
         activeJobs,
-        rating,
+        rating: Math.round(rating * 10) / 10,
         reviewCount: reviews.length,
-        pendingBookings: pendingBookingsCount,
+        pendingBookings,
+        acceptedBookings,
+        completedBookings,
+        cancelledBookings,
         unreadMessages,
         profileViews,
-        totalEarnings
+        monthlyEarnings,
+        followersCount: followers,
+        avgPunctuality: Math.round(avgPunctuality * 10) / 10,
+        avgProfessionalism: Math.round(avgProfessionalism * 10) / 10,
       },
       activity
     });

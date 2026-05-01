@@ -15,6 +15,10 @@ const bookingSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  serviceId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Service',
+  },
   date: {
     type: Date,
     required: true,
@@ -25,7 +29,7 @@ const bookingSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'confirmed', 'completed', 'cancelled'],
+    enum: ['pending', 'accepted', 'rejected', 'confirmed', 'in_progress', 'completed', 'cancelled'],
     default: 'pending',
   },
   address: {
@@ -40,8 +44,40 @@ const bookingSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
-  completedAt: {
-    type: Date,
+  clientSeen: {
+    type: Boolean,
+    default: false,
+  },
+  providerSeen: {
+    type: Boolean,
+    default: false,
+  },
+  rejectReason: {
+    type: String,
+    default: '',
+  },
+  rescheduleRequest: {
+    requestedDate: Date,
+    requestedTime: String,
+    reason: String,
+    status: { type: String, enum: ['pending', 'accepted', 'rejected'], default: null },
+  },
+  chatRoomId: {
+    type: String,
+    default: () => new mongoose.Types.ObjectId().toString(),
+  },
+  startedAt: Date,
+  completedAt: Date,
+  cancelledAt: Date,
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'paid', 'failed', 'refunded'],
+    default: 'pending',
+  },
+  paymentId: String,
+  ratingGiven: {
+    type: Boolean,
+    default: false,
   },
   createdAt: {
     type: Date,
@@ -49,9 +85,9 @@ const bookingSchema = new mongoose.Schema({
   },
 });
 
-module.exports = mongoose.model('Booking', bookingSchema);
-
-// FIXED: #18 - Add database indexes
 bookingSchema.index({ user: 1, createdAt: -1 });
 bookingSchema.index({ provider: 1, createdAt: -1 });
 bookingSchema.index({ status: 1 });
+bookingSchema.index({ chatRoomId: 1 });
+
+module.exports = mongoose.model('Booking', bookingSchema);

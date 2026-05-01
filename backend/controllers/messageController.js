@@ -4,6 +4,7 @@ const Provider = require('../models/Provider');
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const Notification = require('../models/Notification');
+const Booking = require('../models/Booking');
 
 const isValidObjectId = (id) => {
   if (!id || typeof id !== 'string') return false;
@@ -34,6 +35,14 @@ exports.getConversations = async (req, res) => {
           profession = provider?.profession || '';
         }
 
+        const booking = await Booking.findOne({
+          $or: [
+            { user: userId, provider: { $in: await Provider.find({ user: otherUserId }).select('_id') } },
+            { user: otherUserId, provider: { $in: await Provider.find({ user: userId }).select('_id') } }
+          ],
+          status: { $nin: ['cancelled'] }
+        }).sort({ createdAt: -1 });
+
         const unreadCount = await Message.countDocuments({
           conversationId: conv._id,
           receiver: new mongoose.Types.ObjectId(userId),
@@ -51,6 +60,12 @@ exports.getConversations = async (req, res) => {
           lastMessage: conv.lastMessage || '',
           lastMessageTime: conv.lastMessageAt,
           unread: unreadCount,
+          bookingInfo: booking ? {
+            id: booking._id,
+            service: booking.service,
+            status: booking.status,
+            date: booking.date
+          } : null,
         };
       } catch (convError) {
         return null;
@@ -59,6 +74,7 @@ exports.getConversations = async (req, res) => {
 
     res.json(conversationData.filter(Boolean));
   } catch (error) {
+    console.error('[getConversations] Error:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -90,7 +106,7 @@ exports.getMessages = async (req, res) => {
 
     const total = await Message.countDocuments({ conversationId: conversation._id });
     
-    const messages = await Message.find({
+    let messages = await Message.find({
       conversationId: conversation._id
     })
       .populate('sender', 'name avatar')
@@ -101,7 +117,7 @@ exports.getMessages = async (req, res) => {
 
     await Message.updateMany(
       { conversationId: conversation._id, receiver: new mongoose.Types.ObjectId(currentUserId), read: false },
-      { read: true }
+      { read: true, readAt: new Date() }
     );
 
     const messagesData = messages.map(m => ({
@@ -117,10 +133,10 @@ exports.getMessages = async (req, res) => {
       type: m.type,
       time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       read: m.read,
+      seen: m.seen,
       createdAt: m.createdAt,
     }));
 
-    // FIXED: #20 - Add pagination to messages response
     res.json({
       data: messagesData.reverse(),
       pagination: {
@@ -131,6 +147,7 @@ exports.getMessages = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('[getMessages] Error:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -139,7 +156,7 @@ exports.sendMessage = async (req, res) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
     const senderId = req.user.id.toString();
-    const { receiverId, content, mediaUrl, audioUrl, type } = req.body;
+    const { receiverId, content, mediaUrl, audioUrl, type, bookingId, serviceRequestId } = req.body;
 
     if (!receiverId) {
       return res.status(400).json({ error: 'receiverId is required' });
@@ -155,7 +172,7 @@ exports.sendMessage = async (req, res) => {
       });
     }
 
-    const message = await Message.create({
+    const messageData = {
       conversationId: conversation._id,
       sender: new mongoose.Types.ObjectId(senderId),
       receiver: new mongoose.Types.ObjectId(receiverId),
@@ -163,10 +180,21 @@ exports.sendMessage = async (req, res) => {
       mediaUrl: mediaUrl || null,
       audioUrl: audioUrl || null,
       type: type || 'text',
-      read: false
-    });
+      read: false,
+      seen: false,
+    };
 
-    conversation.lastMessage = content || (mediaUrl ? '[Media]' : '');
+    if (bookingId && isValidObjectId(bookingId)) {
+      messageData.bookingId = new mongoose.Types.ObjectId(bookingId);
+    }
+    
+    if (serviceRequestId && isValidObjectId(serviceRequestId)) {
+      messageData.serviceRequestId = new mongoose.Types.ObjectId(serviceRequestId);
+    }
+
+    const message = await Message.create(messageData);
+
+    conversation.lastMessage = content?.substring(0, 100) || (mediaUrl ? (type === 'image' ? '📷 Image' : type === 'video' ? '🎥 Video' : type === 'voice' ? '🎙️ Voice message' : '[Media]') : '');
     conversation.lastMessageAt = new Date();
     await conversation.save();
 
@@ -174,7 +202,7 @@ exports.sendMessage = async (req, res) => {
       user: new mongoose.Types.ObjectId(receiverId),
       type: 'message',
       title: 'New Message',
-      text: content?.substring(0, 50) || 'New message',
+      text: content?.substring(0, 50) || (mediaUrl ? (type === 'image' ? 'Sent an image' : type === 'video' ? 'Sent a video' : 'Sent a message') : 'New message'),
       fromUser: new mongoose.Types.ObjectId(senderId),
     });
 
@@ -195,21 +223,16 @@ exports.sendMessage = async (req, res) => {
         mediaUrl: populatedMessage.mediaUrl,
         audioUrl: populatedMessage.audioUrl,
         type: populatedMessage.type,
+        bookingId: populatedMessage.bookingId,
         read: false,
         createdAt: populatedMessage.createdAt,
       });
 
-      await Notification.create({
-        user: new mongoose.Types.ObjectId(receiverId),
-        type: 'message',
-        title: 'New Message',
-        text: `${populatedMessage.sender.name}: ${(populatedMessage.content || '').substring(0, 50)}`,
-        fromUser: populatedMessage.sender._id,
-      });
       io.to(`user:${receiverId}`).emit('notification', {
         type: 'message',
         title: 'New Message',
-        text: `${populatedMessage.sender.name} sent you a message`,
+        text: `${populatedMessage.sender.name}: ${(populatedMessage.content || '').substring(0, 50)}`,
+        fromUserId: populatedMessage.sender._id,
       });
     }
 
@@ -224,12 +247,14 @@ exports.sendMessage = async (req, res) => {
       mediaUrl: populatedMessage.mediaUrl,
       audioUrl: populatedMessage.audioUrl,
       type: populatedMessage.type,
+      bookingId: populatedMessage.bookingId,
       time: new Date(populatedMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       read: populatedMessage.read,
       createdAt: populatedMessage.createdAt,
     });
 
   } catch (error) {
+    console.error('[sendMessage] Error:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -255,7 +280,7 @@ exports.markAsRead = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid user ID' });
     }
 
-    await Message.updateMany(
+    const result = await Message.updateMany(
       {
         sender: new mongoose.Types.ObjectId(otherUserId),
         receiver: new mongoose.Types.ObjectId(currentUserId),
@@ -272,6 +297,62 @@ exports.markAsRead = async (req, res) => {
       });
     }
 
+    res.json({ success: true, count: result.modifiedCount });
+  } catch (error) {
+    console.error('[markAsRead] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.markAsSeen = async (req, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const currentUserId = req.user.id.toString();
+    const { messageId } = req.params;
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ success: false, error: 'Message not found' });
+    }
+
+    if (message.receiver.toString() !== currentUserId) {
+      return res.status(403).json({ success: false, error: 'Not authorized' });
+    }
+
+    message.seen = true;
+    message.seenAt = new Date();
+    await message.save();
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user:${message.sender.toString()}`).emit('messageSeen', {
+        messageId: message._id,
+        seenAt: message.seenAt,
+      });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.sendTypingIndicator = async (req, res) => {
+  try {
+    const { toUserId, isTyping } = req.body;
+    const fromUserId = req.user?.id?.toString();
+    
+    if (!fromUserId || !toUserId) {
+      return res.status(400).json({ success: false });
+    }
+    
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user:${toUserId}`).emit(isTyping ? 'userTyping' : 'userStoppedTyping', {
+        fromUserId,
+      });
+    }
+    
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });

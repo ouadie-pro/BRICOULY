@@ -1,15 +1,30 @@
 const express = require('express');
 const router = express.Router();
 const { auth, requireClient, requireProvider } = require('../middleware/authMiddleware');
-const { getBookings, createBooking, updateBookingStatus, cancelBooking } = require('../controllers/bookingController');
+const { 
+  getBookings, 
+  getUnreadBookingsCount,
+  createBooking, 
+  updateBookingStatus, 
+  cancelBooking,
+  acceptBooking,
+  rejectBooking,
+  confirmBooking,
+  completeBooking,
+  getBookingById,
+  getBookingMessages
+} = require('../controllers/bookingController');
 
-// Both clients and providers can view bookings (with different data based on role)
 router.get('/', auth, getBookings);
-// Only clients can create bookings
+router.get('/unread-count', auth, getUnreadBookingsCount);
 router.post('/', auth, requireClient, createBooking);
-// Both can update booking status (providers can confirm/complete, clients can cancel)
-router.put('/:id', auth, updateBookingStatus);
-// Both can cancel bookings (handled inside controller by role)
+router.put('/:id/status', auth, updateBookingStatus);
+router.post('/:id/accept', auth, requireProvider, acceptBooking);
+router.post('/:id/reject', auth, requireProvider, rejectBooking);
+router.post('/:id/confirm', auth, confirmBooking);
+router.post('/:id/complete', auth, completeBooking);
 router.delete('/:id', auth, cancelBooking);
+router.get('/:id', auth, getBookingById);
+router.get('/:id/messages', auth, getBookingMessages);
 
 module.exports = router;

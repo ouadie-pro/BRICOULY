@@ -8,7 +8,10 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['message', 'follow_request', 'follow_accepted', 'new_follower', 'request', 'request_update', 'like', 'comment', 'new_booking', 'new_review', 'application_accepted', 'application_rejected', 'booking_cancelled', 'booking_confirmed', 'booking_completed'],
+    enum: ['message', 'follow_request', 'follow_accepted', 'new_follower', 'request', 'request_update', 
+           'like', 'comment', 'new_booking', 'booking_accepted', 'booking_rejected', 'booking_confirmed',
+           'booking_completed', 'booking_cancelled', 'new_review', 'application_accepted', 'application_rejected',
+           'new_application'],
     required: [true, 'Notification type is required'],
   },
   title: {
@@ -27,6 +30,10 @@ const notificationSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'FollowRequest',
   },
+  bookingId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Booking',
+  },
   read: {
     type: Boolean,
     default: false,
@@ -37,7 +44,7 @@ const notificationSchema = new mongoose.Schema({
   },
 });
 
-module.exports = mongoose.model('Notification', notificationSchema);
-
-// FIXED: #18 - Add database index on user field
 notificationSchema.index({ user: 1, createdAt: -1 });
+notificationSchema.index({ user: 1, read: 1 });
+
+module.exports = mongoose.model('Notification', notificationSchema);

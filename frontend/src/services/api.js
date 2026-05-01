@@ -608,9 +608,7 @@ export const api = {
   },
 
   getProviderDashboardStats: async () => {
-    const user = getStoredUser();
-    if (!user?.id) return null;
-    return safeFetch(`${API_BASE}/providers/${user.id}/dashboard-stats`);
+    return safeFetch(`${API_BASE}/providers/me/dashboard-stats`);
   },
 
   getWeeklyActivity: async (providerId) => {
@@ -652,6 +650,56 @@ export const api = {
   cancelBooking: async (bookingId) => {
     return safeFetch(`${API_BASE}/bookings/${bookingId}`, {
       method: 'DELETE',
+    });
+  },
+
+  // Booking specific methods
+  acceptBooking: async (bookingId) => {
+    return safeFetch(`${API_BASE}/bookings/${bookingId}/accept`, {
+      method: 'POST',
+    });
+  },
+
+  rejectBooking: async (bookingId, reason) => {
+    return safeFetch(`${API_BASE}/bookings/${bookingId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  },
+
+  confirmBooking: async (bookingId) => {
+    return safeFetch(`${API_BASE}/bookings/${bookingId}/confirm`, {
+      method: 'POST',
+    });
+  },
+
+  completeBooking: async (bookingId) => {
+    return safeFetch(`${API_BASE}/bookings/${bookingId}/complete`, {
+      method: 'POST',
+    });
+  },
+
+  getBookingsUnreadCount: async () => {
+    return safeFetch(`${API_BASE}/bookings/unread-count`);
+  },
+
+  getBookingById: async (bookingId) => {
+    return safeFetch(`${API_BASE}/bookings/${bookingId}`);
+  },
+
+  getBookingMessages: async (bookingId) => {
+    return safeFetch(`${API_BASE}/bookings/${bookingId}/messages`);
+  },
+
+  requestReschedule: async (bookingId, { date, time, reason }) => {
+    return safeFetch(`${API_BASE}/bookings/${bookingId}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        rescheduleDate: date,
+        rescheduleTime: time,
+        rescheduleReason: reason,
+        status: 'pending'
+      }),
     });
   },
 
