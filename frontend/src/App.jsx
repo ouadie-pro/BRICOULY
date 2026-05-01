@@ -1,3 +1,4 @@
+// frontend/src/App.jsx
 import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
@@ -15,11 +16,14 @@ import VideosScreen from './components/VideosScreen';
 import BookingScreen from './components/BookingScreen';
 import BookingsScreen from './components/BookingsScreen';
 import ProviderBookingsScreen from './components/ProviderBookingsScreen';
+import FollowersScreen from './components/FollowersScreen';
+import FollowingScreen from './components/FollowingScreen';
 
 function ProtectedRoute({ user, loading, children }) {
   const logout = () => {
     localStorage.removeItem('user');
     localStorage.removeItem('token');
+    localStorage.removeItem('userId');
     window.location.href = '/';
   };
   
@@ -49,7 +53,8 @@ function App() {
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
-    if (storedUser) {
+    const storedToken = localStorage.getItem('token');
+    if (storedUser && storedToken) {
       try {
         const parsedUser = JSON.parse(storedUser);
         if (parsedUser && parsedUser.id) {
@@ -58,6 +63,8 @@ function App() {
       } catch (e) {
         console.error('Error parsing stored user:', e);
         localStorage.removeItem('user');
+        localStorage.removeItem('token');
+        localStorage.removeItem('userId');
       }
     }
     setLoading(false);
@@ -80,6 +87,8 @@ function App() {
       <Route path="/search/:q" element={<ProtectedRoute user={user} loading={loading}><SearchScreen isDesktop={isDesktop} /></ProtectedRoute>} />
       <Route path="/videos" element={<ProtectedRoute user={user} loading={loading}><VideosScreen isDesktop={isDesktop} /></ProtectedRoute>} />
       <Route path="/user/:id" element={<ProtectedRoute user={user} loading={loading}><ProfileScreen isDesktop={isDesktop} isViewingOther /></ProtectedRoute>} />
+      <Route path="/user/:id/followers" element={<ProtectedRoute user={user} loading={loading}><FollowersScreen isDesktop={isDesktop} /></ProtectedRoute>} />
+      <Route path="/user/:id/following" element={<ProtectedRoute user={user} loading={loading}><FollowingScreen isDesktop={isDesktop} /></ProtectedRoute>} />
       <Route path="/provider/:id" element={<ProtectedRoute user={user} loading={loading}><ProviderProfileScreen isDesktop={isDesktop} /></ProtectedRoute>} />
       <Route path="/provider/edit" element={<Navigate to="/profile" replace />} />
       <Route path="/dashboard" element={<ProtectedRoute user={user} loading={loading}><ProviderDashboard isDesktop={isDesktop} /></ProtectedRoute>} />

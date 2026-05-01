@@ -1,3 +1,4 @@
+// backend/controllers/followController.js
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const Follow = require('../models/Follow');
@@ -47,16 +48,17 @@ exports.followUser = async (req, res) => {
       return res.json({ success: true, following: false, message: 'Unfollowed successfully' });
     }
     
-    // Create direct follow (no request needed)
+    // For private profiles, you might want to create a follow request
+    // For now, create direct follow for simplicity
     await Follow.create({
       user: new mongoose.Types.ObjectId(userId),
       targetUser: new mongoose.Types.ObjectId(targetUserId),
     });
     
-    // Optionally notify the target user
+    // Notify the target user
     await Notification.create({
       user: new mongoose.Types.ObjectId(targetUserId),
-      type: 'follow_accepted',
+      type: 'new_follower',
       title: 'New Follower',
       text: `${fromUser.name} started following you`,
       fromUser: new mongoose.Types.ObjectId(userId),
@@ -68,7 +70,7 @@ exports.followUser = async (req, res) => {
       message: 'Following successfully'
     });
   } catch (error) {
-    console.error('Error in follow request:', error);
+    console.error('Error in followUser:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -77,39 +79,21 @@ exports.respondFollowRequest = async (req, res) => {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
     let userId = req.user.id.toString();
-    let { requestId, action, userId: bodyUserId } = req.body;
-    
-    console.log('respondFollowRequest - header userId:', userId, 'body userId:', bodyUserId, 'requestId:', requestId);
-    
-    // Also check body for userId in case frontend sends it there
-    if (!userId && bodyUserId) {
-      userId = bodyUserId;
-    }
+    let { requestId, action } = req.body;
     
     if (!requestId || !userId) {
       return res.status(400).json({ success: false, error: 'Missing requestId or userId' });
     }
 
-    // Handle case where userId might be an array (comma-separated values)
-    if (Array.isArray(userId)) {
-      userId = userId[0];
-    }
-    
-    // Trim whitespace and newlines
-    const requestIdStr = String(requestId).trim().replace(/[\r\n]/g, '');
-    const userIdStr = String(userId).trim().replace(/[\r\n]/g, '');
-    
-    console.log('respondFollowRequest - final userIdStr:', userIdStr, 'length:', userIdStr.length, 'isValid:', mongoose.Types.ObjectId.isValid(userIdStr));
-    
-    // Check with regex for exact 24 hex char match
-    const isValidObjectId = (id) => /^[a-fA-F0-9]{24}$/.test(id);
+    const requestIdStr = String(requestId).trim();
+    const userIdStr = String(userId).trim();
     
     if (!isValidObjectId(requestIdStr)) {
-      return res.status(400).json({ success: false, error: 'Invalid requestId format', received: requestIdStr, len: requestIdStr.length });
+      return res.status(400).json({ success: false, error: 'Invalid requestId format' });
     }
     
     if (!isValidObjectId(userIdStr)) {
-      return res.status(400).json({ success: false, error: 'Invalid user ID format', received: userIdStr, len: userIdStr.length });
+      return res.status(400).json({ success: false, error: 'Invalid user ID format' });
     }
 
     const followRequest = await FollowRequest.findById(requestIdStr)
@@ -168,7 +152,6 @@ exports.respondFollowRequest = async (req, res) => {
       });
       
       return res.json({ success: true, message: 'Follow request declined', following: false });
-
     } else {
       return res.status(400).json({ success: false, error: 'Invalid action. Must be "accept" or "decline"' });
     }
@@ -184,21 +167,17 @@ exports.respondFollowRequest = async (req, res) => {
 
 exports.getFollowRequests = async (req, res) => {
   try {
-    console.log('[getFollowRequests] Request received', { headers: req.headers });
     if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
     const userId = req.user.id.toString();
-    console.log('[getFollowRequests] userId:', userId);
     
-    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
-      console.log('[getFollowRequests] Invalid userId');
-      return res.status(400).json({ success: false, error: 'Invalid userId' });
+    if (!userId || !isValidObjectId(userId)) {
+      return res.json([]);
     }
     
     const pendingRequests = await FollowRequest.find({ 
       toUser: new mongoose.Types.ObjectId(userId), 
       status: 'pending' 
     }).populate('fromUser', 'name avatar').lean();
-    console.log('[getFollowRequests] Found requests:', pendingRequests.length);
     
     const requestsData = pendingRequests.map(r => ({
       id: r._id.toString(),
@@ -213,11 +192,12 @@ exports.getFollowRequests = async (req, res) => {
     
     res.json(requestsData);
   } catch (error) {
-    console.error('[getFollowRequests] Error:', error.message, error.stack);
+    console.error('[getFollowRequests] Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 };
 
+// FIXED: Returns array of user objects with id property
 exports.getFollowing = async (req, res) => {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });

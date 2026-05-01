@@ -39,6 +39,34 @@ io.on('connection', (socket) => {
       io.emit('onlineUsers', Array.from(onlineUsers.keys()));
     }
   });
+
+  // Booking events
+  socket.on('booking_created', (data) => {
+    const { providerId, bookingId, service } = data;
+    io.to(`user:${providerId}`).emit('new_booking_notification', {
+      bookingId,
+      service,
+      message: 'New booking request received'
+    });
+  });
+
+  socket.on('booking_confirmed', (data) => {
+    const { clientId, bookingId } = data;
+    io.to(`user:${clientId}`).emit('booking_status_updated', {
+      bookingId,
+      status: 'confirmed',
+      message: 'Your booking has been confirmed'
+    });
+  });
+
+  socket.on('booking_completed', (data) => {
+    const { clientId, bookingId } = data;
+    io.to(`user:${clientId}`).emit('booking_status_updated', {
+      bookingId,
+      status: 'completed',
+      message: 'Service has been marked as completed'
+    });
+  });
 });
 
 const PORT = process.env.PORT || 3001;

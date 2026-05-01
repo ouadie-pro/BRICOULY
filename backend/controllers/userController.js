@@ -90,7 +90,7 @@ exports.getProviders = async (req, res) => {
         bio: p.bio || p.user.bio || '',
         hourlyRate: p.hourlyRate,
         responseTime: p.responseTime || '< 1h',
-        distance: p.distance || 1.0,
+        distance: null, // Remove fake distance - will be calculated with real geolocation
         experience: p.experience || '1 Year Exp.',
         verified: p.verified || false,
         rating: stats.rating,

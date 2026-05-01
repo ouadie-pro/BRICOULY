@@ -19,6 +19,7 @@ router.get('/:id/stats', async (req, res) => {
     const User = require('../models/User');
     const Message = require('../models/Message');
     const Provider = require('../models/Provider');
+    const Booking = require('../models/Booking');
     const { id } = req.params;
     
     // Find provider document
@@ -45,9 +46,9 @@ router.get('/:id/stats', async (req, res) => {
       ? Math.round((reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length) * 10) / 10
       : 0;
     
-    // Count unread messages (Message where receiverId = id AND read = false)
+    // Count unread messages (Message where receiver = id AND read = false)
     const unreadMessages = await Message.countDocuments({
-      receiverId: id,
+      receiver: id,
       read: false
     });
     
@@ -55,16 +56,24 @@ router.get('/:id/stats', async (req, res) => {
     const user = await User.findById(id);
     const profileViews = user?.profileViews || 0;
     
+    // Calculate total earnings from completed bookings
+    const completedBookings = await Booking.find({ 
+      provider: provider._id, 
+      status: 'completed' 
+    });
+    const totalEarnings = completedBookings.reduce((sum, b) => sum + (b.price || 0), 0);
+    
     res.json({
       jobsDone,
       activeJobs,
       rating,
       unreadMessages,
-      profileViews
+      profileViews,
+      totalEarnings
     });
   } catch (error) {
     console.error('Stats error:', error);
-    res.json({ jobsDone: 0, activeJobs: 0, rating: 0, unreadMessages: 0, profileViews: 0 });
+    res.json({ jobsDone: 0, activeJobs: 0, rating: 0, unreadMessages: 0, profileViews: 0, totalEarnings: 0 });
   }
 });
 

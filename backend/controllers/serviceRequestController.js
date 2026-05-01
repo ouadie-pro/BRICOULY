@@ -617,6 +617,7 @@ exports.cancelApplication = async (req, res) => {
   }
 };
 
+
 exports.completeRequest = async (req, res) => {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });

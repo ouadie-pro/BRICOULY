@@ -1,6 +1,9 @@
+// backend/controllers/authController.js
 const User = require('../models/User');
 const Provider = require('../models/Provider');
 const { generateToken } = require('../middleware/authMiddleware');
+const fs = require('fs');
+const path = require('path');
 
 const SERVICE_SPECIALIZATIONS = User.SERVICE_SPECIALIZATIONS;
 
@@ -100,7 +103,7 @@ exports.login = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Email and password are required' });
     }
     
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
     
     if (!user) {
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
@@ -143,17 +146,21 @@ exports.login = async (req, res) => {
 
 exports.getMe = async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Check both JWT and x-user-id for compatibility
+    let userId = null;
+    
+    if (req.user && req.user.id) {
+      userId = req.user.id.toString();
+    } else {
+      // Fallback to x-user-id header
+      userId = req.headers['x-user-id'];
+    }
+    
+    if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     
-    const token = authHeader.split(' ')[1];
-    const jwt = require('jsonwebtoken');
-    const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-    
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(decoded.id);
+    const user = await User.findById(userId);
     
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -178,25 +185,30 @@ exports.getMe = async (req, res) => {
       createdAt: user.createdAt,
     });
   } catch (error) {
-    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
-      return res.status(401).json({ error: 'Invalid or expired token' });
-    }
     res.status(500).json({ error: error.message });
   }
 };
 
 exports.updateProfile = async (req, res) => {
   try {
-    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
-    const userId = req.user.id.toString();
+    let userId = null;
     
-    const { name, phone, location, avatar, bio, city, specialization, hourlyRate } = req.body;
+    if (req.user && req.user.id) {
+      userId = req.user.id.toString();
+    } else {
+      userId = req.headers['x-user-id'];
+    }
+    
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    
+    const { name, phone, location, bio, city, specialization, hourlyRate } = req.body;
     
     const updateData = {};
     if (name) updateData.name = name;
     if (phone !== undefined) updateData.phone = phone;
     if (location !== undefined) updateData.location = location;
-    if (avatar !== undefined) updateData.avatar = avatar;
     if (bio !== undefined) updateData.bio = bio;
     if (city !== undefined) updateData.city = city;
     
@@ -204,7 +216,9 @@ exports.updateProfile = async (req, res) => {
       await User.findByIdAndUpdate(userId, updateData);
     }
     
-    if (req.user?.role === 'provider') {
+    const user = await User.findById(userId);
+    
+    if (user.role === 'provider') {
       const providerUpdate = {};
       if (bio !== undefined) providerUpdate.bio = bio;
       if (specialization) {
@@ -225,7 +239,6 @@ exports.updateProfile = async (req, res) => {
       }
     }
     
-    const user = await User.findById(userId);
     const provider = await Provider.findOne({ user: user._id });
     
     res.json({ 
@@ -253,13 +266,43 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
+// FIXED: Added file validation for avatar upload
 exports.uploadAvatar = async (req, res) => {
   try {
-    if (!req.user) return res.status(401).json({ success: false, error: 'Unauthorized' });
-    const userId = req.user.id.toString();
+    let userId = null;
+    
+    if (req.user && req.user.id) {
+      userId = req.user.id.toString();
+    } else {
+      userId = req.headers['x-user-id'];
+    }
+    
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
     
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'No file uploaded' });
+    }
+    
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(req.file.mimetype)) {
+      // Delete the uploaded file if invalid
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid file type. Only JPEG, PNG, WebP, and GIF are allowed.' 
+      });
+    }
+    
+    // Validate file size (max 5MB)
+    if (req.file.size > 5 * 1024 * 1024) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ 
+        success: false, 
+        error: 'File too large. Maximum size is 5MB.' 
+      });
     }
     
     const avatarUrl = `/uploads/${req.file.filename}`;
@@ -275,6 +318,10 @@ exports.uploadAvatar = async (req, res) => {
     
     res.json({ success: true, filePath: avatarUrl });
   } catch (error) {
+    // Clean up uploaded file if error occurs
+    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
     res.status(500).json({ error: error.message });
   }
 };

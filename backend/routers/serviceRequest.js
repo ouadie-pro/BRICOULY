@@ -34,6 +34,8 @@ router.delete('/:id', auth, deleteRequest);
 
 router.post('/:id/apply', auth, applyToRequest);
 
+router.delete('/:id/cancel-application', auth, cancelApplication);
+
 router.delete('/:id/applications/:applicationId', auth, cancelApplication);
 
 router.put('/:id/applications/:applicationId/status', auth, updateApplicationStatus);
