@@ -62,9 +62,8 @@ const reviewSchema = new mongoose.Schema({
   },
 });
 
-reviewSchema.pre('save', function(next) {
+reviewSchema.pre('save', async function() {
   this.updatedAt = new Date();
-  next();
 });
 
 reviewSchema.index({ clientId: 1, provider: 1 });

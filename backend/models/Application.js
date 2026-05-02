@@ -41,9 +41,8 @@ const applicationSchema = new mongoose.Schema({
 applicationSchema.index({ post: 1, user: 1 }, { unique: true });
 applicationSchema.index({ post: 1, provider: 1 });
 
-applicationSchema.pre('save', function(next) {
+applicationSchema.pre('save', async function() {
   this.updatedAt = new Date();
-  next();
 });
 
 module.exports = mongoose.model('Application', applicationSchema);

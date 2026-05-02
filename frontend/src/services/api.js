@@ -455,6 +455,10 @@ export const api = {
   },
 
   checkCanReview: async (providerId) => {
+    // Ensure providerId is a valid string ID
+    if (!providerId) {
+      return { success: true, canReview: false, reason: 'No provider specified' };
+    }
     return safeFetch(`${API_BASE}/reviews/can-review/${providerId}`);
   },
 

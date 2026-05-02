@@ -137,36 +137,38 @@ export default function RatingModal({
     setError('');
 
     try {
+      // Ensure providerId is correct - it might be the user ID
+      let providerIdValue = provider.id || provider._id || providerId;
+      
       const reviewData = {
-        providerId: provider.id || provider._id,
+        providerId: providerIdValue,
         rating: selectedRating,
         comment: comment.trim(),
-        punctuality,
-        professionalism,
-        quality,
+        punctuality: punctuality,
+        professionalism: professionalism,
+        quality: quality,
       };
       
+      // Add booking or service request ID if available
       if (booking) {
         reviewData.bookingId = booking._id || booking.id;
-        reviewData.serviceName = booking.service;
       } else if (serviceRequest) {
         reviewData.serviceRequestId = serviceRequest._id || serviceRequest.id;
-        reviewData.serviceName = serviceRequest.title;
       } else if (canReview?.bookingId) {
         reviewData.bookingId = canReview.bookingId;
-        reviewData.serviceName = canReview.serviceName;
       } else if (canReview?.serviceRequestId) {
         reviewData.serviceRequestId = canReview.serviceRequestId;
-        reviewData.serviceName = canReview.serviceName;
       }
       
       if (existingReview) {
         reviewData.reviewId = existingReview.id || existingReview._id;
       }
-
+      
+      console.log('Review data being sent:', reviewData);
+      
       const result = await api.submitReview(reviewData);
 
-      if (result.success || result.review) {
+      if (result.success === true || result.review) {
         setSuccess(true);
         if (onReviewSubmitted) {
           onReviewSubmitted({
